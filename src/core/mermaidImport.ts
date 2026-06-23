@@ -1,0 +1,1130 @@
+import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, DiagramDirection, NodeStyle } from './types';
+import { NODE_SIZE_DEFAULTS } from './nodeSizeConfig';
+
+export type MermaidImportWarningType =
+  | 'unsupportedDiagramType'
+  | 'unsupportedShape'
+  | 'unsupportedEdge'
+  | 'unsupportedDirective'
+  | 'unsupportedStyle'
+  | 'unsupportedClass'
+  | 'unsupportedSubgraph'
+  | 'lineSkipped'
+  | 'labelSanitized'
+  | 'duplicateId'
+  | 'layoutFallback'
+  | 'ampersandSkipped';
+
+export interface MermaidImportWarning {
+  type: MermaidImportWarningType;
+  line?: number;
+  message: string;
+  raw?: string;
+}
+
+export interface MermaidImportResult {
+  diagram: CanonicalDiagram;
+  warnings: MermaidImportWarning[];
+}
+
+interface ParsedNode {
+  id: string;
+  shape?: NodeShape;
+  label?: string;
+  style?: NodeStyle;
+  line?: number;
+}
+
+interface ParsedEdge {
+  from: string;
+  to: string;
+  style: EdgeStyle;
+  label: string;
+  unsupported: boolean;
+  rawOperator: string;
+  line?: number;
+}
+
+// Helpers for unescaping & sanitization
+function sanitizeAndUnescapeLabel(rawLabel: string): { label: string; sanitized: boolean; bold?: boolean; italic?: boolean } {
+  let label = rawLabel;
+  let bold = false;
+  let italic = false;
+
+  // Check backtick markdown wrappers (e.g. `**bold**`, `_italic_`, `**_bolditalic_**`)
+  if (label.startsWith('`') && label.endsWith('`')) {
+    label = label.slice(1, -1);
+    
+    // We try to unwrap bold-italic, bold, or italic
+    // Case 1: **_text_** or __*text*__
+    const boldItalicMatch = label.match(/^(\*\*|__)([*_])(.*)\2\1$/) || label.match(/^([*_])(\*\*|__)(.*)\2\1$/);
+    if (boldItalicMatch) {
+      bold = true;
+      italic = true;
+      label = boldItalicMatch[3];
+    } else {
+      // Case 2: **text** or __text__
+      const boldMatch = label.match(/^(\*\*|__)(.*)\1$/);
+      if (boldMatch) {
+        bold = true;
+        label = boldMatch[2];
+      } else {
+        // Case 3: *text* or _text_
+        const italicMatch = label.match(/^([*_])(.*)\1$/);
+        if (italicMatch) {
+          italic = true;
+          label = italicMatch[2];
+        }
+      }
+    }
+  }
+
+  const beforeUnescape = label;
+  
+  // Unescape standard Mermaid/HTML entities
+  label = label.replace(/&amp;/g, '&');
+  label = label.replace(/&lt;/g, '<');
+  label = label.replace(/&gt;/g, '>');
+  label = label.replace(/#quot;/g, '"');
+  label = label.replace(/&quot;/g, '"');
+  label = label.replace(/#35;/g, '#');
+  label = label.replace(/\\\\/g, '\\');
+  label = label.replace(/<br\s*\/?>/gi, '\n');
+
+  const sanitized = (label !== rawLabel) || (label !== beforeUnescape);
+
+  return { label, sanitized, bold, italic };
+}
+
+// Helper to check if a line contains unquoted ampersands
+function hasUnquotedAmpersand(s: string): boolean {
+  let inDoubleQuotes = false;
+  let inSingleQuotes = false;
+  let inBackticks = false;
+
+  for (let i = 0; i < s.length; i++) {
+    const char = s[i];
+    if (char === '"' && !inSingleQuotes && !inBackticks) {
+      if (i === 0 || s[i - 1] !== '\\') {
+        inDoubleQuotes = !inDoubleQuotes;
+      }
+    } else if (char === "'" && !inDoubleQuotes && !inBackticks) {
+      if (i === 0 || s[i - 1] !== '\\') {
+        inSingleQuotes = !inSingleQuotes;
+      }
+    } else if (char === '`' && !inDoubleQuotes && !inSingleQuotes) {
+      inBackticks = !inBackticks;
+    } else if (char === '&' && !inDoubleQuotes && !inSingleQuotes && !inBackticks) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Helper to check for standard non-flowchart headers
+const NON_FLOWCHART_TYPES = [
+  'sequenceDiagram',
+  'classDiagram',
+  'erDiagram',
+  'gantt',
+  'journey',
+  'stateDiagram-v2',
+  'stateDiagram',
+  'mindmap',
+  'timeline',
+  'pie',
+  'quadrantChart',
+  'requirementDiagram',
+  'gitGraph',
+  'C4Context',
+];
+
+export function importMermaidFlowchart(code: string): MermaidImportResult {
+  // Phase 1 - Size and Empty Checks
+  if (code.length > 100 * 1024) {
+    throw new Error('Le diagramme dépasse la taille maximale (100 KB).');
+  }
+
+  if (!code || code.trim() === '') {
+    throw new Error('Le diagramme est vide.');
+  }
+
+  const warnings: MermaidImportWarning[] = [];
+  const lines = code.split(/\r?\n/);
+  
+  // Track original 1-indexed lines
+  let lineObjects = lines.map((text, idx) => ({ text, index: idx + 1 }));
+
+  // Strip YAML Frontmatter
+  const firstNonEmptyIdx = lineObjects.findIndex(line => line.text.trim() !== '');
+  if (firstNonEmptyIdx !== -1 && lineObjects[firstNonEmptyIdx].text.trim() === '---') {
+    const closingIdx = lineObjects.findIndex((line, idx) => idx > firstNonEmptyIdx && line.text.trim() === '---');
+    if (closingIdx !== -1) {
+      lineObjects = lineObjects.slice(closingIdx + 1);
+    }
+  }
+
+  // Identify Header & Direction
+  let direction: DiagramDirection = 'TD';
+  let headerFound = false;
+
+  for (let i = 0; i < lineObjects.length; i++) {
+    const lineObj = lineObjects[i];
+    const trimmed = lineObj.text.trim();
+
+    if (trimmed === '' || trimmed.startsWith('%%')) {
+      // Check if this is an init directive
+      if (trimmed.startsWith('%%{') && trimmed.includes('init')) {
+        warnings.push({
+          type: 'unsupportedDirective',
+          line: lineObj.index,
+          message: `Directive d'initialisation ignorée: "${trimmed}"`,
+          raw: trimmed,
+        });
+      }
+      continue;
+    }
+
+    // Check if it's a non-flowchart diagram type first
+    const cleanWord = trimmed.split(/[\s(]/)[0];
+    if (NON_FLOWCHART_TYPES.includes(cleanWord)) {
+      throw new Error('Only Mermaid flowcharts are supported for import in this version.');
+    }
+
+    // Match flowchart/graph header
+    // Allow graph TD, flowchart LR, etc.
+    const headerMatch = trimmed.match(/^\s*(graph|flowchart)\s+(TD|TB|LR|BT|RL)\s*$/i);
+    if (headerMatch) {
+      headerFound = true;
+      const dir = headerMatch[2].toUpperCase();
+      if (dir === 'TB') {
+        direction = 'TD';
+      } else {
+        direction = dir as DiagramDirection;
+      }
+      // Remove header line from parsing loop
+      lineObjects = lineObjects.slice(i + 1);
+      break;
+    } else {
+      // If we hit any non-empty non-comment line before a valid header, or it's just invalid
+      throw new Error('Only Mermaid flowcharts are supported for import in this version.');
+    }
+  }
+
+  if (!headerFound) {
+    throw new Error('Only Mermaid flowcharts are supported for import in this version.');
+  }
+
+  // Intermediate parsing structures
+  const parsedNodes: ParsedNode[] = [];
+  const parsedEdges: ParsedEdge[] = [];
+  
+  const subgraphStack: string[] = [];
+
+  // Phase 2 - Line-by-line Parsing
+  for (const lineObj of lineObjects) {
+    const text = lineObj.text.trim();
+    if (text === '' || text.startsWith('%%')) {
+      if (text.startsWith('%%{') && text.includes('init')) {
+        warnings.push({
+          type: 'unsupportedDirective',
+          line: lineObj.index,
+          message: `Directive d'initialisation ignorée: "${text}"`,
+          raw: text,
+        });
+      }
+      continue;
+    }
+
+    // Check for ampersand syntax in line (outside quotes)
+    if (hasUnquotedAmpersand(text)) {
+      warnings.push({
+        type: 'ampersandSkipped',
+        line: lineObj.index,
+        message: `Ligne ignorée car la syntaxe d'arête multiple '&' n'est pas supportée.`,
+        raw: text,
+      });
+      continue;
+    }
+
+    // Subgraph match
+    const subgraphMatch = text.match(/^subgraph\b\s*(.*)$/i);
+    if (subgraphMatch) {
+      subgraphStack.push(subgraphMatch[1] || 'subgraph');
+      warnings.push({
+        type: 'unsupportedSubgraph',
+        line: lineObj.index,
+        message: `Le regroupement visuel des sous-graphes n'est pas supporté. Son contenu sera importé à plat.`,
+        raw: text,
+      });
+      continue;
+    }
+
+    // End match (only closes subgraph if stack is not empty)
+    if (text.toLowerCase() === 'end' && subgraphStack.length > 0) {
+      subgraphStack.pop();
+      continue;
+    }
+
+    // ClassDef & Class ignore
+    if (text.startsWith('classDef ') || text.startsWith('class ')) {
+      warnings.push({
+        type: 'unsupportedClass',
+        line: lineObj.index,
+        message: `Déclaration de classe ignorée: "${text}"`,
+        raw: text,
+      });
+      continue;
+    }
+
+    // Click ignore
+    if (text.startsWith('click ')) {
+      // Ignored silently for security
+      continue;
+    }
+
+    // Style parsing (best effort)
+    if (text.startsWith('style ')) {
+      const parts = text.substring(6).trim().split(/\s+/);
+      const nodeId = parts[0];
+      const stylePayload = parts.slice(1).join(' ');
+      
+      const nodeStyle: NodeStyle = {};
+      let hasStyles = false;
+      let hasUnsupportedStyles = false;
+
+      // Extract styles like fill:#fff,stroke:#333
+      const stylePairs = stylePayload.split(/[\s,]+/);
+      for (const pair of stylePairs) {
+        if (!pair) continue;
+        const [key, value] = pair.split(':').map(s => s.trim());
+        if (key && value) {
+          hasStyles = true;
+          if (key === 'fill') {
+            nodeStyle.backgroundColor = value;
+          } else if (key === 'stroke') {
+            nodeStyle.borderColor = value;
+          } else if (key === 'color') {
+            nodeStyle.text = { ...nodeStyle.text, color: value };
+          } else if (key === 'font-size') {
+            const num = parseInt(value, 10);
+            if (!isNaN(num)) {
+              nodeStyle.text = { ...nodeStyle.text, fontSize: num };
+            }
+          } else if (key === 'font-weight' && value === 'bold') {
+            nodeStyle.text = { ...nodeStyle.text, bold: true };
+          } else {
+            hasUnsupportedStyles = true;
+          }
+        }
+      }
+
+      if (hasStyles) {
+        parsedNodes.push({
+          id: nodeId,
+          style: nodeStyle,
+          line: lineObj.index,
+        });
+      }
+      
+      if (hasUnsupportedStyles || !hasStyles) {
+        warnings.push({
+          type: 'unsupportedStyle',
+          line: lineObj.index,
+          message: `Styles partiellement non supportés sur "${nodeId}": "${stylePayload}"`,
+          raw: text,
+        });
+      }
+      continue;
+    }
+
+    // Parse general node and edge chains
+    const chainElements = parseChain(text, lineObj.index, warnings);
+    if (!chainElements || chainElements.length === 0) {
+      warnings.push({
+        type: 'lineSkipped',
+        line: lineObj.index,
+        message: `Ligne ignorée car elle n'a pas pu être analysée.`,
+        raw: text,
+      });
+      continue;
+    }
+
+    // Process parsed elements from the chain
+    // The chain must alternate Node, Edge, Node, Edge, Node ...
+    // Verify structure
+    let isValidChain = true;
+    if (chainElements.length % 2 === 0) {
+      // Must be odd number of items: Node, Edge, Node
+      isValidChain = false;
+    } else {
+      for (let j = 0; j < chainElements.length; j++) {
+        const isNodeIndex = j % 2 === 0;
+        const item = chainElements[j];
+        if (isNodeIndex && !('id' in item)) {
+          isValidChain = false;
+          break;
+        }
+        if (!isNodeIndex && !('from' in item)) {
+          isValidChain = false;
+          break;
+        }
+      }
+    }
+
+    if (!isValidChain) {
+      warnings.push({
+        type: 'lineSkipped',
+        line: lineObj.index,
+        message: `Ligne ignorée car la structure de chaîne de diagramme est invalide.`,
+        raw: text,
+      });
+      continue;
+    }
+
+    // Add nodes and edges from valid chain
+    for (let j = 0; j < chainElements.length; j++) {
+      if (j % 2 === 0) {
+        parsedNodes.push(chainElements[j] as ParsedNode);
+      } else {
+        const edge = chainElements[j] as ParsedEdge;
+        // The parser set placeholder from/to since it doesn't know adjacent nodes in parseChain
+        // Set them now
+        edge.from = (chainElements[j - 1] as ParsedNode).id;
+        edge.to = (chainElements[j + 1] as ParsedNode).id;
+        parsedEdges.push(edge);
+      }
+    }
+  }
+
+  // Phase 3 - Post-processing & Overwrite resolution (Last wins)
+  const nodesMap = new Map<string, DiagramNode & { isExplicit: boolean }>();
+  const orderOfAppearance: string[] = [];
+
+  for (const pNode of parsedNodes) {
+    const { id, shape, label, style } = pNode;
+    
+    // Unescape & sanitize label if provided
+    let finalLabel = label;
+    let nodeStylePatch: NodeStyle | undefined = style;
+    
+    if (label !== undefined) {
+      const res = sanitizeAndUnescapeLabel(label);
+      finalLabel = res.label;
+      if (res.sanitized) {
+        warnings.push({
+          type: 'labelSanitized',
+          line: pNode.line,
+          message: `Libellé du nœud "${id}" nettoyé/décodé.`,
+          raw: label,
+        });
+      }
+      if (res.bold || res.italic) {
+        nodeStylePatch = {
+          ...nodeStylePatch,
+          text: {
+            ...nodeStylePatch?.text,
+            bold: res.bold || nodeStylePatch?.text?.bold,
+            italic: res.italic || nodeStylePatch?.text?.italic,
+          }
+        };
+      }
+    }
+
+    const isExplicitDefinition = (shape !== undefined || label !== undefined);
+
+    if (nodesMap.has(id)) {
+      const existing = nodesMap.get(id)!;
+      if (isExplicitDefinition) {
+        if (existing.isExplicit) {
+          warnings.push({
+            type: 'duplicateId',
+            line: pNode.line,
+            message: `Identifiant de nœud doublon "${id}". La dernière définition explicite écrase les précédentes.`,
+            raw: id,
+          });
+        }
+        
+        // Overwrite properties
+        existing.shape = shape || 'process';
+        existing.label = finalLabel !== undefined ? finalLabel : id;
+        existing.isExplicit = true;
+      }
+      
+      // Merge styles
+      if (nodeStylePatch) {
+        existing.style = {
+          ...existing.style,
+          ...nodeStylePatch,
+          text: {
+            ...existing.style?.text,
+            ...nodeStylePatch.text,
+          }
+        };
+      }
+    } else {
+      orderOfAppearance.push(id);
+      nodesMap.set(id, {
+        id,
+        label: finalLabel !== undefined ? finalLabel : id,
+        shape: shape || 'process',
+        position: { x: 0, y: 0 },
+        isExplicit: isExplicitDefinition,
+        style: nodeStylePatch,
+      });
+    }
+  }
+
+  // Create implicit nodes that are referenced in edges but never explicitly defined
+  for (const edge of parsedEdges) {
+    if (!nodesMap.has(edge.from)) {
+      orderOfAppearance.push(edge.from);
+      nodesMap.set(edge.from, {
+        id: edge.from,
+        label: edge.from,
+        shape: 'process',
+        position: { x: 0, y: 0 },
+        isExplicit: false,
+      });
+    }
+    if (!nodesMap.has(edge.to)) {
+      orderOfAppearance.push(edge.to);
+      nodesMap.set(edge.to, {
+        id: edge.to,
+        label: edge.to,
+        shape: 'process',
+        position: { x: 0, y: 0 },
+        isExplicit: false,
+      });
+    }
+  }
+
+  // Map final DiagramNodes and assign default sizes
+  const finalNodes: DiagramNode[] = Array.from(nodesMap.values()).map(node => {
+    const size = NODE_SIZE_DEFAULTS[node.shape] || NODE_SIZE_DEFAULTS.process;
+    return {
+      id: node.id,
+      label: node.label,
+      shape: node.shape,
+      position: node.position,
+      width: size.width,
+      height: size.height,
+      style: node.style,
+    };
+  });
+
+  // Convert parsed edges to final DiagramEdges
+  let edgeCounter = 1;
+  const finalEdges: DiagramEdge[] = parsedEdges.map(edge => {
+    if (edge.unsupported) {
+      warnings.push({
+        type: 'unsupportedEdge',
+        line: edge.line,
+        message: `L'opérateur d'arête "${edge.rawOperator}" n'est pas supporté. Remplacé par une arête standard.`,
+        raw: edge.rawOperator,
+      });
+    }
+
+    let finalEdgeLabel = edge.label;
+    if (edge.label) {
+      const res = sanitizeAndUnescapeLabel(edge.label);
+      finalEdgeLabel = res.label;
+      if (res.sanitized) {
+        warnings.push({
+          type: 'labelSanitized',
+          line: edge.line,
+          message: `Libellé de la liaison de "${edge.from}" vers "${edge.to}" nettoyé.`,
+          raw: edge.label,
+        });
+      }
+    }
+
+    return {
+      id: `e${edgeCounter++}`,
+      from: edge.from,
+      to: edge.to,
+      label: finalEdgeLabel,
+      style: edge.style,
+    };
+  });
+
+  // Layout Computation
+  const usedLayoutFallback = computeLayout(finalNodes, finalEdges, direction, orderOfAppearance);
+
+  if (usedLayoutFallback) {
+    warnings.push({
+      type: 'layoutFallback',
+      message: 'La disposition a détecté des cycles ou des portions isolées. Les positions ont été estimées.',
+    });
+  }
+
+  const diagram: CanonicalDiagram = {
+    schemaVersion: 1,
+    diagramType: 'flowchart',
+    direction,
+    nodes: finalNodes,
+    edges: finalEdges,
+    textBoxes: [],
+  };
+
+  return { diagram, warnings };
+}
+
+// Phase 2 details: parses a single line for a chain of nodes and edges
+function parseChain(lineText: string, lineIndex: number, warnings: MermaidImportWarning[]): (ParsedNode | ParsedEdge)[] | null {
+  const result: (ParsedNode | ParsedEdge)[] = [];
+  let i = 0;
+  const s = lineText.trim();
+  if (!s) return null;
+
+  while (i < s.length) {
+    // Skip whitespace
+    while (i < s.length && /\s/.test(s[i])) i++;
+    if (i >= s.length) break;
+
+    // 1. Scan Node Reference
+    const nodeRes = scanNodeRef(s, i, lineIndex, warnings);
+    if (!nodeRes) {
+      return null; // parse failure
+    }
+    result.push(nodeRes.node);
+    i = nodeRes.nextIndex;
+
+    // Skip whitespace
+    while (i < s.length && /\s/.test(s[i])) i++;
+    if (i >= s.length) break;
+
+    // 2. Scan Edge Reference
+    const edgeRes = scanEdgeRef(s, i);
+    if (!edgeRes) {
+      // If we are at the end of string or hit something else, it might be a parse error
+      // unless we successfully finished at a node, but we checked whitespace and we aren't at end
+      return null;
+    }
+    result.push(edgeRes.edge);
+    i = edgeRes.nextIndex;
+  }
+
+  return result;
+}
+
+// Character-by-character scanner for node definitions
+interface ClassicBracketConfig {
+  open: string;
+  close: string;
+  shape: NodeShape;
+}
+
+const CLASSIC_BRACKETS: ClassicBracketConfig[] = [
+  { open: '(((', close: ')))', shape: 'endEvent' },
+  { open: '((', close: '))', shape: 'event' },
+  { open: '([', close: '])', shape: 'stadium' },
+  { open: '[(', close: ')]', shape: 'database' },
+  { open: '[[', close: ']]', shape: 'subroutine' },
+  { open: '{{', close: '}}', shape: 'hexagon' },
+  { open: '[/', close: '/]', shape: 'parallelogram' }, // parallelogram can also match [/ ... \] as trapezoid
+  { open: '[\\', close: '\\\\]', shape: 'parallelogramAlt' }, // parallelogramAlt can also match [\ ... /] as trapezoidAlt
+  { open: '[', close: ']', shape: 'process' },
+  { open: '(', close: ')', shape: 'rounded' },
+  { open: '{', close: '}', shape: 'decision' },
+  { open: '>', close: ']', shape: 'asymmetric' },
+];
+
+function scanNodeRef(s: string, start: number, lineIndex: number, warnings: MermaidImportWarning[]): { node: ParsedNode; nextIndex: number } | null {
+  let idx = start;
+  
+  // Consume ID: alphanumeric, underscore, hyphen, dot
+  let id = '';
+  while (idx < s.length && /[a-zA-Z0-9_.-]/.test(s[idx])) {
+    id += s[idx];
+    idx++;
+  }
+
+  if (!id) return null;
+
+  // Skip spacing
+  while (idx < s.length && /\s/.test(s[idx])) idx++;
+
+  // Check 11.3+ shape syntax: @{ shape: hex, label: "Text" }
+  if (idx < s.length - 1 && s[idx] === '@' && s[idx + 1] === '{') {
+    idx += 2; // skip @{
+    let payload = '';
+    while (idx < s.length && s[idx] !== '}') {
+      payload += s[idx];
+      idx++;
+    }
+    if (idx < s.length && s[idx] === '}') {
+      idx++; // skip }
+    } else {
+      return null; // unclosed @{}
+    }
+
+    // Parse shape: \w+
+    const shapeMatch = payload.match(/shape\s*:\s*([a-zA-Z0-9_-]+)/);
+    const labelMatch = payload.match(/label\s*:\s*"([^"]*)"/);
+
+    const mShape = shapeMatch ? shapeMatch[1] : 'rect';
+    const label = labelMatch ? labelMatch[1] : undefined;
+
+    // Map 11.3+ shape
+    let shape: NodeShape;
+    let isUnsupported = false;
+
+    switch (mShape) {
+      case 'rect': shape = 'process'; break;
+      case 'rounded': shape = 'rounded'; break;
+      case 'stadium': shape = 'stadium'; break;
+      case 'diamond': shape = 'decision'; break;
+      case 'circle': shape = 'event'; break;
+      case 'dbl-circ': shape = 'endEvent'; break;
+      case 'cyl': shape = 'database'; break;
+      case 'doc': shape = 'file'; break;
+      case 'docs': shape = 'documents'; break;
+      case 'subproc': shape = 'subroutine'; break;
+      case 'hex': shape = 'hexagon'; break;
+      case 'lean-r': shape = 'parallelogram'; break;
+      case 'lean-l': shape = 'parallelogramAlt'; break;
+      case 'trap-b': shape = 'trapezoid'; break;
+      case 'trap-t': shape = 'trapezoidAlt'; break;
+      default:
+        shape = 'process';
+        isUnsupported = true;
+        break;
+    }
+
+    if (isUnsupported) {
+      warnings.push({
+        type: 'unsupportedShape',
+        line: lineIndex,
+        message: `Forme non supportée "${mShape}" sur le nœud "${id}". Remplacée par "process".`,
+        raw: mShape,
+      });
+    }
+
+    return {
+      node: { id, shape, label, line: lineIndex },
+      nextIndex: idx
+    };
+  }
+
+  // Check classic shapes
+  for (const config of CLASSIC_BRACKETS) {
+    const openLen = config.open.length;
+    if (s.substring(idx, idx + openLen) === config.open) {
+      idx += openLen;
+
+      // Scan label content
+      let label = '';
+      let labelSanityCheckIndex = idx;
+      
+      // If label starts with quote
+      if (s[labelSanityCheckIndex] === '"') {
+        labelSanityCheckIndex++;
+        while (labelSanityCheckIndex < s.length && s[labelSanityCheckIndex] !== '"') {
+          if (s[labelSanityCheckIndex] === '\\' && s[labelSanityCheckIndex + 1] === '"') {
+            label += '"';
+            labelSanityCheckIndex += 2;
+          } else {
+            label += s[labelSanityCheckIndex];
+            labelSanityCheckIndex++;
+          }
+        }
+        if (s[labelSanityCheckIndex] === '"') {
+          labelSanityCheckIndex++;
+        }
+        idx = labelSanityCheckIndex;
+      } else {
+        // Unquoted: scan until closing bracket sequence
+        // We need to look ahead for the exact closing sequence
+        // For trapezoids, the closing sequences might differ
+        let actualClose = config.close;
+        if (config.open === '[/') {
+          // Check if ending with \] or /]
+          const slashEnd = s.indexOf('/]', idx);
+          const backslashEnd = s.indexOf('\\]', idx);
+          if (slashEnd !== -1 && (backslashEnd === -1 || slashEnd < backslashEnd)) {
+            actualClose = '/]';
+          } else if (backslashEnd !== -1) {
+            actualClose = '\\]';
+          }
+        } else if (config.open === '[\\') {
+          const slashEnd = s.indexOf('/]', idx);
+          const backslashEnd = s.indexOf('\\]', idx);
+          if (backslashEnd !== -1 && (slashEnd === -1 || backslashEnd < slashEnd)) {
+            actualClose = '\\]';
+          } else if (slashEnd !== -1) {
+            actualClose = '/]';
+          }
+        }
+
+        const closeIdx = s.indexOf(actualClose, idx);
+        if (closeIdx === -1) {
+          return null; // unclosed bracket
+        }
+        label = s.substring(idx, closeIdx);
+        idx = closeIdx;
+      }
+
+      // Check closing bracket match
+      let actualClose = config.close;
+      let finalShape = config.shape;
+
+      if (config.open === '[/') {
+        if (s.substring(idx, idx + 2) === '/]') {
+          actualClose = '/]';
+          finalShape = 'parallelogram';
+        } else if (s.substring(idx, idx + 2) === '\\]') {
+          actualClose = '\\]';
+          finalShape = 'trapezoid';
+        }
+      } else if (config.open === '[\\') {
+        if (s.substring(idx, idx + 2) === '\\]') {
+          actualClose = '\\]';
+          finalShape = 'parallelogramAlt';
+        } else if (s.substring(idx, idx + 2) === '/]') {
+          actualClose = '/]';
+          finalShape = 'trapezoidAlt';
+        }
+      }
+
+      if (s.substring(idx, idx + actualClose.length) !== actualClose) {
+        return null; // mismatch
+      }
+
+      idx += actualClose.length;
+
+      return {
+        node: { id, shape: finalShape, label, line: lineIndex },
+        nextIndex: idx
+      };
+    }
+  }
+
+  // Node reference without shape definition
+  return {
+    node: { id, line: lineIndex },
+    nextIndex: idx
+  };
+}
+
+// Character-by-character scanner for edges
+function scanEdgeRef(s: string, start: number): { edge: ParsedEdge; nextIndex: number } | null {
+  let idx = start;
+
+  const matchPrefix = (prefix: string): boolean => {
+    return s.substring(idx, idx + prefix.length) === prefix;
+  };
+
+  // 1. Dotted arrow with label: -. text .->
+  if (matchPrefix('-.') && idx + 2 < s.length && s[idx + 2] !== '-' && s[idx + 2] !== '>') {
+    idx += 2;
+    // skip spaces
+    while (idx < s.length && /\s/.test(s[idx])) idx++;
+    const endIdx = s.indexOf('.->', idx);
+    if (endIdx === -1) return null;
+    const label = s.substring(idx, endIdx).trim();
+    idx = endIdx + 3;
+    return {
+      edge: { from: '', to: '', style: 'dotted', label, unsupported: false, rawOperator: '-. label .->' },
+      nextIndex: idx
+    };
+  }
+
+  // 2. Dotted arrow: -.->
+  if (matchPrefix('-.->')) {
+    return {
+      edge: { from: '', to: '', style: 'dotted', label: '', unsupported: false, rawOperator: '-.->' },
+      nextIndex: idx + 4
+    };
+  }
+
+  // 3. Thick arrow with label: == text ==>
+  if (matchPrefix('==') && idx + 2 < s.length && s[idx + 2] !== '>' && s[idx + 2] !== '=') {
+    idx += 2;
+    while (idx < s.length && /\s/.test(s[idx])) idx++;
+    const endIdx = s.indexOf('==>', idx);
+    if (endIdx === -1) return null;
+    const label = s.substring(idx, endIdx).trim();
+    idx = endIdx + 3;
+    return {
+      edge: { from: '', to: '', style: 'solid', label, unsupported: true, rawOperator: `== ${label} ==>` },
+      nextIndex: idx
+    };
+  }
+
+  // 4. Thick arrow: ==>
+  if (matchPrefix('==>')) {
+    return {
+      edge: { from: '', to: '', style: 'solid', label: '', unsupported: true, rawOperator: '==>' },
+      nextIndex: idx + 3
+    };
+  }
+
+  // 5. Bidirectional arrow: <-->
+  if (matchPrefix('<-->')) {
+    return {
+      edge: { from: '', to: '', style: 'solid', label: '', unsupported: true, rawOperator: '<-->' },
+      nextIndex: idx + 4
+    };
+  }
+
+  // 6. Solid arrow with label type 2: -->|text|
+  if (matchPrefix('-->|')) {
+    idx += 4;
+    const endIdx = s.indexOf('|', idx);
+    if (endIdx === -1) return null;
+    const label = s.substring(idx, endIdx);
+    idx = endIdx + 1;
+    return {
+      edge: { from: '', to: '', style: 'solid', label, unsupported: false, rawOperator: `-->|${label}|` },
+      nextIndex: idx
+    };
+  }
+
+  // 7. Solid arrow: -->
+  if (matchPrefix('-->')) {
+    return {
+      edge: { from: '', to: '', style: 'solid', label: '', unsupported: false, rawOperator: '-->' },
+      nextIndex: idx + 3
+    };
+  }
+
+  // 8. Undirected line: ---
+  if (matchPrefix('---')) {
+    return {
+      edge: { from: '', to: '', style: 'solid', label: '', unsupported: true, rawOperator: '---' },
+      nextIndex: idx + 3
+    };
+  }
+
+  // 9. Solid arrow with label type 1: -- text -->
+  if (matchPrefix('--') && idx + 2 < s.length && s[idx + 2] !== '-' && s[idx + 2] !== '>') {
+    idx += 2;
+    // skip spaces
+    while (idx < s.length && /\s/.test(s[idx])) idx++;
+    const endIdx = s.indexOf('-->', idx);
+    if (endIdx === -1) return null;
+    const label = s.substring(idx, endIdx).trim();
+    idx = endIdx + 3;
+    return {
+      edge: { from: '', to: '', style: 'solid', label, unsupported: false, rawOperator: `-- ${label} -->` },
+      nextIndex: idx
+    };
+  }
+
+  return null;
+}
+
+// Spacing constants for diagram layers layout
+const IMPORT_LEVEL_SPACING = 220;
+const IMPORT_SIBLING_SPACING = 140;
+const IMPORT_COMPONENT_SPACING = 260;
+
+function computeLayout(
+  nodes: DiagramNode[],
+  edges: DiagramEdge[],
+  direction: DiagramDirection,
+  orderOfAppearance: string[]
+): boolean {
+  if (nodes.length === 0) return false;
+
+  // 1. Build Adjacency Representation (Undirected to find components)
+  const adjUndirected = new Map<string, string[]>();
+  for (const n of nodes) {
+    adjUndirected.set(n.id, []);
+  }
+  for (const e of edges) {
+    adjUndirected.get(e.from)?.push(e.to);
+    adjUndirected.get(e.to)?.push(e.from);
+  }
+
+  // 2. Find Connected Components
+  const visitedGlobal = new Set<string>();
+  const components: string[][] = [];
+
+  for (const nodeId of orderOfAppearance) {
+    if (!visitedGlobal.has(nodeId)) {
+      const component: string[] = [];
+      const stack: string[] = [nodeId];
+      visitedGlobal.add(nodeId);
+
+      while (stack.length > 0) {
+        const curr = stack.pop()!;
+        component.push(curr);
+        for (const neighbor of adjUndirected.get(curr) || []) {
+          if (!visitedGlobal.has(neighbor)) {
+            visitedGlobal.add(neighbor);
+            stack.push(neighbor);
+          }
+        }
+      }
+      
+      // Sort components nodes by their appearance in original order
+      component.sort((a, b) => orderOfAppearance.indexOf(a) - orderOfAppearance.indexOf(b));
+      components.push(component);
+    }
+  }
+
+  let layoutFallbackTriggered = false;
+
+  let componentOffsetX = 0;
+  let componentOffsetY = 0;
+
+  // 3. Layout each component separately
+  for (const comp of components) {
+    // Build directed adj list & compute indegrees
+    const adjDirected = new Map<string, string[]>();
+    const inDegree = new Map<string, number>();
+
+    for (const nodeId of comp) {
+      adjDirected.set(nodeId, []);
+      inDegree.set(nodeId, 0);
+    }
+
+    for (const e of edges) {
+      if (adjDirected.has(e.from) && adjDirected.has(e.to)) {
+        adjDirected.get(e.from)!.push(e.to);
+        inDegree.set(e.to, inDegree.get(e.to)! + 1);
+      }
+    }
+
+    // Source nodes (inDegree === 0)
+    let sources = comp.filter(id => inDegree.get(id) === 0);
+
+    if (sources.length === 0) {
+      // Cycle: select the first node by order of appearance
+      sources = [comp[0]];
+      layoutFallbackTriggered = true;
+    }
+
+    // BFS to assign layers
+    const layers = new Map<string, number>();
+    const queue: string[] = [];
+    const visitedBFS = new Set<string>();
+
+    for (const src of sources) {
+      layers.set(src, 0);
+      queue.push(src);
+      visitedBFS.add(src);
+    }
+
+    while (queue.length > 0) {
+      const curr = queue.shift()!;
+      const currLayer = layers.get(curr) || 0;
+
+      for (const neighbor of adjDirected.get(curr) || []) {
+        if (!visitedBFS.has(neighbor)) {
+          visitedBFS.add(neighbor);
+          layers.set(neighbor, currLayer + 1);
+          queue.push(neighbor);
+        } else {
+          // Alternate path / cycle: update to maximum layer to prevent loops
+          const oldLayer = layers.get(neighbor) || 0;
+          if (currLayer + 1 > oldLayer) {
+            layers.set(neighbor, currLayer + 1);
+            // We do not re-enqueue to prevent infinite loops on cycle
+            layoutFallbackTriggered = true;
+          }
+        }
+      }
+    }
+
+    // Handle any unreachable nodes (e.g. cycles disconnected from main source)
+    for (const nodeId of comp) {
+      if (!visitedBFS.has(nodeId)) {
+        layers.set(nodeId, 0);
+        layoutFallbackTriggered = true;
+      }
+    }
+
+    // Group by layer
+    const layerGroups: Map<number, string[]> = new Map();
+    for (const nodeId of comp) {
+      const L = layers.get(nodeId) || 0;
+      if (!layerGroups.has(L)) {
+        layerGroups.set(L, []);
+      }
+      layerGroups.get(L)!.push(nodeId);
+    }
+
+    // Sort nodes in each layer by their appearance
+    const sortedLayers = Array.from(layerGroups.keys()).sort((a, b) => a - b);
+    for (const L of sortedLayers) {
+      layerGroups.get(L)!.sort((a, b) => orderOfAppearance.indexOf(a) - orderOfAppearance.indexOf(b));
+    }
+
+    // Assign local positions
+    const nodesMap = new Map<string, DiagramNode>();
+    for (const n of nodes) {
+      nodesMap.set(n.id, n);
+    }
+
+    const localPositions = new Map<string, { x: number; y: number }>();
+    let compMinX = Infinity;
+    let compMaxX = -Infinity;
+    let compMinY = Infinity;
+    let compMaxY = -Infinity;
+
+    for (const L of sortedLayers) {
+      const layerNodes = layerGroups.get(L) || [];
+      const totalWidth = (layerNodes.length - 1) * IMPORT_SIBLING_SPACING;
+      
+      for (let siblingIdx = 0; siblingIdx < layerNodes.length; siblingIdx++) {
+        const nodeId = layerNodes[siblingIdx];
+        
+        let lx = 0;
+        let ly = 0;
+
+        const siblingOffset = layerNodes.length > 1 
+          ? (siblingIdx * IMPORT_SIBLING_SPACING) - (totalWidth / 2)
+          : 0;
+
+        if (direction === 'TD') {
+          lx = siblingOffset;
+          ly = L * IMPORT_LEVEL_SPACING;
+        } else if (direction === 'LR') {
+          lx = L * IMPORT_LEVEL_SPACING;
+          ly = siblingOffset;
+        } else if (direction === 'BT') {
+          lx = siblingOffset;
+          ly = -L * IMPORT_LEVEL_SPACING;
+        } else if (direction === 'RL') {
+          lx = -L * IMPORT_LEVEL_SPACING;
+          ly = siblingOffset;
+        }
+
+        localPositions.set(nodeId, { x: lx, y: ly });
+        
+        if (lx < compMinX) compMinX = lx;
+        if (lx > compMaxX) compMaxX = lx;
+        if (ly < compMinY) compMinY = ly;
+        if (ly > compMaxY) compMaxY = ly;
+      }
+    }
+
+    // Shift component positions by offsets to prevent overlaps
+    for (const nodeId of comp) {
+      const localPos = localPositions.get(nodeId)!;
+      const node = nodesMap.get(nodeId)!;
+
+      if (direction === 'TD' || direction === 'BT') {
+        node.position.x = Math.round(localPos.x - compMinX + componentOffsetX);
+        node.position.y = Math.round(localPos.y);
+      } else {
+        node.position.x = Math.round(localPos.x);
+        node.position.y = Math.round(localPos.y - compMinY + componentOffsetY);
+      }
+    }
+
+    // Increment offsets
+    if (direction === 'TD' || direction === 'BT') {
+      const compWidth = compMaxX - compMinX;
+      componentOffsetX += compWidth + IMPORT_COMPONENT_SPACING;
+    } else {
+      const compHeight = compMaxY - compMinY;
+      componentOffsetY += compHeight + IMPORT_COMPONENT_SPACING;
+    }
+  }
+
+  return layoutFallbackTriggered;
+}

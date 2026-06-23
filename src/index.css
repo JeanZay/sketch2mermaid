@@ -2179,3 +2179,104 @@ body {
     transform: scale(1);
   }
 }
+
+/* ============================================================
+   Import Mermaid Modal Styles
+   ============================================================ */
+
+.mermaid-import-modal-content {
+  max-width: 640px !important;
+}
+
+.mermaid-import-textarea {
+  width: 100%;
+  height: 240px;
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 14px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+  margin-top: 10px;
+  margin-bottom: 8px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mermaid-import-textarea:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.mermaid-import-error {
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  color: #f87171;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  margin-top: 6px;
+  margin-bottom: 16px;
+}
+
+.mermaid-import-warnings-container {
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 14px 18px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: 10px;
+  margin-bottom: 20px;
+  box-sizing: border-box;
+}
+
+.mermaid-import-warnings-list {
+  margin: 0;
+  padding: 0 0 0 16px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.mermaid-import-warning-item {
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.mermaid-import-warning-item:last-child {
+  margin-bottom: 0;
+}
+
+.warning-type {
+  color: #f59e0b;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.warning-line {
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.warning-msg {
+  color: #cbd5e1;
+}
+
+.warning-raw {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: #94a3b8;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+

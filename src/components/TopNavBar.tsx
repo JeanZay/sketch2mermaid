@@ -10,6 +10,7 @@ import {
 import { downloadTextFile } from '../utils/downloadFile';
 import { useToast } from './useToast';
 import { ConfirmModal } from './ConfirmModal';
+import { ImportMermaidModal } from './ImportMermaidModal';
 import type { DiagramDirection, S2mViewport } from '../core/types';
 
 export const TopNavBar = () => {
@@ -26,6 +27,8 @@ export const TopNavBar = () => {
     message: string;
     onConfirm: () => void;
   } | null>(null);
+
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Hidden file input ref — only accessed in event handlers (not render)
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +79,19 @@ export const TopNavBar = () => {
       }
     },
     [loadDiagram, setViewport, fitView, showToast],
+  );
+
+  const handleImportSuccess = useCallback(
+    (importedDiagram: CanonicalDiagram) => {
+      loadDiagram(importedDiagram);
+      
+      requestAnimationFrame(() => {
+        fitView({ duration: 200 });
+      });
+
+      showToast('Diagramme Mermaid importé avec succès.', 'success');
+    },
+    [loadDiagram, fitView, showToast]
   );
 
   const isDiagramEmpty = useCallback(() => {
@@ -203,6 +219,17 @@ export const TopNavBar = () => {
             </svg>
             Import .s2m
           </button>
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="header-action-btn border-btn"
+            title="Import Mermaid flowchart code"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+              <polyline points="16 18 22 12 16 6"></polyline>
+              <polyline points="8 6 2 12 8 18"></polyline>
+            </svg>
+            Import Mermaid
+          </button>
         </div>
       </header>
 
@@ -225,6 +252,14 @@ export const TopNavBar = () => {
           onConfirm={confirmModal.onConfirm}
           onCancel={() => setConfirmModal(null)}
           variant="danger"
+        />
+      )}
+
+      {/* Import Mermaid Modal */}
+      {isImportModalOpen && (
+        <ImportMermaidModal
+          onClose={() => setIsImportModalOpen(false)}
+          onImportSuccess={handleImportSuccess}
         />
       )}
     </>
