@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
-import { toMermaid } from '../core/mermaid';
 import {
   serializeSketch2MermaidFile,
   parseSketch2MermaidFile,
@@ -22,7 +21,6 @@ export const TopNavBar = () => {
   const { getViewport, setViewport, fitView } = useReactFlow();
   const { showToast } = useToast();
 
-  const [copied, setCopied] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
     message: string;
@@ -35,17 +33,6 @@ export const TopNavBar = () => {
   const handleNew = () => {
     if (window.confirm('Voulez-vous vraiment réinitialiser le diagramme ? Cette action effacera tout.')) {
       resetDiagram();
-    }
-  };
-
-  const handleCopy = async () => {
-    try {
-      const code = toMermaid(diagram);
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy to clipboard', err);
     }
   };
 
@@ -190,13 +177,6 @@ export const TopNavBar = () => {
             title="Créer un nouveau diagramme vide"
           >
             New
-          </button>
-          <button 
-            onClick={handleCopy} 
-            className="header-action-btn primary-btn"
-            title="Copier le code Mermaid"
-          >
-            {copied ? 'Copié !' : 'Copy Mermaid'}
           </button>
           <div className="header-divider"></div>
           <button
