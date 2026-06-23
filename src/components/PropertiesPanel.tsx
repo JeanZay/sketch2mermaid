@@ -24,6 +24,7 @@ export const PropertiesPanel = () => {
   const updateTextBoxText = useDiagramStore((state) => state.updateTextBoxText);
   const updateTextBoxStyle = useDiagramStore((state) => state.updateTextBoxStyle);
   const deleteTextBox = useDiagramStore((state) => state.deleteTextBox);
+  const updateNodeStyle = useDiagramStore((state) => state.updateNodeStyle);
 
   const handleDeselect = () => {
     setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
@@ -187,10 +188,14 @@ export const PropertiesPanel = () => {
     const outEdges = diagram.edges.filter((e) => e.from === selectedNode.id).length;
 
     const updateNodeTextStyle = useDiagramStore.getState().updateNodeTextStyle;
-    const style = { ...DEFAULT_NODE_TEXT_STYLE, ...nodeData.textStyle };
+    const style = { ...DEFAULT_NODE_TEXT_STYLE, ...nodeData.style?.text };
 
     const handleStyleChange = (updates: Partial<TextStyle>) => {
       updateNodeTextStyle(selectedNode.id, updates);
+    };
+
+    const handleNodeStyleChange = (updates: Partial<import('../core/types').NodeStyle>) => {
+      updateNodeStyle(selectedNode.id, updates);
     };
 
     const shapes = SHAPE_CONFIGS;
@@ -229,9 +234,47 @@ export const PropertiesPanel = () => {
           </div>
 
           <div className="property-group">
+            <label className="property-label">Background Color</label>
+            <div className="color-input-row">
+              <input
+                type="color"
+                value={nodeData.style?.backgroundColor || '#ffffff'}
+                onChange={(e) => handleNodeStyleChange({ backgroundColor: e.target.value })}
+                className="color-picker"
+              />
+              <input
+                type="text"
+                value={nodeData.style?.backgroundColor || ''}
+                placeholder="#ffffff"
+                onChange={(e) => handleNodeStyleChange({ backgroundColor: e.target.value })}
+                className="property-input color-text-input"
+              />
+            </div>
+          </div>
+
+          <div className="property-group">
+            <label className="property-label">Border Color</label>
+            <div className="color-input-row">
+              <input
+                type="color"
+                value={nodeData.style?.borderColor || '#c4c5d7'}
+                onChange={(e) => handleNodeStyleChange({ borderColor: e.target.value })}
+                className="color-picker"
+              />
+              <input
+                type="text"
+                value={nodeData.style?.borderColor || ''}
+                placeholder="#c4c5d7"
+                onChange={(e) => handleNodeStyleChange({ borderColor: e.target.value })}
+                className="property-input color-text-input"
+              />
+            </div>
+          </div>
+
+          <div className="property-group">
             <label className="property-label">Font Size</label>
             <div className="annotation-info-text" style={{ marginBottom: 4, padding: 0 }}>
-              {nodeData.textStyle?.fontSize ? 'Custom size:' : 'Auto-fit (default):'}
+              {nodeData.style?.text?.fontSize ? 'Custom size:' : 'Auto-fit (default):'}
             </div>
             <FontSizeControl
               value={style.fontSize ?? 14}

@@ -1,4 +1,4 @@
-import type { CanonicalDiagram, MermaidExportFormat } from './types';
+import type { CanonicalDiagram, MermaidExportFormat, DiagramNode } from './types';
 
 /**
  * Helper to sort IDs numerically by their numeric suffix (e.g., n1, n2, n10).
@@ -46,6 +46,38 @@ export function escapeLabel(label: string): string {
   return result;
 }
 
+function getMermaidNodeStyleLine(node: DiagramNode): string | null {
+  const parts: string[] = [];
+  const style = node.style;
+  if (!style) return null;
+
+  const isValidColor = (val: string | undefined): boolean => {
+    if (!val) return false;
+    return /^[#a-zA-Z0-9(),.\s-]+$/.test(val);
+  };
+
+  if (isValidColor(style.backgroundColor)) {
+    parts.push(`fill:${style.backgroundColor}`);
+  }
+  if (isValidColor(style.borderColor)) {
+    parts.push(`stroke:${style.borderColor}`);
+  }
+  if (style.text) {
+    if (isValidColor(style.text.color)) {
+      parts.push(`color:${style.text.color}`);
+    }
+    const fontSize = style.text.fontSize;
+    if (typeof fontSize === 'number' && !isNaN(fontSize) && fontSize > 0 && fontSize < 100) {
+      parts.push(`font-size:${Math.round(fontSize)}px`);
+    }
+  }
+
+  if (parts.length > 0) {
+    return `  style ${node.id} ${parts.join(',')}`;
+  }
+  return null;
+}
+
 /**
  * Serializes the canonical JSON diagram model to deterministic Mermaid markup.
  * Order of nodes and edges is guaranteed to be stable (sorted by ID).
@@ -59,8 +91,22 @@ export function toMermaid(diagram: CanonicalDiagram): string {
 
   for (const node of sortedNodes) {
     const escaped = escapeLabel(node.label);
+
+    let finalLabel = escaped;
+    if (node.style?.text?.bold || node.style?.text?.italic) {
+      let markdownLabel = escaped;
+      if (node.style.text.bold && node.style.text.italic) {
+        markdownLabel = `**_${escaped}_**`;
+      } else if (node.style.text.bold) {
+        markdownLabel = `**${escaped}**`;
+      } else if (node.style.text.italic) {
+        markdownLabel = `_${escaped}_`;
+      }
+      finalLabel = `\`${markdownLabel}\``;
+    }
+
     if (node.shape === 'file') {
-      lines.push(`  ${node.id}@{ shape: doc, label: "${escaped}" }`);
+      lines.push(`  ${node.id}@{ shape: doc, label: "${finalLabel}" }`);
     } else {
       let open = '[';
       let close = ']';
@@ -80,7 +126,7 @@ export function toMermaid(diagram: CanonicalDiagram): string {
         case 'database':
           open = '[('; close = ')]'; break;
       }
-      lines.push(`  ${node.id}${open}"${escaped}"${close}`);
+      lines.push(`  ${node.id}${open}"${finalLabel}"${close}`);
     }
   }
 
@@ -95,6 +141,20 @@ export function toMermaid(diagram: CanonicalDiagram): string {
     } else {
       lines.push(`  ${edge.from} ${connector} ${edge.to}`);
     }
+  }
+
+  // Append style declarations
+  const styleLines: string[] = [];
+  for (const node of sortedNodes) {
+    const styleLine = getMermaidNodeStyleLine(node);
+    if (styleLine) {
+      styleLines.push(styleLine);
+    }
+  }
+
+  if (styleLines.length > 0) {
+    lines.push('');
+    lines.push(...styleLines);
   }
 
   return lines.join('\n');

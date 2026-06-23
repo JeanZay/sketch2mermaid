@@ -15,11 +15,10 @@ export interface DiagramNode {
   width?: number;
   height?: number;
 
-  /**
-   * Canvas-only visual text styling.
-   * Not exported to Mermaid.
-   */
+  /** @deprecated legacy canvas-only field. Use style.text instead. */
   textStyle?: TextStyle;
+
+  style?: NodeStyle;
 }
 
 export interface DiagramEdge {
@@ -44,6 +43,12 @@ export interface TextStyle {
   italic?: boolean;
   textAlign?: 'left' | 'center' | 'right';
   color?: string;
+}
+
+export interface NodeStyle {
+  backgroundColor?: string;
+  borderColor?: string;
+  text?: TextStyle;
 }
 
 export type TextBoxStyle = TextStyle;

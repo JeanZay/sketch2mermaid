@@ -53,7 +53,7 @@ function FlowInner() {
         shape: node.shape,
         width: node.width,
         height: node.height,
-        textStyle: node.textStyle,
+        style: node.style,
         updateNodeSize,
       },
       selected: selectedNodeIds.has(node.id),

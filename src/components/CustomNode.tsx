@@ -10,7 +10,8 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   const shape = (data.shape as NodeShape) || 'process';
   const nodeWidth = (data.width as number | undefined);
   const nodeHeight = (data.height as number | undefined);
-  const textStyle = (data.textStyle as import('../core/types').TextStyle | undefined);
+  const nodeStyle = (data.style as import('../core/types').NodeStyle | undefined);
+  const textStyle = nodeStyle?.text;
   const updateNodeSize = data.updateNodeSize as ((id: string, w: number, h: number) => void) | undefined;
   
   const updateNodeLabel = useDiagramStore((state) => state.updateNodeLabel);
@@ -38,6 +39,13 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
     textAlign: textStyle?.textAlign ?? 'center',
     color: textStyle?.color ?? 'inherit',
   };
+
+  const shapeStyle: React.CSSProperties = {
+    width,
+    height,
+    ...((nodeStyle?.backgroundColor) ? { '--node-bg-color': nodeStyle.backgroundColor } : {}),
+    ...((nodeStyle?.borderColor) ? { '--node-border-color': nodeStyle.borderColor } : {}),
+  } as React.CSSProperties;
 
 
   const handleStartEditing = () => {
@@ -125,7 +133,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (shape === 'decision') {
     return (
-      <div className={`decision-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={{ width, height }}>
+      <div className={`decision-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
         {renderResizer()}
         <div className="decision-bg"></div>
         <div className="decision-text">{renderInner()}</div>
@@ -136,7 +144,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (shape === 'event') {
     return (
-      <div className={`event-circle ${selected ? 'node-selected' : ''} ${connectingClass}`} style={{ width, height }}>
+      <div className={`event-circle ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
         {renderResizer()}
         <div className="event-inner">{renderInner()}</div>
         {renderHandles()}
@@ -146,7 +154,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (shape === 'endEvent') {
     return (
-      <div className={`end-event-circle-outer ${selected ? 'node-selected' : ''} ${connectingClass}`} style={{ width, height }}>
+      <div className={`end-event-circle-outer ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
         {renderResizer()}
         <div className="end-event-circle-inner">
           <div className="event-inner">{renderInner()}</div>
@@ -158,7 +166,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (shape === 'database') {
     return (
-      <div className={`database-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={{ width, height }}>
+      <div className={`database-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
         {renderResizer()}
         <div className="database-text">{renderInner()}</div>
         {renderHandles()}
@@ -168,7 +176,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (shape === 'file') {
     return (
-      <div className={`file-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={{ width, height }}>
+      <div className={`file-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
         {renderResizer()}
         {renderInner()}
         {renderHandles()}
@@ -182,7 +190,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   if (shape === 'stadium') shapeClass = 'shape-stadium';
 
   return (
-    <div className={`custom-node ${shapeClass} ${selected ? 'node-selected' : ''} ${connectingClass}`} style={{ width, height }}>
+    <div className={`custom-node ${shapeClass} ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
       {renderResizer()}
       {renderInner()}
       {renderHandles()}

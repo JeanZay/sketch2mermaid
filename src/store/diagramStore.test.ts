@@ -328,4 +328,80 @@ describe('Zustand diagram store tests', () => {
     expect(node.width).toBe(120);
     expect(node.height).toBe(90);
   });
+
+  test('updateNodeStyle merges background/border and text style updates safely', () => {
+    const store = useDiagramStore.getState();
+    store.addNode('process', 10, 10);
+    
+    // Initial style update
+    store.updateNodeStyle('n1', { backgroundColor: '#ff0000', borderColor: '#00ff00' });
+    
+    let node = useDiagramStore.getState().diagram.nodes[0];
+    expect(node.style?.backgroundColor).toBe('#ff0000');
+    expect(node.style?.borderColor).toBe('#00ff00');
+    expect(node.style?.text).toBeUndefined();
+
+    // Partial update to text style
+    store.updateNodeStyle('n1', { text: { fontSize: 16, bold: true } });
+    node = useDiagramStore.getState().diagram.nodes[0];
+    expect(node.style?.backgroundColor).toBe('#ff0000');
+    expect(node.style?.borderColor).toBe('#00ff00');
+    expect(node.style?.text?.fontSize).toBe(16);
+    expect(node.style?.text?.bold).toBe(true);
+
+    // Update only background color
+    store.updateNodeStyle('n1', { backgroundColor: '#0000ff' });
+    node = useDiagramStore.getState().diagram.nodes[0];
+    expect(node.style?.backgroundColor).toBe('#0000ff');
+    expect(node.style?.borderColor).toBe('#00ff00');
+    expect(node.style?.text?.fontSize).toBe(16);
+    expect(node.style?.text?.bold).toBe(true);
+  });
+
+  test('updateNodeTextStyle merges text style updates safely', () => {
+    const store = useDiagramStore.getState();
+    store.addNode('process', 10, 10);
+    
+    store.updateNodeStyle('n1', { backgroundColor: '#ff0000', text: { color: '#00ff00', fontSize: 14 } });
+    
+    // Call updateNodeTextStyle
+    store.updateNodeTextStyle('n1', { bold: true, color: '#0000ff' });
+    const node = useDiagramStore.getState().diagram.nodes[0];
+    expect(node.style?.backgroundColor).toBe('#ff0000'); // remains unchanged
+    expect(node.style?.text?.fontSize).toBe(14); // remains unchanged
+    expect(node.style?.text?.bold).toBe(true); // updated
+    expect(node.style?.text?.color).toBe('#0000ff'); // updated
+  });
+
+  test('normalizeDiagram legacy textStyle migration', () => {
+    const store = useDiagramStore.getState();
+    const legacyDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart' as const,
+      direction: 'TD' as const,
+      nodes: [
+        {
+          id: 'n1',
+          label: 'Legacy Node',
+          shape: 'process' as const,
+          position: { x: 0, y: 0 },
+          // Legacy canvas-only textStyle
+          textStyle: { fontSize: 18, bold: true, color: '#ff0000' }
+        }
+      ],
+      edges: [],
+      textBoxes: []
+    };
+
+    store.loadDiagram(legacyDiagram);
+    const node = useDiagramStore.getState().diagram.nodes[0];
+    
+    // Check it has been migrated to style.text
+    expect(node.style?.text?.fontSize).toBe(18);
+    expect(node.style?.text?.bold).toBe(true);
+    expect(node.style?.text?.color).toBe('#ff0000');
+    
+    // And legacy textStyle property is removed
+    expect((node as { textStyle?: unknown }).textStyle).toBeUndefined();
+  });
 });

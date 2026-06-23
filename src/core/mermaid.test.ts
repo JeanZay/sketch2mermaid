@@ -313,3 +313,151 @@ describe('Mermaid invariance — width/height must never appear in output', () =
     expect(formatted).not.toContain('height');
   });
 });
+
+describe('Mermaid Node Styling tests', () => {
+  test('bold label exports using Mermaid Markdown String syntax', () => {
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        {
+          id: 'n1',
+          label: 'Bold Node',
+          shape: 'process',
+          position: { x: 0, y: 0 },
+          style: { text: { bold: true } },
+        },
+      ],
+      edges: [],
+      textBoxes: [],
+    };
+    const output = toMermaid(diagram);
+    expect(output).toContain('n1["`**Bold Node**`"]');
+  });
+
+  test('italic label exports using Mermaid Markdown String syntax', () => {
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        {
+          id: 'n1',
+          label: 'Italic Node',
+          shape: 'process',
+          position: { x: 0, y: 0 },
+          style: { text: { italic: true } },
+        },
+      ],
+      edges: [],
+      textBoxes: [],
+    };
+    const output = toMermaid(diagram);
+    expect(output).toContain('n1["`_Italic Node_`"]');
+  });
+
+  test('bold + italic label exports deterministically using nested Markdown String syntax', () => {
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        {
+          id: 'n1',
+          label: 'Bold & Italic Node',
+          shape: 'process',
+          position: { x: 0, y: 0 },
+          style: { text: { bold: true, italic: true } },
+        },
+      ],
+      edges: [],
+      textBoxes: [],
+    };
+    const output = toMermaid(diagram);
+    expect(output).toContain('n1["`**_Bold &amp; Italic Node_**`"]');
+  });
+
+  test('background, border, text color, and font size export combined in a single deterministic style directive', () => {
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        {
+          id: 'n1',
+          label: 'Styled Node',
+          shape: 'process',
+          position: { x: 0, y: 0 },
+          style: {
+            backgroundColor: '#ff0000',
+            borderColor: '#00ff00',
+            text: {
+              color: '#0000ff',
+              fontSize: 18,
+            },
+          },
+        },
+      ],
+      edges: [],
+      textBoxes: [],
+    };
+    const output = toMermaid(diagram);
+    expect(output).toContain('style n1 fill:#ff0000,stroke:#00ff00,color:#0000ff,font-size:18px');
+  });
+
+  test('text alignment is not exported to Mermaid', () => {
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        {
+          id: 'n1',
+          label: 'Aligned Node',
+          shape: 'process',
+          position: { x: 0, y: 0 },
+          style: { text: { textAlign: 'right' } },
+        },
+      ],
+      edges: [],
+      textBoxes: [],
+    };
+    const output = toMermaid(diagram);
+    expect(output).not.toContain('text-align');
+    expect(output).not.toContain('align');
+    // It should not generate style block for alignment alone since it is canvas-only
+    expect(output).not.toContain('style n1');
+  });
+
+  test('invalid or unsafe styling properties are sanitized and ignored', () => {
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        {
+          id: 'n1',
+          label: 'Unsafe Node',
+          shape: 'process',
+          position: { x: 0, y: 0 },
+          style: {
+            backgroundColor: '#fff; injection: true',
+            borderColor: '#000',
+            text: {
+              color: 'red',
+              fontSize: 15,
+            },
+          },
+        },
+      ],
+      edges: [],
+      textBoxes: [],
+    };
+    const output = toMermaid(diagram);
+    // #fff; injection: true has a semicolon, should be skipped
+    expect(output).not.toContain('fill:#fff; injection: true');
+    // But other valid styles on the same node should still be emitted
+    expect(output).toContain('style n1 stroke:#000,color:red,font-size:15px');
+  });
+});

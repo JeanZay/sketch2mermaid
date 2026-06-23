@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CanonicalDiagram, DiagramNode, DiagramEdge, TextBox, TextBoxStyle, NodeShape, EdgeStyle, DiagramDirection } from '../core/types';
+import type { CanonicalDiagram, DiagramNode, DiagramEdge, TextBox, TextBoxStyle, NodeShape, EdgeStyle, DiagramDirection, NodeStyle } from '../core/types';
 import { NODE_SIZE_DEFAULTS } from '../core/nodeSizeConfig';
 
 const SCHEMA_VERSION = 1;
@@ -91,9 +91,30 @@ export const DEFAULT_TEXT_BOX_STYLE: TextBoxStyle = {
  * are present with correct defaults. Called at load and import boundaries.
  */
 export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
+  const textBoxes = Array.isArray(raw.textBoxes) ? raw.textBoxes : [];
+  const nodes = Array.isArray(raw.nodes)
+    ? raw.nodes.map((node) => {
+        // @ts-expect-error - legacy field migration
+        if (node.textStyle) {
+          const { textStyle, ...rest } = node as { textStyle?: unknown } & DiagramNode;
+          return {
+            ...rest,
+            style: {
+              ...node.style,
+              text: {
+                ...textStyle,
+                ...node.style?.text,
+              },
+            },
+          };
+        }
+        return node;
+      })
+    : [];
   return {
     ...raw,
-    textBoxes: Array.isArray(raw.textBoxes) ? raw.textBoxes : [],
+    nodes,
+    textBoxes,
   };
 }
 
@@ -135,7 +156,8 @@ export interface DiagramState {
   updateNodeShape: (id: string, shape: NodeShape) => void;
   updateNodePosition: (id: string, x: number, y: number) => void;
   updateNodeSize: (id: string, width: number, height: number) => void;
-  updateNodeTextStyle: (id: string, style: Partial<import('../core/types').TextStyle>) => void;
+  updateNodeTextStyle: (id: string, style: Partial<TextStyle>) => void;
+  updateNodeStyle: (id: string, style: Partial<NodeStyle>) => void;
   deleteNode: (id: string) => void;
   addEdge: (from: string, to: string, style?: EdgeStyle, sourceHandle?: string, targetHandle?: string) => string;
   updateEdgeLabel: (id: string, label: string) => void;
@@ -243,12 +265,42 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     }));
   },
 
-  updateNodeTextStyle: (id, style) => {
+  updateNodeTextStyle: (id, stylePatch) => {
     set((state) => ({
       diagram: {
         ...state.diagram,
         nodes: state.diagram.nodes.map((node) =>
-          node.id === id ? { ...node, textStyle: { ...node.textStyle, ...style } } : node
+          node.id === id
+            ? {
+                ...node,
+                style: {
+                  ...node.style,
+                  text: { ...node.style?.text, ...stylePatch },
+                },
+              }
+            : node
+        ),
+      },
+    }));
+  },
+
+  updateNodeStyle: (id, stylePatch) => {
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        nodes: state.diagram.nodes.map((node) =>
+          node.id === id
+            ? {
+                ...node,
+                style: {
+                  ...node.style,
+                  ...stylePatch,
+                  text: stylePatch.text
+                    ? { ...node.style?.text, ...stylePatch.text }
+                    : node.style?.text,
+                },
+              }
+            : node
         ),
       },
     }));
