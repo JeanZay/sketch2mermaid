@@ -1,4 +1,4 @@
-import type { CanonicalDiagram, MermaidExportFormat, DiagramNode } from './types';
+import type { CanonicalDiagram, MermaidExportFormat, DiagramNode, EdgeStyle, EdgeDirection } from './types';
 
 /**
  * Helper to sort IDs numerically by their numeric suffix (e.g., n1, n2, n10).
@@ -78,6 +78,17 @@ function getMermaidNodeStyleLine(node: DiagramNode): string | null {
   return null;
 }
 
+export function getMermaidEdgeOperator(style: EdgeStyle, direction: EdgeDirection): string {
+  if (style === 'dotted') {
+    if (direction === 'undirected') return '-.-';
+    if (direction === 'bidirectional') return '<-.->';
+    return '-.->';
+  }
+  if (direction === 'undirected') return '---';
+  if (direction === 'bidirectional') return '<-->';
+  return '-->';
+}
+
 /**
  * Serializes the canonical JSON diagram model to deterministic Mermaid markup.
  * Order of nodes and edges is guaranteed to be stable (sorted by ID).
@@ -149,7 +160,7 @@ export function toMermaid(diagram: CanonicalDiagram): string {
   const sortedEdges = [...diagram.edges].sort((a, b) => sortById(a.id, b.id));
 
   for (const edge of sortedEdges) {
-    const connector = edge.style === 'dotted' ? '-.->' : '-->';
+    const connector = getMermaidEdgeOperator(edge.style, edge.direction || 'directed');
     if (edge.label) {
       const escaped = escapeLabel(edge.label);
       lines.push(`  ${edge.from} ${connector}|"${escaped}"| ${edge.to}`);

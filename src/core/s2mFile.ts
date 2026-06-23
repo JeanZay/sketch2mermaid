@@ -241,6 +241,9 @@ export function parseSketch2MermaidFile(raw: string): ParseResult {
     if (!isNonEmptyString(edge.to) || !nodeIds.has(edge.to as string)) {
       return { ok: false, error: `Edge "${edge.id as string}" references a missing target node "${String(edge.to)}".` };
     }
+    if (edge.direction !== undefined && edge.direction !== 'directed' && edge.direction !== 'undirected' && edge.direction !== 'bidirectional') {
+      return { ok: false, error: `Edge "${edge.id as string}" has an invalid direction "${String(edge.direction)}".` };
+    }
   }
 
   // ---- TextBox validation ----

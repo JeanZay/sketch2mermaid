@@ -482,4 +482,56 @@ describe('Zustand diagram store tests', () => {
     // And legacy textStyle property is removed
     expect((node as { textStyle?: unknown }).textStyle).toBeUndefined();
   });
+
+  test('addEdge defaults direction to directed', () => {
+    const store = useDiagramStore.getState();
+    store.resetDiagram();
+    
+    // Add nodes
+    store.addNode('process', 0, 0);
+    store.addNode('process', 100, 0);
+    
+    const edgeId = store.addEdge('n1', 'n2', 'solid');
+    const edge = useDiagramStore.getState().diagram.edges.find(e => e.id === edgeId);
+    expect(edge?.direction).toBe('directed');
+  });
+
+  test('updateEdgeDirection updates edge direction correctly', () => {
+    const store = useDiagramStore.getState();
+    store.resetDiagram();
+    store.addNode('process', 0, 0);
+    store.addNode('process', 100, 0);
+    const edgeId = store.addEdge('n1', 'n2', 'solid');
+    
+    store.updateEdgeDirection(edgeId, 'undirected');
+    expect(useDiagramStore.getState().diagram.edges[0].direction).toBe('undirected');
+    
+    store.updateEdgeDirection(edgeId, 'bidirectional');
+    expect(useDiagramStore.getState().diagram.edges[0].direction).toBe('bidirectional');
+  });
+
+  test('normalizeDiagram edge direction defensive fallback', () => {
+    const store = useDiagramStore.getState();
+    const badDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart' as const,
+      direction: 'TD' as const,
+      nodes: [
+        { id: 'n1', label: 'A', shape: 'process' as const, position: { x: 0, y: 0 } },
+        { id: 'n2', label: 'B', shape: 'process' as const, position: { x: 100, y: 0 } }
+      ],
+      edges: [
+        // @ts-expect-error - testing bad direction value
+        { id: 'e1', from: 'n1', to: 'n2', label: '', style: 'solid', direction: 'banana' },
+        // @ts-expect-error - testing missing direction field
+        { id: 'e2', from: 'n1', to: 'n2', label: '', style: 'dotted' }
+      ],
+      textBoxes: []
+    };
+
+    store.loadDiagram(badDiagram);
+    const edges = useDiagramStore.getState().diagram.edges;
+    expect(edges[0].direction).toBe('directed');
+    expect(edges[1].direction).toBe('directed');
+  });
 });

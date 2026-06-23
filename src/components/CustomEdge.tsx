@@ -12,6 +12,7 @@ export const CustomEdge = ({
   targetPosition,
   style = {},
   markerEnd,
+  markerStart,
   label,
   selected,
 }: EdgeProps) => {
@@ -69,7 +70,7 @@ export const CustomEdge = ({
 
   return (
     <>
-      <BaseEdge path={edgePath} style={edgeStyle} markerEnd={markerEnd} />
+      <BaseEdge path={edgePath} style={edgeStyle} markerEnd={markerEnd} markerStart={markerStart} />
       <EdgeLabelRenderer>
         <div
           className="edge-label-container"

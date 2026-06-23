@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { importMermaidFlowchart } from './mermaidImport';
+import { toMermaid } from './mermaid';
 
 describe('Mermaid Flowchart Import Tests', () => {
   // 1. graph TD parses with direction TD
@@ -145,18 +146,20 @@ describe('Mermaid Flowchart Import Tests', () => {
     expect(res.warnings.filter(w => w.type === 'unsupportedEdge').length).toBe(2);
   });
 
-  // 16. open link fallback warning (undirected --- imports as solid with warning)
-  test('16. open link fallback warning', () => {
+  // 16. open link is fully supported
+  test('16. open link is fully supported', () => {
     const res = importMermaidFlowchart('graph TD\n  A --- B');
     expect(res.diagram.edges[0].style).toBe('solid');
-    expect(res.warnings.some(w => w.type === 'unsupportedEdge')).toBe(true);
+    expect(res.diagram.edges[0].direction).toBe('undirected');
+    expect(res.warnings.some(w => w.type === 'unsupportedEdge')).toBe(false);
   });
 
-  // 17. bidirectional fallback warning
-  test('17. bidirectional fallback warning', () => {
+  // 17. bidirectional is fully supported
+  test('17. bidirectional is fully supported', () => {
     const res = importMermaidFlowchart('graph TD\n  A <--> B');
     expect(res.diagram.edges[0].style).toBe('solid');
-    expect(res.warnings.some(w => w.type === 'unsupportedEdge')).toBe(true);
+    expect(res.diagram.edges[0].direction).toBe('bidirectional');
+    expect(res.warnings.some(w => w.type === 'unsupportedEdge')).toBe(false);
   });
 
   // 18. quoted label containing --> is not split
@@ -306,8 +309,10 @@ describe('Mermaid Flowchart Import Tests', () => {
     const res = importMermaidFlowchart('graph TD\n  A --- B & C');
     expect(res.diagram.edges.length).toBe(2);
     expect(res.diagram.edges[0].style).toBe('solid');
+    expect(res.diagram.edges[0].direction).toBe('undirected');
     expect(res.diagram.edges[1].style).toBe('solid');
-    expect(res.warnings.filter(w => w.type === 'unsupportedEdge').length).toBe(1);
+    expect(res.diagram.edges[1].direction).toBe('undirected');
+    expect(res.warnings.filter(w => w.type === 'unsupportedEdge').length).toBe(0);
   });
 
   // 22l. bidirectional fallback with ampersand
@@ -315,8 +320,10 @@ describe('Mermaid Flowchart Import Tests', () => {
     const res = importMermaidFlowchart('graph TD\n  A <--> B & C');
     expect(res.diagram.edges.length).toBe(2);
     expect(res.diagram.edges[0].style).toBe('solid');
+    expect(res.diagram.edges[0].direction).toBe('bidirectional');
     expect(res.diagram.edges[1].style).toBe('solid');
-    expect(res.warnings.filter(w => w.type === 'unsupportedEdge').length).toBe(1);
+    expect(res.diagram.edges[1].direction).toBe('bidirectional');
+    expect(res.warnings.filter(w => w.type === 'unsupportedEdge').length).toBe(0);
   });
 
   // 22m. ampersand inside edge label does not expand
@@ -428,5 +435,70 @@ describe('Mermaid Flowchart Import Tests', () => {
     expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
     expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'D')).toBe(true);
     expect(res.diagram.edges.some(e => e.from === 'C' && e.to === 'D')).toBe(true);
+  });
+
+  // 32. imports direction-specific operators correctly
+  test('32. imports direction-specific operators correctly', () => {
+    const code = `flowchart TD
+      A --- B
+      A <--> B
+      A -.- B
+      A <-.-> B
+      A ---|"L1"| B
+      A <-->|"L2"| B
+      A -.-|"L3"| B
+      A <-.->|"L4"| B
+    `;
+    const res = importMermaidFlowchart(code);
+    expect(res.warnings.filter(w => w.type !== 'labelSanitized').length).toBe(0);
+    const edges = res.diagram.edges;
+    expect(edges.length).toBe(8);
+
+    expect(edges[0]).toMatchObject({ style: 'solid', direction: 'undirected', label: '' });
+    expect(edges[1]).toMatchObject({ style: 'solid', direction: 'bidirectional', label: '' });
+    expect(edges[2]).toMatchObject({ style: 'dotted', direction: 'undirected', label: '' });
+    expect(edges[3]).toMatchObject({ style: 'dotted', direction: 'bidirectional', label: '' });
+    expect(edges[4]).toMatchObject({ style: 'solid', direction: 'undirected', label: 'L1' });
+    expect(edges[5]).toMatchObject({ style: 'solid', direction: 'bidirectional', label: 'L2' });
+    expect(edges[6]).toMatchObject({ style: 'dotted', direction: 'undirected', label: 'L3' });
+    expect(edges[7]).toMatchObject({ style: 'dotted', direction: 'bidirectional', label: 'L4' });
+  });
+
+  // 33. thick edges fallback
+  test('33. thick edges fallback', () => {
+    const code = `flowchart TD
+      A === B
+      A ===|"Label"| B
+    `;
+    const res = importMermaidFlowchart(code);
+    expect(res.diagram.edges.length).toBe(2);
+    expect(res.diagram.edges[0]).toMatchObject({ style: 'solid', direction: 'directed' });
+    expect(res.diagram.edges[1]).toMatchObject({ style: 'solid', direction: 'directed', label: 'Label' });
+    expect(res.warnings.filter(w => w.type === 'unsupportedEdge').length).toBe(2);
+  });
+
+  // 34. import -> export round-trip preserves directions
+  test('34. import -> export round-trip preserves directions', () => {
+    const code = [
+      'flowchart TD',
+      '  A --- B',
+      '  A ---|"L1"| B',
+      '  A <--> B',
+      '  A <-->|"L2"| B',
+      '  A -.- B',
+      '  A -.-|"L3"| B',
+      '  A <-.-> B',
+      '  A <-.->|"L4"| B'
+    ].join('\n');
+    const imported = importMermaidFlowchart(code);
+    const exported = toMermaid(imported.diagram);
+    expect(exported).toContain('A --- B');
+    expect(exported).toContain('A ---|"L1"| B');
+    expect(exported).toContain('A <--> B');
+    expect(exported).toContain('A <-->|"L2"| B');
+    expect(exported).toContain('A -.- B');
+    expect(exported).toContain('A -.-|"L3"| B');
+    expect(exported).toContain('A <-.-> B');
+    expect(exported).toContain('A <-.->|"L4"| B');
   });
 });

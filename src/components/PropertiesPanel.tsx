@@ -21,6 +21,7 @@ export const PropertiesPanel = () => {
   const toggleEdgeStyle = useDiagramStore((state) => state.toggleEdgeStyle);
   const deleteEdge = useDiagramStore((state) => state.deleteEdge);
   const updateEdgeTextStyle = useDiagramStore((state) => state.updateEdgeTextStyle);
+  const updateEdgeDirection = useDiagramStore((state) => state.updateEdgeDirection);
   const updateTextBoxText = useDiagramStore((state) => state.updateTextBoxText);
   const updateTextBoxStyle = useDiagramStore((state) => state.updateTextBoxStyle);
   const deleteTextBox = useDiagramStore((state) => state.deleteTextBox);
@@ -503,6 +504,33 @@ export const PropertiesPanel = () => {
                 onClick={() => !isDotted && toggleEdgeStyle(selectedEdge.id)}
               >
                 Dotted
+              </button>
+            </div>
+          </div>
+
+          <div className="property-group">
+            <label className="property-label">Direction</label>
+            <div className="style-segmented-control">
+              <button
+                className={`segment-btn ${edgeData.direction === 'directed' || !edgeData.direction ? 'active' : ''}`}
+                onClick={() => updateEdgeDirection(selectedEdge.id, 'directed')}
+                title="Dirigée"
+              >
+                A → B
+              </button>
+              <button
+                className={`segment-btn ${edgeData.direction === 'undirected' ? 'active' : ''}`}
+                onClick={() => updateEdgeDirection(selectedEdge.id, 'undirected')}
+                title="Non dirigée"
+              >
+                A — B
+              </button>
+              <button
+                className={`segment-btn ${edgeData.direction === 'bidirectional' ? 'active' : ''}`}
+                onClick={() => updateEdgeDirection(selectedEdge.id, 'bidirectional')}
+                title="Bidirectionnelle"
+              >
+                A ↔ B
               </button>
             </div>
           </div>

@@ -22,6 +22,7 @@
  */
 export type NodeShape = 'process' | 'rounded' | 'stadium' | 'decision' | 'event' | 'endEvent' | 'database' | 'file' | 'subroutine' | 'hexagon' | 'parallelogram' | 'parallelogramAlt' | 'trapezoid' | 'trapezoidAlt' | 'asymmetric' | 'documents';
 export type EdgeStyle = 'solid' | 'dotted';
+export type EdgeDirection = 'directed' | 'undirected' | 'bidirectional';
 export type DiagramDirection = 'TD' | 'LR' | 'BT' | 'RL';
 
 export interface DiagramNode {
@@ -51,6 +52,7 @@ export interface DiagramEdge {
   targetHandle?: string;
   label: string; // "" means no label
   style: EdgeStyle;
+  direction?: EdgeDirection;
   
   /**
    * Canvas-only visual text styling for the label.

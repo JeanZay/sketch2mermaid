@@ -79,22 +79,31 @@ function FlowInner() {
 
   // Derive React Flow edges from diagram store + selection state
   const rfEdges = useMemo(() => {
-    return diagram.edges.map((edge) => ({
-      id: edge.id,
-      source: edge.from,
-      target: edge.to,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
-      label: edge.label,
-      type: 'customEdge',
-      selected: selectedEdgeIds.has(edge.id),
-      markerEnd: {
+    return diagram.edges.map((edge) => {
+      const isSelected = selectedEdgeIds.has(edge.id);
+      const color = isSelected ? '#8b5cf6' : '#4b5563';
+      const edgeDirection = edge.direction || 'directed';
+
+      const marker = {
         type: MarkerType.ArrowClosed,
         width: 20,
         height: 20,
-        color: selectedEdgeIds.has(edge.id) ? '#8b5cf6' : '#4b5563',
-      },
-    }));
+        color,
+      };
+
+      return {
+        id: edge.id,
+        source: edge.from,
+        target: edge.to,
+        sourceHandle: edge.sourceHandle,
+        targetHandle: edge.targetHandle,
+        label: edge.label,
+        type: 'customEdge',
+        selected: isSelected,
+        markerEnd: edgeDirection !== 'undirected' ? marker : undefined,
+        markerStart: edgeDirection === 'bidirectional' ? marker : undefined,
+      };
+    });
   }, [diagram.edges, selectedEdgeIds]);
 
   // Access React Flow's internal node list for keyboard nudging

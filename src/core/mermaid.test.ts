@@ -532,4 +532,44 @@ describe('Mermaid Node Styling tests', () => {
     // But other valid styles on the same node should still be emitted
     expect(output).toContain('style n1 stroke:#000,color:red,font-size:15px');
   });
+
+  test('Edge Direction and Style Serialization - all combinations', () => {
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        { id: 'n1', label: 'A', shape: 'process', position: { x: 0, y: 0 } },
+        { id: 'n2', label: 'B', shape: 'process', position: { x: 100, y: 0 } }
+      ],
+      edges: [
+        { id: 'e1', from: 'n1', to: 'n2', label: '', style: 'solid', direction: 'directed' },
+        { id: 'e2', from: 'n1', to: 'n2', label: 'Label', style: 'solid', direction: 'directed' },
+        { id: 'e3', from: 'n1', to: 'n2', label: '', style: 'solid', direction: 'undirected' },
+        { id: 'e4', from: 'n1', to: 'n2', label: 'Label', style: 'solid', direction: 'undirected' },
+        { id: 'e5', from: 'n1', to: 'n2', label: '', style: 'solid', direction: 'bidirectional' },
+        { id: 'e6', from: 'n1', to: 'n2', label: 'Label', style: 'solid', direction: 'bidirectional' },
+        { id: 'e7', from: 'n1', to: 'n2', label: '', style: 'dotted', direction: 'directed' },
+        { id: 'e8', from: 'n1', to: 'n2', label: 'Label', style: 'dotted', direction: 'directed' },
+        { id: 'e9', from: 'n1', to: 'n2', label: '', style: 'dotted', direction: 'undirected' },
+        { id: 'e10', from: 'n1', to: 'n2', label: 'Label', style: 'dotted', direction: 'undirected' },
+        { id: 'e11', from: 'n1', to: 'n2', label: '', style: 'dotted', direction: 'bidirectional' },
+        { id: 'e12', from: 'n1', to: 'n2', label: 'Label', style: 'dotted', direction: 'bidirectional' }
+      ],
+      textBoxes: []
+    };
+    const output = toMermaid(diagram);
+    expect(output).toContain('n1 --> n2');
+    expect(output).toContain('n1 -->|"Label"| n2');
+    expect(output).toContain('n1 --- n2');
+    expect(output).toContain('n1 ---|"Label"| n2');
+    expect(output).toContain('n1 <--> n2');
+    expect(output).toContain('n1 <-->|"Label"| n2');
+    expect(output).toContain('n1 -.-> n2');
+    expect(output).toContain('n1 -.->|"Label"| n2');
+    expect(output).toContain('n1 -.- n2');
+    expect(output).toContain('n1 -.-|"Label"| n2');
+    expect(output).toContain('n1 <-.-> n2');
+    expect(output).toContain('n1 <-.->|"Label"| n2');
+  });
 });

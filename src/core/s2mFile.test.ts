@@ -49,6 +49,7 @@ function makeTestDiagram(): CanonicalDiagram {
         to: 'n2',
         label: 'Yes',
         style: 'solid',
+        direction: 'directed',
       },
     ],
     textBoxes: [
@@ -572,7 +573,7 @@ describe('store integration — export/import round-trip', () => {
         { id: 'n8', label: 'Documents Node', shape: 'documents', position: { x: 700, y: 720 }, width: 225, height: 64 }
       ],
       edges: [
-        { id: 'e1', from: 'n1', to: 'n2', label: 'Link', style: 'solid' }
+        { id: 'e1', from: 'n1', to: 'n2', label: 'Link', style: 'solid', direction: 'directed' }
       ],
       textBoxes: []
     };
@@ -597,5 +598,59 @@ describe('store integration — export/import round-trip', () => {
     }
     expect(result.diagram.edges).toEqual(originalDiagram.edges);
     expect(result.viewport).toEqual(testViewport);
+  });
+
+  it('rejects edge with invalid direction', () => {
+    const raw = {
+      fileType: S2M_FILE_TYPE,
+      fileVersion: S2M_FILE_VERSION,
+      appVersion: APP_VERSION,
+      exportedAt: new Date().toISOString(),
+      diagram: {
+        schemaVersion: 1,
+        diagramType: 'flowchart',
+        direction: 'TD',
+        nodes: [
+          { id: 'n1', label: 'Start', shape: 'rounded', position: { x: 0, y: 0 } },
+          { id: 'n2', label: 'End', shape: 'process', position: { x: 0, y: 100 } }
+        ],
+        edges: [
+          { id: 'e1', from: 'n1', to: 'n2', label: '', style: 'solid', direction: 'banana' }
+        ],
+        textBoxes: []
+      }
+    };
+    const res = parseSketch2MermaidFile(JSON.stringify(raw));
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error).toContain('has an invalid direction "banana"');
+    }
+  });
+
+  it('accepts legacy s2m files without direction', () => {
+    const raw = {
+      fileType: S2M_FILE_TYPE,
+      fileVersion: S2M_FILE_VERSION,
+      appVersion: APP_VERSION,
+      exportedAt: new Date().toISOString(),
+      diagram: {
+        schemaVersion: 1,
+        diagramType: 'flowchart',
+        direction: 'TD',
+        nodes: [
+          { id: 'n1', label: 'Start', shape: 'rounded', position: { x: 0, y: 0 } },
+          { id: 'n2', label: 'End', shape: 'process', position: { x: 0, y: 100 } }
+        ],
+        edges: [
+          { id: 'e1', from: 'n1', to: 'n2', label: '', style: 'solid' }
+        ],
+        textBoxes: []
+      }
+    };
+    const res = parseSketch2MermaidFile(JSON.stringify(raw));
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.diagram.edges[0].direction).toBe('directed');
+    }
   });
 });

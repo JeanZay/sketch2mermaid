@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CanonicalDiagram, DiagramNode, DiagramEdge, TextBox, TextBoxStyle, NodeShape, EdgeStyle, DiagramDirection, NodeStyle } from '../core/types';
+import type { CanonicalDiagram, DiagramNode, DiagramEdge, TextBox, TextBoxStyle, NodeShape, EdgeStyle, EdgeDirection, DiagramDirection, NodeStyle } from '../core/types';
 import { NODE_SIZE_DEFAULTS } from '../core/nodeSizeConfig';
 
 const SCHEMA_VERSION = 1;
@@ -96,6 +96,14 @@ function normalizeDimension(value: unknown, fallback: number, min: number): numb
   return Math.max(min, Math.round(n));
 }
 
+export const normalizeEdgeDirection = (direction: unknown): EdgeDirection =>
+  direction === 'undirected' || direction === 'bidirectional' || direction === 'directed'
+    ? direction
+    : 'directed';
+
+export const normalizeEdgeStyle = (style: unknown): EdgeStyle =>
+  style === 'dotted' ? 'dotted' : 'solid';
+
 /**
  * Centralizes diagram normalization: ensures all optional/additive fields
  * are present with correct defaults. Called at load and import boundaries.
@@ -135,9 +143,17 @@ export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
         return node;
       })
     : [];
+  const edges = Array.isArray(raw.edges)
+    ? raw.edges.map((edge) => ({
+        ...edge,
+        style: normalizeEdgeStyle(edge.style),
+        direction: normalizeEdgeDirection(edge.direction),
+      }))
+    : [];
   return {
     ...raw,
     nodes,
+    edges,
     textBoxes,
   };
 }
@@ -186,6 +202,7 @@ export interface DiagramState {
   addEdge: (from: string, to: string, style?: EdgeStyle, sourceHandle?: string, targetHandle?: string) => string;
   updateEdgeLabel: (id: string, label: string) => void;
   updateEdgeTextStyle: (id: string, style: Partial<import('../core/types').TextStyle>) => void;
+  updateEdgeDirection: (id: string, direction: EdgeDirection) => void;
   toggleEdgeStyle: (id: string) => void;
   deleteEdge: (id: string) => void;
   addTextBox: (x: number, y: number) => string;
@@ -364,6 +381,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       targetHandle,
       label: '',
       style,
+      direction: 'directed',
     };
     set((state) => ({
       diagram: {
@@ -391,6 +409,17 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
         ...state.diagram,
         edges: state.diagram.edges.map((edge) =>
           edge.id === id ? { ...edge, textStyle: { ...edge.textStyle, ...style } } : edge
+        ),
+      },
+    }));
+  },
+
+  updateEdgeDirection: (id, direction) => {
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        edges: state.diagram.edges.map((edge) =>
+          edge.id === id ? { ...edge, direction } : edge
         ),
       },
     }));

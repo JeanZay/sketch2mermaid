@@ -1,4 +1,4 @@
-import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, DiagramDirection, NodeStyle } from './types';
+import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, EdgeDirection, DiagramDirection, NodeStyle } from './types';
 import { NODE_SIZE_DEFAULTS } from './nodeSizeConfig';
 
 export type MermaidImportWarningType =
@@ -39,6 +39,7 @@ interface ParsedEdge {
   from: string;
   to: string;
   style: EdgeStyle;
+  direction?: EdgeDirection;
   label: string;
   unsupported: boolean;
   rawOperator: string;
@@ -90,6 +91,10 @@ function sanitizeAndUnescapeLabel(rawLabel: string): { label: string; sanitized:
   label = label.replace(/#35;/g, '#');
   label = label.replace(/\\\\/g, '\\');
   label = label.replace(/<br\s*\/?>/gi, '\n');
+
+  if (label.startsWith('"') && label.endsWith('"')) {
+    label = label.slice(1, -1);
+  }
 
   const sanitized = (label !== rawLabel) || (label !== beforeUnescape);
 
@@ -569,7 +574,7 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
       }
     }
 
-    const edgeKey = `${edge.from}->${edge.to}||${finalEdgeLabel}||${edge.style}`;
+    const edgeKey = `${edge.from}->${edge.to}||${finalEdgeLabel}||${edge.style}||${edge.direction || 'directed'}`;
     if (seenEdges.has(edgeKey)) {
       continue;
     }
@@ -581,6 +586,7 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
       to: edge.to,
       label: finalEdgeLabel,
       style: edge.style,
+      direction: edge.direction || 'directed',
     });
   }
 
@@ -893,107 +899,122 @@ function scanNodeRef(s: string, start: number, lineIndex: number, warnings: Merm
 
 // Character-by-character scanner for edges
 function scanEdgeRef(s: string, start: number): { edge: ParsedEdge; nextIndex: number } | null {
-  let idx = start;
+  const idx = start;
 
   const matchPrefix = (prefix: string): boolean => {
     return s.substring(idx, idx + prefix.length) === prefix;
   };
 
-  // 1. Dotted arrow with label: -. text .->
+  // 1. Dotted arrow with inline label: -. label .->
   if (matchPrefix('-.') && idx + 2 < s.length && s[idx + 2] !== '-' && s[idx + 2] !== '>') {
-    idx += 2;
-    // skip spaces
-    while (idx < s.length && /\s/.test(s[idx])) idx++;
-    const endIdx = s.indexOf('.->', idx);
-    if (endIdx === -1) return null;
-    const label = s.substring(idx, endIdx).trim();
-    idx = endIdx + 3;
-    return {
-      edge: { from: '', to: '', style: 'dotted', label, unsupported: false, rawOperator: '-. label .->' },
-      nextIndex: idx
-    };
+    const startLabel = idx + 2;
+    let labelStartIdx = startLabel;
+    while (labelStartIdx < s.length && /\s/.test(s[labelStartIdx])) labelStartIdx++;
+    const endIdx = s.indexOf('.->', labelStartIdx);
+    if (endIdx !== -1) {
+      const label = s.substring(labelStartIdx, endIdx).trim();
+      return {
+        edge: {
+          from: '',
+          to: '',
+          style: 'dotted',
+          direction: 'directed',
+          label,
+          unsupported: false,
+          rawOperator: `-. ${label} .->`
+        },
+        nextIndex: endIdx + 3
+      };
+    }
   }
 
-  // 2. Dotted arrow: -.->
-  if (matchPrefix('-.->')) {
-    return {
-      edge: { from: '', to: '', style: 'dotted', label: '', unsupported: false, rawOperator: '-.->' },
-      nextIndex: idx + 4
-    };
-  }
-
-  // 3. Thick arrow with label: == text ==>
+  // 2. Thick arrow with inline label: == label ==>
   if (matchPrefix('==') && idx + 2 < s.length && s[idx + 2] !== '>' && s[idx + 2] !== '=') {
-    idx += 2;
-    while (idx < s.length && /\s/.test(s[idx])) idx++;
-    const endIdx = s.indexOf('==>', idx);
-    if (endIdx === -1) return null;
-    const label = s.substring(idx, endIdx).trim();
-    idx = endIdx + 3;
-    return {
-      edge: { from: '', to: '', style: 'solid', label, unsupported: true, rawOperator: `== ${label} ==>` },
-      nextIndex: idx
-    };
+    const startLabel = idx + 2;
+    let labelStartIdx = startLabel;
+    while (labelStartIdx < s.length && /\s/.test(s[labelStartIdx])) labelStartIdx++;
+    const endIdx = s.indexOf('==>', labelStartIdx);
+    if (endIdx !== -1) {
+      const label = s.substring(labelStartIdx, endIdx).trim();
+      return {
+        edge: {
+          from: '',
+          to: '',
+          style: 'solid',
+          direction: 'directed',
+          label,
+          unsupported: true,
+          rawOperator: `== ${label} ==>`
+        },
+        nextIndex: endIdx + 3
+      };
+    }
   }
 
-  // 4. Thick arrow: ==>
-  if (matchPrefix('==>')) {
-    return {
-      edge: { from: '', to: '', style: 'solid', label: '', unsupported: true, rawOperator: '==>' },
-      nextIndex: idx + 3
-    };
-  }
-
-  // 5. Bidirectional arrow: <-->
-  if (matchPrefix('<-->')) {
-    return {
-      edge: { from: '', to: '', style: 'solid', label: '', unsupported: true, rawOperator: '<-->' },
-      nextIndex: idx + 4
-    };
-  }
-
-  // 6. Solid arrow with label type 2: -->|text|
-  if (matchPrefix('-->|')) {
-    idx += 4;
-    const endIdx = s.indexOf('|', idx);
-    if (endIdx === -1) return null;
-    const label = s.substring(idx, endIdx);
-    idx = endIdx + 1;
-    return {
-      edge: { from: '', to: '', style: 'solid', label, unsupported: false, rawOperator: `-->|${label}|` },
-      nextIndex: idx
-    };
-  }
-
-  // 7. Solid arrow: -->
-  if (matchPrefix('-->')) {
-    return {
-      edge: { from: '', to: '', style: 'solid', label: '', unsupported: false, rawOperator: '-->' },
-      nextIndex: idx + 3
-    };
-  }
-
-  // 8. Undirected line: ---
-  if (matchPrefix('---')) {
-    return {
-      edge: { from: '', to: '', style: 'solid', label: '', unsupported: true, rawOperator: '---' },
-      nextIndex: idx + 3
-    };
-  }
-
-  // 9. Solid arrow with label type 1: -- text -->
+  // 3. Solid arrow with inline label: -- label -->
   if (matchPrefix('--') && idx + 2 < s.length && s[idx + 2] !== '-' && s[idx + 2] !== '>') {
-    idx += 2;
-    // skip spaces
-    while (idx < s.length && /\s/.test(s[idx])) idx++;
-    const endIdx = s.indexOf('-->', idx);
-    if (endIdx === -1) return null;
-    const label = s.substring(idx, endIdx).trim();
-    idx = endIdx + 3;
-    return {
-      edge: { from: '', to: '', style: 'solid', label, unsupported: false, rawOperator: `-- ${label} -->` },
-      nextIndex: idx
-    };
+    const startLabel = idx + 2;
+    let labelStartIdx = startLabel;
+    while (labelStartIdx < s.length && /\s/.test(s[labelStartIdx])) labelStartIdx++;
+    const endIdx = s.indexOf('-->', labelStartIdx);
+    if (endIdx !== -1) {
+      const label = s.substring(labelStartIdx, endIdx).trim();
+      return {
+        edge: {
+          from: '',
+          to: '',
+          style: 'solid',
+          direction: 'directed',
+          label,
+          unsupported: false,
+          rawOperator: `-- ${label} -->`
+        },
+        nextIndex: endIdx + 3
+      };
+    }
+  }
+
+  // 4. Simple Operators (with optional pipe labels)
+  const simpleOperators: { op: string; style: EdgeStyle; direction: EdgeDirection; unsupported: boolean }[] = [
+    { op: '<-.->', style: 'dotted', direction: 'bidirectional', unsupported: false },
+    { op: '-.->', style: 'dotted', direction: 'directed', unsupported: false },
+    { op: '-.-', style: 'dotted', direction: 'undirected', unsupported: false },
+    { op: '<-->', style: 'solid', direction: 'bidirectional', unsupported: false },
+    { op: '==>', style: 'solid', direction: 'directed', unsupported: true },
+    { op: '===', style: 'solid', direction: 'directed', unsupported: true },
+    { op: '-->', style: 'solid', direction: 'directed', unsupported: false },
+    { op: '---', style: 'solid', direction: 'undirected', unsupported: false },
+  ];
+
+  for (const item of simpleOperators) {
+    if (matchPrefix(item.op)) {
+      let label = '';
+      let nextIndex = idx + item.op.length;
+      let rawOperator = item.op;
+
+      if (nextIndex < s.length && s[nextIndex] === '|') {
+        const startPipe = nextIndex + 1;
+        const endPipe = s.indexOf('|', startPipe);
+        if (endPipe !== -1) {
+          label = s.substring(startPipe, endPipe);
+          nextIndex = endPipe + 1;
+          rawOperator = `${item.op}|${label}|`;
+        }
+      }
+
+      return {
+        edge: {
+          from: '',
+          to: '',
+          style: item.style,
+          direction: item.direction,
+          label,
+          unsupported: item.unsupported,
+          rawOperator
+        },
+        nextIndex
+      };
+    }
   }
 
   return null;
