@@ -105,12 +105,13 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   addNode: (shape, x, y) => {
     const newId = getNextNodeId(get().diagram.nodes);
     
-    let targetX = x;
-    let targetY = y;
+    let targetX = Math.round(x);
+    let targetY = Math.round(y);
     const nodes = get().diagram.nodes;
-    while (nodes.some((n) => n.position.x === targetX && n.position.y === targetY)) {
-      targetX += 20;
-      targetY += 20;
+    // Check if any node is within a 20px radius of the target position
+    while (nodes.some((n) => Math.abs(n.position.x - targetX) < 20 && Math.abs(n.position.y - targetY) < 20)) {
+      targetX += 30;
+      targetY += 30;
     }
 
     const newNode: DiagramNode = {

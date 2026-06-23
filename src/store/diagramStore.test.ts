@@ -62,8 +62,8 @@ describe('Zustand diagram store tests', () => {
     expect(state.nodes).toHaveLength(3);
     
     expect(state.nodes[0].position).toEqual({ x: 100, y: 100 });
-    expect(state.nodes[1].position).toEqual({ x: 120, y: 120 });
-    expect(state.nodes[2].position).toEqual({ x: 140, y: 140 });
+    expect(state.nodes[1].position).toEqual({ x: 130, y: 130 });
+    expect(state.nodes[2].position).toEqual({ x: 160, y: 160 });
   });
 
   test('AC8 — Renaming a node does not modify its internal ID', () => {
