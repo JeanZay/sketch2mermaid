@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { importMermaidFlowchart } from './mermaidImport';
 import { toMermaid } from './mermaid';
+import { normalizeDiagram } from '../store/diagramStore';
 
 describe('Mermaid Flowchart Import Tests', () => {
   // 1. graph TD parses with direction TD
@@ -500,5 +501,105 @@ describe('Mermaid Flowchart Import Tests', () => {
     expect(exported).toContain('A -.-|"L3"| B');
     expect(exported).toContain('A <-.-> B');
     expect(exported).toContain('A <-.->|"L4"| B');
+  });
+
+  // 35. Targeted parser tests for each edge direction+style combination
+  describe('35. edge direction parser — individual operator tests', () => {
+    test('solid directed: -->', () => {
+      const res = importMermaidFlowchart('flowchart TD\n  A --> B');
+      expect(res.diagram.edges).toHaveLength(1);
+      expect(res.diagram.edges[0]).toMatchObject({ style: 'solid', direction: 'directed', label: '' });
+    });
+
+    test('solid undirected: ---', () => {
+      const res = importMermaidFlowchart('flowchart TD\n  A --- B');
+      expect(res.diagram.edges).toHaveLength(1);
+      expect(res.diagram.edges[0]).toMatchObject({ style: 'solid', direction: 'undirected', label: '' });
+    });
+
+    test('solid bidirectional: <-->', () => {
+      const res = importMermaidFlowchart('flowchart TD\n  A <--> B');
+      expect(res.diagram.edges).toHaveLength(1);
+      expect(res.diagram.edges[0]).toMatchObject({ style: 'solid', direction: 'bidirectional', label: '' });
+    });
+
+    test('dotted directed: -.->', () => {
+      const res = importMermaidFlowchart('flowchart TD\n  A -.-> B');
+      expect(res.diagram.edges).toHaveLength(1);
+      expect(res.diagram.edges[0]).toMatchObject({ style: 'dotted', direction: 'directed', label: '' });
+    });
+
+    test('dotted undirected: -.-', () => {
+      const res = importMermaidFlowchart('flowchart TD\n  A -.- B');
+      expect(res.diagram.edges).toHaveLength(1);
+      expect(res.diagram.edges[0]).toMatchObject({ style: 'dotted', direction: 'undirected', label: '' });
+    });
+
+    test('dotted bidirectional: <-.->', () => {
+      const res = importMermaidFlowchart('flowchart TD\n  A <-.-> B');
+      expect(res.diagram.edges).toHaveLength(1);
+      expect(res.diagram.edges[0]).toMatchObject({ style: 'dotted', direction: 'bidirectional', label: '' });
+    });
+
+    test('all 6 operators with pipe labels', () => {
+      const res = importMermaidFlowchart([
+        'flowchart TD',
+        '  A1 -->|"L1"| B1',
+        '  A2 ---|"L2"| B2',
+        '  A3 <-->|"L3"| B3',
+        '  A4 -.->|"L4"| B4',
+        '  A5 -.-|"L5"| B5',
+        '  A6 <-.->|"L6"| B6',
+      ].join('\n'));
+      expect(res.diagram.edges).toHaveLength(6);
+      expect(res.diagram.edges[0]).toMatchObject({ style: 'solid', direction: 'directed', label: 'L1' });
+      expect(res.diagram.edges[1]).toMatchObject({ style: 'solid', direction: 'undirected', label: 'L2' });
+      expect(res.diagram.edges[2]).toMatchObject({ style: 'solid', direction: 'bidirectional', label: 'L3' });
+      expect(res.diagram.edges[3]).toMatchObject({ style: 'dotted', direction: 'directed', label: 'L4' });
+      expect(res.diagram.edges[4]).toMatchObject({ style: 'dotted', direction: 'undirected', label: 'L5' });
+      expect(res.diagram.edges[5]).toMatchObject({ style: 'dotted', direction: 'bidirectional', label: 'L6' });
+    });
+
+    test('inline text labels preserve direction', () => {
+      const res = importMermaidFlowchart([
+        'flowchart TD',
+        '  A -- solid label --> B',
+        '  C -. dotted label .-> D',
+      ].join('\n'));
+      expect(res.diagram.edges).toHaveLength(2);
+      expect(res.diagram.edges[0]).toMatchObject({ style: 'solid', direction: 'directed', label: 'solid label' });
+      expect(res.diagram.edges[1]).toMatchObject({ style: 'dotted', direction: 'directed', label: 'dotted label' });
+    });
+  });
+
+  // 36. Full chain: import → normalizeDiagram → export round-trip
+  test('36. full chain import → normalizeDiagram → export preserves all directions', () => {
+    const code = [
+      'flowchart TD',
+      '  A --- B',
+      '  C <--> D',
+      '  E -.- F',
+      '  G <-.-> H',
+    ].join('\n');
+
+    const imported = importMermaidFlowchart(code);
+
+    // Simulate loadDiagram path: normalizeDiagram
+    const normalized = normalizeDiagram(imported.diagram);
+
+    // Verify direction survived normalization
+    const edges = normalized.edges;
+    expect(edges).toHaveLength(4);
+    expect(edges[0]).toMatchObject({ from: 'A', to: 'B', style: 'solid', direction: 'undirected' });
+    expect(edges[1]).toMatchObject({ from: 'C', to: 'D', style: 'solid', direction: 'bidirectional' });
+    expect(edges[2]).toMatchObject({ from: 'E', to: 'F', style: 'dotted', direction: 'undirected' });
+    expect(edges[3]).toMatchObject({ from: 'G', to: 'H', style: 'dotted', direction: 'bidirectional' });
+
+    // Verify export round-trip
+    const exported = toMermaid(normalized);
+    expect(exported).toContain('A --- B');
+    expect(exported).toContain('C <--> D');
+    expect(exported).toContain('E -.- F');
+    expect(exported).toContain('G <-.-> H');
   });
 });

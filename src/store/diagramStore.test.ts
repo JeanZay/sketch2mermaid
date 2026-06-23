@@ -534,4 +534,30 @@ describe('Zustand diagram store tests', () => {
     expect(edges[0].direction).toBe('directed');
     expect(edges[1].direction).toBe('directed');
   });
+
+  test('loadDiagram preserves undirected and bidirectional directions', () => {
+    const store = useDiagramStore.getState();
+    const diagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart' as const,
+      direction: 'TD' as const,
+      nodes: [
+        { id: 'n1', label: 'A', shape: 'process' as const, position: { x: 0, y: 0 } },
+        { id: 'n2', label: 'B', shape: 'process' as const, position: { x: 100, y: 0 } },
+        { id: 'n3', label: 'C', shape: 'process' as const, position: { x: 200, y: 0 } }
+      ],
+      edges: [
+        { id: 'e1', from: 'n1', to: 'n2', label: '', style: 'solid' as const, direction: 'undirected' as const },
+        { id: 'e2', from: 'n2', to: 'n3', label: '', style: 'dotted' as const, direction: 'bidirectional' as const },
+        { id: 'e3', from: 'n1', to: 'n3', label: '', style: 'solid' as const, direction: 'directed' as const }
+      ],
+      textBoxes: []
+    };
+
+    store.loadDiagram(diagram);
+    const edges = useDiagramStore.getState().diagram.edges;
+    expect(edges[0].direction).toBe('undirected');
+    expect(edges[1].direction).toBe('bidirectional');
+    expect(edges[2].direction).toBe('directed');
+  });
 });
