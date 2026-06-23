@@ -1433,7 +1433,7 @@ body {
   border: 1px solid var(--border-primary, #374151);
   border-radius: 6px;
   background: var(--bg-secondary, #111827);
-  color: var(--text-secondary, #9ca3af);
+  color: #ffffff;
   cursor: pointer;
   font-size: 14px;
   transition: all 0.15s ease;
@@ -1441,7 +1441,7 @@ body {
 
 .format-toggle-btn:hover {
   border-color: var(--border-secondary, #4b5563);
-  color: var(--text-primary, #f9fafb);
+  color: #ffffff;
 }
 
 .format-toggle-btn.active {
