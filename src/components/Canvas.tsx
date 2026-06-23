@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useEffect, useState } from 'react';
 import { 
   ReactFlow, 
   Background, 
@@ -6,13 +6,10 @@ import {
   MiniMap, 
   useReactFlow, 
   useNodes,
-  applyNodeChanges,
-  applyEdgeChanges,
   type Connection,
   type NodeChange,
   type EdgeChange,
-  type Node,
-  type Edge
+  type Node
 } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
 import CustomNode from './CustomNode';
@@ -36,38 +33,32 @@ function FlowInner() {
 
   const { screenToFlowPosition } = useReactFlow();
 
-  // Local React Flow state for nodes and edges, preserving selection
-  const [rfNodes, setRfNodes] = useState<Node[]>([]);
-  const [rfEdges, setRfEdges] = useState<Edge[]>([]);
+  // Selection state — updated only from event handler callbacks (not effects)
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
+  const [selectedEdgeIds, setSelectedEdgeIds] = useState<Set<string>>(new Set());
 
-  // Sync diagram store → React Flow nodes, preserving selection state
-  useEffect(() => {
-    setRfNodes((prev) => {
-      const selectedIds = new Set(prev.filter((n) => n.selected).map((n) => n.id));
-      return diagram.nodes.map((node) => ({
-        id: node.id,
-        type: 'customNode',
-        position: node.position,
-        data: { label: node.label, shape: node.shape },
-        selected: selectedIds.has(node.id),
-      }));
-    });
-  }, [diagram.nodes]);
+  // Derive React Flow nodes from diagram store + selection state
+  const rfNodes = useMemo(() => {
+    return diagram.nodes.map((node) => ({
+      id: node.id,
+      type: 'customNode',
+      position: node.position,
+      data: { label: node.label, shape: node.shape },
+      selected: selectedNodeIds.has(node.id),
+    }));
+  }, [diagram.nodes, selectedNodeIds]);
 
-  // Sync diagram store → React Flow edges, preserving selection state
-  useEffect(() => {
-    setRfEdges((prev) => {
-      const selectedIds = new Set(prev.filter((e) => e.selected).map((e) => e.id));
-      return diagram.edges.map((edge) => ({
-        id: edge.id,
-        source: edge.from,
-        target: edge.to,
-        label: edge.label,
-        type: 'customEdge',
-        selected: selectedIds.has(edge.id),
-      }));
-    });
-  }, [diagram.edges]);
+  // Derive React Flow edges from diagram store + selection state
+  const rfEdges = useMemo(() => {
+    return diagram.edges.map((edge) => ({
+      id: edge.id,
+      source: edge.from,
+      target: edge.to,
+      label: edge.label,
+      type: 'customEdge',
+      selected: selectedEdgeIds.has(edge.id),
+    }));
+  }, [diagram.edges, selectedEdgeIds]);
 
   // Access React Flow's internal node list for keyboard nudging
   const nodes = useNodes();
@@ -115,22 +106,54 @@ function FlowInner() {
     };
   }, [nodes, updateNodePosition]);
 
-  // Handle ALL node changes (selection, position, dimensions, etc.)
-  // Position is synced to the diagram store only on drag stop (see onNodeDragStop)
-  // to avoid a race condition where the store update triggers useEffect and clobbers selection.
+  // Handle ALL node changes — selection tracked in state, position synced on drag stop
   const onNodesChange = useCallback((changes: NodeChange[]) => {
-    setRfNodes((nds) => applyNodeChanges(changes, nds));
-  }, []);
+    let selectionChanged = false;
+    let nextSelected: Set<string> | null = null;
+    for (const change of changes) {
+      if (change.type === 'select') {
+        if (!nextSelected) {
+          nextSelected = new Set(selectedNodeIds);
+        }
+        if (change.selected) {
+          nextSelected.add(change.id);
+        } else {
+          nextSelected.delete(change.id);
+        }
+        selectionChanged = true;
+      }
+    }
+    if (selectionChanged && nextSelected) {
+      setSelectedNodeIds(nextSelected);
+    }
+  }, [selectedNodeIds]);
 
   // Sync final position to diagram store only when drag ends
   const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
     updateNodePosition(node.id, node.position.x, node.position.y);
   }, [updateNodePosition]);
 
-  // Handle ALL edge changes (selection, etc.)
+  // Handle ALL edge changes — selection tracked in state
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
-    setRfEdges((eds) => applyEdgeChanges(changes, eds));
-  }, []);
+    let selectionChanged = false;
+    let nextSelected: Set<string> | null = null;
+    for (const change of changes) {
+      if (change.type === 'select') {
+        if (!nextSelected) {
+          nextSelected = new Set(selectedEdgeIds);
+        }
+        if (change.selected) {
+          nextSelected.add(change.id);
+        } else {
+          nextSelected.delete(change.id);
+        }
+        selectionChanged = true;
+      }
+    }
+    if (selectionChanged && nextSelected) {
+      setSelectedEdgeIds(nextSelected);
+    }
+  }, [selectedEdgeIds]);
 
   // Handle edge connections
   const onConnect = useCallback((connection: Connection) => {
@@ -187,3 +210,5 @@ export const Canvas = () => {
 };
 
 export default Canvas;
+
+
