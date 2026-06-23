@@ -116,15 +116,15 @@ function FlowInner() {
   }, [nodes, updateNodePosition]);
 
   // Handle ALL node changes (selection, position, dimensions, etc.)
+  // Position is synced to the diagram store only on drag stop (see onNodeDragStop)
+  // to avoid a race condition where the store update triggers useEffect and clobbers selection.
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setRfNodes((nds) => applyNodeChanges(changes, nds));
+  }, []);
 
-    // Sync position changes back to diagram store
-    changes.forEach((change) => {
-      if (change.type === 'position' && change.position) {
-        updateNodePosition(change.id, change.position.x, change.position.y);
-      }
-    });
+  // Sync final position to diagram store only when drag ends
+  const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
+    updateNodePosition(node.id, node.position.x, node.position.y);
   }, [updateNodePosition]);
 
   // Handle ALL edge changes (selection, etc.)
@@ -160,11 +160,14 @@ function FlowInner() {
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeDragStop={onNodeDragStop}
         onConnect={onConnect}
         onPaneDoubleClick={onPaneDoubleClick}
         onNodesDelete={(nodes) => nodes.forEach((n) => deleteNode(n.id))}
         onEdgesDelete={(edges) => edges.forEach((e) => deleteEdge(e.id))}
         deleteKeyCode={['Delete', 'Backspace']}
+        nodeDragThreshold={2}
+        defaultEdgeOptions={{ interactionWidth: 20 }}
         fitView
       >
         <Background color="#374151" gap={16} />
