@@ -1,21 +1,17 @@
 import React from 'react';
-import { useNodes, useEdges, useReactFlow } from '@xyflow/react';
+import { useEdges, useReactFlow } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
 import type { NodeShape } from '../core/types';
 
 export const Toolbar = () => {
   const addNode = useDiagramStore((state) => state.addNode);
-  const updateNodeShape = useDiagramStore((state) => state.updateNodeShape);
   const toggleEdgeStyle = useDiagramStore((state) => state.toggleEdgeStyle);
   const diagram = useDiagramStore((state) => state.diagram);
 
-  const nodes = useNodes();
   const edges = useEdges();
   const { screenToFlowPosition } = useReactFlow();
 
-  const selectedNode = nodes.find((n) => n.selected);
   const selectedEdge = edges.find((e) => e.selected);
-
   const currentEdgeData = selectedEdge ? diagram.edges.find((e) => e.id === selectedEdge.id) : null;
   const isDotted = currentEdgeData ? currentEdgeData.style === 'dotted' : false;
 
@@ -35,12 +31,8 @@ export const Toolbar = () => {
   };
 
   const handleShapeClick = (shape: NodeShape) => {
-    if (selectedNode) {
-      updateNodeShape(selectedNode.id, shape);
-    } else {
-      const coords = getCenterCoordinates();
-      addNode(shape, coords.x, coords.y);
-    }
+    const coords = getCenterCoordinates();
+    addNode(shape, coords.x, coords.y);
   };
 
   const handleToggleStyle = (targetDotted: boolean) => {
@@ -94,15 +86,12 @@ export const Toolbar = () => {
         <h3 className="sidebar-section-title">Shapes</h3>
         <div className="shapes-list">
           {shapes.map((s) => {
-            const isActive = selectedNode
-              ? diagram.nodes.find((n) => n.id === selectedNode.id)?.shape === s.type
-              : false;
             return (
               <button
                 key={s.type}
                 onClick={() => handleShapeClick(s.type)}
-                title={selectedNode ? `Changer le nœud en ${s.label}` : `Ajouter un nœud ${s.label}`}
-                className={`palette-shape-btn ${isActive ? 'active' : ''}`}
+                title={`Ajouter un nœud ${s.label}`}
+                className="palette-shape-btn"
               >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   {s.svg}
