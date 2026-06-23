@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, type NodeProps, useConnection } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
 import type { NodeShape } from '../core/types';
 
@@ -11,6 +11,10 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   
   const [isEditing, setIsEditing] = useState(false);
   const [tempLabel, setTempLabel] = useState(label);
+
+  const connection = useConnection();
+  const isConnecting = connection.inProgress;
+  const connectingClass = isConnecting ? 'is-connecting' : '';
 
   const handleStartEditing = () => {
     setTempLabel(label);
@@ -91,7 +95,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (shape === 'decision') {
     return (
-      <div className={`decision-wrapper ${selected ? 'node-selected' : ''}`}>
+      <div className={`decision-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`}>
         <div className="decision-bg"></div>
         <div className="decision-text">{renderInner()}</div>
         {renderHandles()}
@@ -102,7 +106,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (shape === 'event') {
     return (
-      <div className={`event-circle ${selected ? 'node-selected' : ''}`}>
+      <div className={`event-circle ${selected ? 'node-selected' : ''} ${connectingClass}`}>
         <div className="event-inner">{renderInner()}</div>
         {renderHandles()}
         {renderSelectionOverlay()}
@@ -112,7 +116,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (shape === 'endEvent') {
     return (
-      <div className={`end-event-circle-outer ${selected ? 'node-selected' : ''}`}>
+      <div className={`end-event-circle-outer ${selected ? 'node-selected' : ''} ${connectingClass}`}>
         <div className="end-event-circle-inner">
           <div className="event-inner">{renderInner()}</div>
         </div>
@@ -128,7 +132,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   if (shape === 'stadium') shapeClass = 'shape-stadium';
 
   return (
-    <div className={`custom-node ${shapeClass} ${selected ? 'node-selected' : ''}`}>
+    <div className={`custom-node ${shapeClass} ${selected ? 'node-selected' : ''} ${connectingClass}`}>
       {renderInner()}
       {renderHandles()}
       {renderSelectionOverlay()}

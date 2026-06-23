@@ -9,7 +9,8 @@ import {
   type Connection,
   type NodeChange,
   type EdgeChange,
-  type Node
+  type Node,
+  MarkerType
 } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
 import CustomNode from './CustomNode';
@@ -59,6 +60,12 @@ function FlowInner() {
       label: edge.label,
       type: 'customEdge',
       selected: selectedEdgeIds.has(edge.id),
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 20,
+        height: 20,
+        color: selectedEdgeIds.has(edge.id) ? '#8b5cf6' : '#4b5563',
+      },
     }));
   }, [diagram.edges, selectedEdgeIds]);
 
@@ -199,6 +206,15 @@ function FlowInner() {
         deleteKeyCode={['Delete', 'Backspace']}
         nodeDragThreshold={2}
         defaultEdgeOptions={{ interactionWidth: 20 }}
+        connectionLineOptions={{
+          style: { stroke: '#4b5563', strokeWidth: 2 },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 20,
+            height: 20,
+            color: '#4b5563',
+          },
+        }}
         fitView
       >
         <Background color="#374151" gap={16} />

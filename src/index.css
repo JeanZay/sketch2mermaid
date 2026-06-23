@@ -463,7 +463,24 @@ body {
   background-color: #ffffff !important;
   border: 2px solid var(--accent-color) !important;
   border-radius: 50%;
-  transition: background-color 0.15s, transform 0.15s;
+  opacity: 0;
+  transition: opacity 0.2s, background-color 0.15s, transform 0.15s;
+}
+
+/* Scoped visibility rules for node handles */
+.custom-node:hover .node-handle,
+.custom-node.node-selected .node-handle,
+.custom-node.is-connecting .node-handle,
+.decision-wrapper:hover .node-handle,
+.decision-wrapper.node-selected .node-handle,
+.decision-wrapper.is-connecting .node-handle,
+.event-circle:hover .node-handle,
+.event-circle.node-selected .node-handle,
+.event-circle.is-connecting .node-handle,
+.end-event-circle-outer:hover .node-handle,
+.end-event-circle-outer.node-selected .node-handle,
+.end-event-circle-outer.is-connecting .node-handle {
+  opacity: 1;
 }
 
 /* Ensure overlapping handles stack correctly so that source is on top to start drags */
@@ -478,6 +495,7 @@ body {
 .node-handle:hover {
   background-color: var(--accent-color) !important;
   transform: scale(1.3);
+  opacity: 1;
 }
 
 /* Inline Label Editors */
