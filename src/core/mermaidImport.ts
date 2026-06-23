@@ -1,5 +1,6 @@
 import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, EdgeDirection, DiagramDirection, NodeStyle } from './types';
 import { NODE_SIZE_DEFAULTS } from './nodeSizeConfig';
+import { layoutImportedDiagram } from './layout/mermaidLayout';
 
 export type MermaidImportWarningType =
   | 'unsupportedDiagramType'
@@ -12,7 +13,6 @@ export type MermaidImportWarningType =
   | 'lineSkipped'
   | 'labelSanitized'
   | 'duplicateId'
-  | 'layoutFallback'
   | 'ampersandSkipped';
 
 export interface MermaidImportWarning {
@@ -590,14 +590,24 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
     });
   }
 
-  // Layout Computation
-  const usedLayoutFallback = computeLayout(finalNodes, finalEdges, direction, orderOfAppearance);
+  // Layout Computation — Dagre (same engine as Mermaid.js)
+  const layoutResult = layoutImportedDiagram(finalNodes, finalEdges, direction, orderOfAppearance);
 
-  if (usedLayoutFallback) {
-    warnings.push({
-      type: 'layoutFallback',
-      message: 'La disposition a détecté des cycles ou des portions isolées. Les positions ont été estimées.',
-    });
+  // Apply positions
+  for (const node of finalNodes) {
+    const pos = layoutResult.positions.get(node.id);
+    if (pos) {
+      node.position = pos;
+    }
+  }
+
+  // Apply handles per edge (geometric, based on post-layout positions)
+  for (const edge of finalEdges) {
+    const handlePair = layoutResult.handles.get(edge.id);
+    if (handlePair) {
+      edge.sourceHandle = handlePair.sourceHandle;
+      edge.targetHandle = handlePair.targetHandle;
+    }
   }
 
   // Deduplicate warnings by: type + line + raw + message
@@ -1020,216 +1030,3 @@ function scanEdgeRef(s: string, start: number): { edge: ParsedEdge; nextIndex: n
   return null;
 }
 
-// Spacing constants for diagram layers layout
-const IMPORT_LEVEL_SPACING = 220;
-const IMPORT_SIBLING_SPACING = 140;
-const IMPORT_COMPONENT_SPACING = 260;
-
-function computeLayout(
-  nodes: DiagramNode[],
-  edges: DiagramEdge[],
-  direction: DiagramDirection,
-  orderOfAppearance: string[]
-): boolean {
-  if (nodes.length === 0) return false;
-
-  // 1. Build Adjacency Representation (Undirected to find components)
-  const adjUndirected = new Map<string, string[]>();
-  for (const n of nodes) {
-    adjUndirected.set(n.id, []);
-  }
-  for (const e of edges) {
-    adjUndirected.get(e.from)?.push(e.to);
-    adjUndirected.get(e.to)?.push(e.from);
-  }
-
-  // 2. Find Connected Components
-  const visitedGlobal = new Set<string>();
-  const components: string[][] = [];
-
-  for (const nodeId of orderOfAppearance) {
-    if (!visitedGlobal.has(nodeId)) {
-      const component: string[] = [];
-      const stack: string[] = [nodeId];
-      visitedGlobal.add(nodeId);
-
-      while (stack.length > 0) {
-        const curr = stack.pop()!;
-        component.push(curr);
-        for (const neighbor of adjUndirected.get(curr) || []) {
-          if (!visitedGlobal.has(neighbor)) {
-            visitedGlobal.add(neighbor);
-            stack.push(neighbor);
-          }
-        }
-      }
-      
-      // Sort components nodes by their appearance in original order
-      component.sort((a, b) => orderOfAppearance.indexOf(a) - orderOfAppearance.indexOf(b));
-      components.push(component);
-    }
-  }
-
-  let layoutFallbackTriggered = false;
-
-  let componentOffsetX = 0;
-  let componentOffsetY = 0;
-
-  // 3. Layout each component separately
-  for (const comp of components) {
-    // Build directed adj list & compute indegrees
-    const adjDirected = new Map<string, string[]>();
-    const inDegree = new Map<string, number>();
-
-    for (const nodeId of comp) {
-      adjDirected.set(nodeId, []);
-      inDegree.set(nodeId, 0);
-    }
-
-    for (const e of edges) {
-      if (adjDirected.has(e.from) && adjDirected.has(e.to)) {
-        adjDirected.get(e.from)!.push(e.to);
-        inDegree.set(e.to, inDegree.get(e.to)! + 1);
-      }
-    }
-
-    // Source nodes (inDegree === 0)
-    let sources = comp.filter(id => inDegree.get(id) === 0);
-
-    if (sources.length === 0) {
-      // Cycle: select the first node by order of appearance
-      sources = [comp[0]];
-      layoutFallbackTriggered = true;
-    }
-
-    // BFS to assign layers
-    const layers = new Map<string, number>();
-    const queue: string[] = [];
-    const visitedBFS = new Set<string>();
-
-    for (const src of sources) {
-      layers.set(src, 0);
-      queue.push(src);
-      visitedBFS.add(src);
-    }
-
-    while (queue.length > 0) {
-      const curr = queue.shift()!;
-      const currLayer = layers.get(curr) || 0;
-
-      for (const neighbor of adjDirected.get(curr) || []) {
-        if (!visitedBFS.has(neighbor)) {
-          visitedBFS.add(neighbor);
-          layers.set(neighbor, currLayer + 1);
-          queue.push(neighbor);
-        } else {
-          // Alternate path / cycle: update to maximum layer to prevent loops
-          const oldLayer = layers.get(neighbor) || 0;
-          if (currLayer + 1 > oldLayer) {
-            layers.set(neighbor, currLayer + 1);
-            // We do not re-enqueue to prevent infinite loops on cycle
-            layoutFallbackTriggered = true;
-          }
-        }
-      }
-    }
-
-    // Handle any unreachable nodes (e.g. cycles disconnected from main source)
-    for (const nodeId of comp) {
-      if (!visitedBFS.has(nodeId)) {
-        layers.set(nodeId, 0);
-        layoutFallbackTriggered = true;
-      }
-    }
-
-    // Group by layer
-    const layerGroups: Map<number, string[]> = new Map();
-    for (const nodeId of comp) {
-      const L = layers.get(nodeId) || 0;
-      if (!layerGroups.has(L)) {
-        layerGroups.set(L, []);
-      }
-      layerGroups.get(L)!.push(nodeId);
-    }
-
-    // Sort nodes in each layer by their appearance
-    const sortedLayers = Array.from(layerGroups.keys()).sort((a, b) => a - b);
-    for (const L of sortedLayers) {
-      layerGroups.get(L)!.sort((a, b) => orderOfAppearance.indexOf(a) - orderOfAppearance.indexOf(b));
-    }
-
-    // Assign local positions
-    const nodesMap = new Map<string, DiagramNode>();
-    for (const n of nodes) {
-      nodesMap.set(n.id, n);
-    }
-
-    const localPositions = new Map<string, { x: number; y: number }>();
-    let compMinX = Infinity;
-    let compMaxX = -Infinity;
-    let compMinY = Infinity;
-    let compMaxY = -Infinity;
-
-    for (const L of sortedLayers) {
-      const layerNodes = layerGroups.get(L) || [];
-      const totalWidth = (layerNodes.length - 1) * IMPORT_SIBLING_SPACING;
-      
-      for (let siblingIdx = 0; siblingIdx < layerNodes.length; siblingIdx++) {
-        const nodeId = layerNodes[siblingIdx];
-        
-        let lx = 0;
-        let ly = 0;
-
-        const siblingOffset = layerNodes.length > 1 
-          ? (siblingIdx * IMPORT_SIBLING_SPACING) - (totalWidth / 2)
-          : 0;
-
-        if (direction === 'TD') {
-          lx = siblingOffset;
-          ly = L * IMPORT_LEVEL_SPACING;
-        } else if (direction === 'LR') {
-          lx = L * IMPORT_LEVEL_SPACING;
-          ly = siblingOffset;
-        } else if (direction === 'BT') {
-          lx = siblingOffset;
-          ly = -L * IMPORT_LEVEL_SPACING;
-        } else if (direction === 'RL') {
-          lx = -L * IMPORT_LEVEL_SPACING;
-          ly = siblingOffset;
-        }
-
-        localPositions.set(nodeId, { x: lx, y: ly });
-        
-        if (lx < compMinX) compMinX = lx;
-        if (lx > compMaxX) compMaxX = lx;
-        if (ly < compMinY) compMinY = ly;
-        if (ly > compMaxY) compMaxY = ly;
-      }
-    }
-
-    // Shift component positions by offsets to prevent overlaps
-    for (const nodeId of comp) {
-      const localPos = localPositions.get(nodeId)!;
-      const node = nodesMap.get(nodeId)!;
-
-      if (direction === 'TD' || direction === 'BT') {
-        node.position.x = Math.round(localPos.x - compMinX + componentOffsetX);
-        node.position.y = Math.round(localPos.y);
-      } else {
-        node.position.x = Math.round(localPos.x);
-        node.position.y = Math.round(localPos.y - compMinY + componentOffsetY);
-      }
-    }
-
-    // Increment offsets
-    if (direction === 'TD' || direction === 'BT') {
-      const compWidth = compMaxX - compMinX;
-      componentOffsetX += compWidth + IMPORT_COMPONENT_SPACING;
-    } else {
-      const compHeight = compMaxY - compMinY;
-      componentOffsetY += compHeight + IMPORT_COMPONENT_SPACING;
-    }
-  }
-
-  return layoutFallbackTriggered;
-}
