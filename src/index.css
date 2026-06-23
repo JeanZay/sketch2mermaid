@@ -317,11 +317,7 @@ body {
   background: #f4f2fe !important;
 }
 
-.rf-minimap {
-  background: #ffffff !important;
-  border: 1px solid var(--border-color) !important;
-  border-radius: 8px;
-}
+
 
 /* Custom Nodes inside Canvas */
 .custom-node {

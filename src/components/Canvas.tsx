@@ -3,7 +3,6 @@ import {
   ReactFlow, 
   Background, 
   Controls, 
-  MiniMap, 
   useReactFlow, 
   useNodes,
   type Connection,
@@ -261,11 +260,7 @@ function FlowInner() {
       >
         <Background color="#374151" gap={16} />
         <Controls showInteractive={false} className="rf-controls" />
-        <MiniMap 
-          nodeColor={() => '#1f2937'} 
-          maskColor="rgba(11, 15, 25, 0.6)" 
-          className="rf-minimap"
-        />
+
       </ReactFlow>
     </div>
   );
