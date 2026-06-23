@@ -98,16 +98,16 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   // Four handles for flexible connections (each side has both target and source)
   const renderHandles = () => (
     <>
-      <Handle type="target" position={Position.Top} id="t-target" className="node-handle" />
+      <Handle type="target" position={Position.Top} id="t-target" className="node-handle" isConnectableStart={false} />
       <Handle type="source" position={Position.Top} id="t-source" className="node-handle" />
       
-      <Handle type="target" position={Position.Bottom} id="b-target" className="node-handle" />
+      <Handle type="target" position={Position.Bottom} id="b-target" className="node-handle" isConnectableStart={false} />
       <Handle type="source" position={Position.Bottom} id="b-source" className="node-handle" />
       
-      <Handle type="target" position={Position.Left} id="l-target" className="node-handle" />
+      <Handle type="target" position={Position.Left} id="l-target" className="node-handle" isConnectableStart={false} />
       <Handle type="source" position={Position.Left} id="l-source" className="node-handle" />
       
-      <Handle type="target" position={Position.Right} id="r-target" className="node-handle" />
+      <Handle type="target" position={Position.Right} id="r-target" className="node-handle" isConnectableStart={false} />
       <Handle type="source" position={Position.Right} id="r-source" className="node-handle" />
     </>
   );

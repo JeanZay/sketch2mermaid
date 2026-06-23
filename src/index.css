@@ -602,11 +602,11 @@ body {
 }
 
 /* Ensure overlapping handles stack correctly so that source is on top to start drags */
-.node-handle[data-handle-type="source"] {
+.node-handle.source {
   z-index: 5 !important;
 }
 
-.node-handle[data-handle-type="target"] {
+.node-handle.target {
   z-index: 4 !important;
 }
 
