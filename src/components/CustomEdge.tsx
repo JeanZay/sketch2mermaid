@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
-import { useDiagramStore } from '../store/diagramStore';
+import { useDiagramStore, DEFAULT_EDGE_TEXT_STYLE } from '../store/diagramStore';
 
 export const CustomEdge = ({
   id,
@@ -59,6 +59,14 @@ export const CustomEdge = ({
     transition: 'stroke 0.2s, stroke-width 0.2s',
   };
 
+  const textStyleObj = storeEdge ? { ...DEFAULT_EDGE_TEXT_STYLE, ...storeEdge.textStyle } : DEFAULT_EDGE_TEXT_STYLE;
+  const edgeTextStyle: React.CSSProperties = {
+    fontSize: `${textStyleObj.fontSize}px`,
+    fontWeight: textStyleObj.bold ? 'bold' : 'normal',
+    fontStyle: textStyleObj.italic ? 'italic' : 'normal',
+    color: textStyleObj.color ?? '#4b5563',
+  };
+
   return (
     <>
       <BaseEdge path={edgePath} style={edgeStyle} markerEnd={markerEnd} />
@@ -69,6 +77,7 @@ export const CustomEdge = ({
             position: 'absolute',
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             pointerEvents: 'all',
+            ...edgeTextStyle,
           }}
           onDoubleClick={handleStartEditing}
           title="Double-cliquer pour modifier le label de l'arête"
@@ -82,6 +91,7 @@ export const CustomEdge = ({
               onKeyDown={handleKeyDown}
               autoFocus
               className="edge-label-input"
+              style={edgeTextStyle}
             />
           ) : (
             <span className="edge-label-text">

@@ -10,6 +10,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   const shape = (data.shape as NodeShape) || 'process';
   const nodeWidth = (data.width as number | undefined);
   const nodeHeight = (data.height as number | undefined);
+  const textStyle = (data.textStyle as import('../core/types').TextStyle | undefined);
   const updateNodeSize = data.updateNodeSize as ((id: string, w: number, h: number) => void) | undefined;
   
   const updateNodeLabel = useDiagramStore((state) => state.updateNodeLabel);
@@ -27,7 +28,16 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   const height = nodeHeight ?? sizeConfig.height;
 
   // Compute auto-fit font size
-  const fontSize = computeNodeFontSize({ label, width, height });
+  const autoFontSize = computeNodeFontSize({ label, width, height });
+  const fontSize = textStyle?.fontSize ?? autoFontSize;
+
+  const nodeTextStyle: React.CSSProperties = {
+    fontSize: `${fontSize}px`,
+    fontWeight: textStyle?.bold ? 'bold' : 'normal',
+    fontStyle: textStyle?.italic ? 'italic' : 'normal',
+    textAlign: textStyle?.textAlign ?? 'center',
+    color: textStyle?.color ?? 'inherit',
+  };
 
   const handleStartEditing = () => {
     setTempLabel(label);
@@ -65,7 +75,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
           onKeyDown={handleKeyDown}
           autoFocus
           className="node-input"
-          style={{ fontSize }}
+          style={nodeTextStyle}
         />
       );
     }
@@ -75,7 +85,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
         className="node-label" 
         onDoubleClick={handleStartEditing}
         title={label}
-        style={{ fontSize }}
+        style={nodeTextStyle}
       >
         {label || 'Double-clic...'}
       </div>

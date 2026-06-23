@@ -14,6 +14,12 @@ export interface DiagramNode {
    */
   width?: number;
   height?: number;
+
+  /**
+   * Canvas-only visual text styling.
+   * Not exported to Mermaid.
+   */
+  textStyle?: TextStyle;
 }
 
 export interface DiagramEdge {
@@ -24,15 +30,23 @@ export interface DiagramEdge {
   targetHandle?: string;
   label: string; // "" means no label
   style: EdgeStyle;
+  
+  /**
+   * Canvas-only visual text styling for the label.
+   * Not exported to Mermaid.
+   */
+  textStyle?: TextStyle;
 }
 
-export interface TextBoxStyle {
-  fontSize: number;
-  bold: boolean;
-  italic: boolean;
-  textAlign: 'left' | 'center' | 'right';
-  color: string;
+export interface TextStyle {
+  fontSize?: number;
+  bold?: boolean;
+  italic?: boolean;
+  textAlign?: 'left' | 'center' | 'right';
+  color?: string;
 }
+
+export type TextBoxStyle = TextStyle;
 
 export interface TextBox {
   id: string;

@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { type NodeProps } from '@xyflow/react';
-import { useDiagramStore } from '../store/diagramStore';
+import { useDiagramStore, DEFAULT_TEXT_BOX_STYLE } from '../store/diagramStore';
 import type { TextBoxStyle } from '../core/types';
 
 export const TextBoxNode = ({ id, selected, data }: NodeProps) => {
   const text = (data.text as string) || '';
-  const style = (data.style as TextBoxStyle) || {};
+  const rawStyle = (data.style as TextBoxStyle) || {};
+  const style = { ...DEFAULT_TEXT_BOX_STYLE, ...rawStyle };
 
   const updateTextBoxText = useDiagramStore((state) => state.updateTextBoxText);
 
@@ -43,11 +44,11 @@ export const TextBoxNode = ({ id, selected, data }: NodeProps) => {
   };
 
   const textStyle: React.CSSProperties = {
-    fontSize: `${style.fontSize ?? 14}px`,
+    fontSize: `${style.fontSize}px`,
     fontWeight: style.bold ? 'bold' : 'normal',
     fontStyle: style.italic ? 'italic' : 'normal',
-    textAlign: style.textAlign ?? 'left',
-    color: style.color ?? '#374151',
+    textAlign: style.textAlign,
+    color: style.color,
   };
 
   return (

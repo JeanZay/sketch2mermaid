@@ -62,6 +62,22 @@ export function getNextTextBoxId(textBoxes: TextBox[]): string {
   return `tb${max + 1}`;
 }
 
+export const DEFAULT_NODE_TEXT_STYLE: import('../core/types').TextStyle = {
+  // fontSize is left undefined intentionally to trigger auto-fit fallback `computeNodeFontSize`
+  bold: false,
+  italic: false,
+  textAlign: 'center',
+  color: '#000000',
+};
+
+export const DEFAULT_EDGE_TEXT_STYLE: import('../core/types').TextStyle = {
+  fontSize: 14,
+  bold: false,
+  italic: false,
+  textAlign: 'center',
+  color: '#4b5563',
+};
+
 export const DEFAULT_TEXT_BOX_STYLE: TextBoxStyle = {
   fontSize: 14,
   bold: false,
@@ -119,9 +135,11 @@ export interface DiagramState {
   updateNodeShape: (id: string, shape: NodeShape) => void;
   updateNodePosition: (id: string, x: number, y: number) => void;
   updateNodeSize: (id: string, width: number, height: number) => void;
+  updateNodeTextStyle: (id: string, style: Partial<import('../core/types').TextStyle>) => void;
   deleteNode: (id: string) => void;
   addEdge: (from: string, to: string, style?: EdgeStyle, sourceHandle?: string, targetHandle?: string) => string;
   updateEdgeLabel: (id: string, label: string) => void;
+  updateEdgeTextStyle: (id: string, style: Partial<import('../core/types').TextStyle>) => void;
   toggleEdgeStyle: (id: string) => void;
   deleteEdge: (id: string) => void;
   addTextBox: (x: number, y: number) => string;
@@ -225,6 +243,17 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     }));
   },
 
+  updateNodeTextStyle: (id, style) => {
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        nodes: state.diagram.nodes.map((node) =>
+          node.id === id ? { ...node, textStyle: { ...node.textStyle, ...style } } : node
+        ),
+      },
+    }));
+  },
+
   deleteNode: (id) => {
     set((state) => ({
       diagram: {
@@ -274,6 +303,17 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
         ...state.diagram,
         edges: state.diagram.edges.map((edge) =>
           edge.id === id ? { ...edge, label } : edge
+        ),
+      },
+    }));
+  },
+
+  updateEdgeTextStyle: (id, style) => {
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        edges: state.diagram.edges.map((edge) =>
+          edge.id === id ? { ...edge, textStyle: { ...edge.textStyle, ...style } } : edge
         ),
       },
     }));

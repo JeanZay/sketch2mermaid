@@ -1,8 +1,9 @@
 import React from 'react';
 import { useNodes, useEdges, useReactFlow } from '@xyflow/react';
-import { useDiagramStore } from '../store/diagramStore';
-import type { TextBoxStyle } from '../core/types';
+import { useDiagramStore, DEFAULT_NODE_TEXT_STYLE, DEFAULT_EDGE_TEXT_STYLE, DEFAULT_TEXT_BOX_STYLE } from '../store/diagramStore';
+import type { TextStyle, TextBoxStyle } from '../core/types';
 import { SHAPE_CONFIGS } from './shapeConfig';
+import { FontSizeControl } from './properties/FontSizeControl';
 
 export const PropertiesPanel = () => {
   const nodes = useNodes();
@@ -19,6 +20,7 @@ export const PropertiesPanel = () => {
   const updateEdgeLabel = useDiagramStore((state) => state.updateEdgeLabel);
   const toggleEdgeStyle = useDiagramStore((state) => state.toggleEdgeStyle);
   const deleteEdge = useDiagramStore((state) => state.deleteEdge);
+  const updateEdgeTextStyle = useDiagramStore((state) => state.updateEdgeTextStyle);
   const updateTextBoxText = useDiagramStore((state) => state.updateTextBoxText);
   const updateTextBoxStyle = useDiagramStore((state) => state.updateTextBoxStyle);
   const deleteTextBox = useDiagramStore((state) => state.deleteTextBox);
@@ -92,13 +94,9 @@ export const PropertiesPanel = () => {
 
           <div className="property-group">
             <label className="property-label">Font Size</label>
-            <input
-              type="number"
-              value={style.fontSize}
-              min={8}
-              max={48}
-              onChange={(e) => handleStyleChange({ fontSize: Math.max(8, Math.min(48, Number(e.target.value))) })}
-              className="property-input property-number"
+            <FontSizeControl
+              value={style.fontSize ?? DEFAULT_TEXT_BOX_STYLE.fontSize!}
+              onChange={(val) => handleStyleChange({ fontSize: val })}
             />
           </div>
 
@@ -188,6 +186,13 @@ export const PropertiesPanel = () => {
     const inEdges = diagram.edges.filter((e) => e.to === selectedNode.id).length;
     const outEdges = diagram.edges.filter((e) => e.from === selectedNode.id).length;
 
+    const updateNodeTextStyle = useDiagramStore.getState().updateNodeTextStyle;
+    const style = { ...DEFAULT_NODE_TEXT_STYLE, ...nodeData.textStyle };
+
+    const handleStyleChange = (updates: Partial<TextStyle>) => {
+      updateNodeTextStyle(selectedNode.id, updates);
+    };
+
     const shapes = SHAPE_CONFIGS;
 
     return (
@@ -243,6 +248,79 @@ export const PropertiesPanel = () => {
           </div>
 
           <div className="property-group">
+            <label className="property-label">Font Size</label>
+            <div className="annotation-info-text" style={{ marginBottom: 4, padding: 0 }}>
+              {nodeData.textStyle?.fontSize ? 'Custom size:' : 'Auto-fit (default):'}
+            </div>
+            <FontSizeControl
+              value={style.fontSize ?? 14}
+              onChange={(val) => handleStyleChange({ fontSize: val })}
+            />
+          </div>
+
+          <div className="property-group">
+            <label className="property-label">Format</label>
+            <div className="text-format-controls">
+              <button
+                className={`format-toggle-btn ${style.bold ? 'active' : ''}`}
+                onClick={() => handleStyleChange({ bold: !style.bold })}
+                title="Bold"
+              >
+                <strong>B</strong>
+              </button>
+              <button
+                className={`format-toggle-btn ${style.italic ? 'active' : ''}`}
+                onClick={() => handleStyleChange({ italic: !style.italic })}
+                title="Italic"
+              >
+                <em>I</em>
+              </button>
+            </div>
+          </div>
+
+          <div className="property-group">
+            <label className="property-label">Alignment</label>
+            <div className="style-segmented-control">
+              <button
+                className={`segment-btn ${style.textAlign === 'left' ? 'active' : ''}`}
+                onClick={() => handleStyleChange({ textAlign: 'left' })}
+              >
+                Left
+              </button>
+              <button
+                className={`segment-btn ${style.textAlign === 'center' ? 'active' : ''}`}
+                onClick={() => handleStyleChange({ textAlign: 'center' })}
+              >
+                Center
+              </button>
+              <button
+                className={`segment-btn ${style.textAlign === 'right' ? 'active' : ''}`}
+                onClick={() => handleStyleChange({ textAlign: 'right' })}
+              >
+                Right
+              </button>
+            </div>
+          </div>
+
+          <div className="property-group">
+            <label className="property-label">Text Color</label>
+            <div className="color-input-row">
+              <input
+                type="color"
+                value={style.color}
+                onChange={(e) => handleStyleChange({ color: e.target.value })}
+                className="color-picker"
+              />
+              <input
+                type="text"
+                value={style.color}
+                onChange={(e) => handleStyleChange({ color: e.target.value })}
+                className="property-input color-text-input"
+              />
+            </div>
+          </div>
+
+          <div className="property-group">
             <label className="property-label">Connections</label>
             <span className="property-text-val">
               {inEdges} in · {outEdges} out
@@ -271,6 +349,12 @@ export const PropertiesPanel = () => {
     const targetLabel = targetNode ? targetNode.label : edgeData.to;
 
     const isDotted = edgeData.style === 'dotted';
+    
+    const style = { ...DEFAULT_EDGE_TEXT_STYLE, ...edgeData.textStyle };
+
+    const handleStyleChange = (updates: Partial<TextStyle>) => {
+      updateEdgeTextStyle(selectedEdge.id, updates);
+    };
 
     return (
       <div className="properties-panel-content">
@@ -323,6 +407,56 @@ export const PropertiesPanel = () => {
               </button>
             </div>
           </div>
+
+          {edgeData.label && edgeData.label.trim().length > 0 && (
+            <>
+              <div className="property-group">
+                <label className="property-label">Font Size</label>
+                <FontSizeControl
+                  value={style.fontSize ?? DEFAULT_EDGE_TEXT_STYLE.fontSize!}
+                  onChange={(val) => handleStyleChange({ fontSize: val })}
+                />
+              </div>
+
+              <div className="property-group">
+                <label className="property-label">Format</label>
+                <div className="text-format-controls">
+                  <button
+                    className={`format-toggle-btn ${style.bold ? 'active' : ''}`}
+                    onClick={() => handleStyleChange({ bold: !style.bold })}
+                    title="Bold"
+                  >
+                    <strong>B</strong>
+                  </button>
+                  <button
+                    className={`format-toggle-btn ${style.italic ? 'active' : ''}`}
+                    onClick={() => handleStyleChange({ italic: !style.italic })}
+                    title="Italic"
+                  >
+                    <em>I</em>
+                  </button>
+                </div>
+              </div>
+
+              <div className="property-group">
+                <label className="property-label">Text Color</label>
+                <div className="color-input-row">
+                  <input
+                    type="color"
+                    value={style.color}
+                    onChange={(e) => handleStyleChange({ color: e.target.value })}
+                    className="color-picker"
+                  />
+                  <input
+                    type="text"
+                    value={style.color}
+                    onChange={(e) => handleStyleChange({ color: e.target.value })}
+                    className="property-input color-text-input"
+                  />
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="property-group">
             <label className="property-label">Connections</label>
