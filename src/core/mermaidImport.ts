@@ -96,26 +96,48 @@ function sanitizeAndUnescapeLabel(rawLabel: string): { label: string; sanitized:
   return { label, sanitized, bold, italic };
 }
 
-// Helper to check if a line contains unquoted ampersands
+// Helper to check if a line contains unquoted ampersands outside of node labels/shapes or edge labels
 function hasUnquotedAmpersand(s: string): boolean {
   let inDoubleQuotes = false;
   let inSingleQuotes = false;
   let inBackticks = false;
+  let bracketDepth = 0;
+  let inPipe = false;
 
   for (let i = 0; i < s.length; i++) {
     const char = s[i];
-    if (char === '"' && !inSingleQuotes && !inBackticks) {
-      if (i === 0 || s[i - 1] !== '\\') {
-        inDoubleQuotes = !inDoubleQuotes;
+
+    // Handle escape char inside quotes
+    if (char === '\\' && (inDoubleQuotes || inSingleQuotes || inBackticks) && i + 1 < s.length) {
+      i++;
+      continue;
+    }
+
+    if (inDoubleQuotes) {
+      if (char === '"') inDoubleQuotes = false;
+    } else if (inSingleQuotes) {
+      if (char === "'") inSingleQuotes = false;
+    } else if (inBackticks) {
+      if (char === '`') inBackticks = false;
+    } else {
+      // Not in any quotes
+      if (char === '"') {
+        inDoubleQuotes = true;
+      } else if (char === "'") {
+        inSingleQuotes = true;
+      } else if (char === '`') {
+        inBackticks = true;
+      } else if (char === '[' || char === '(' || char === '{') {
+        bracketDepth++;
+      } else if (char === ']' || char === ')' || char === '}') {
+        bracketDepth = Math.max(0, bracketDepth - 1);
+      } else if (char === '|' && bracketDepth === 0) {
+        inPipe = !inPipe;
+      } else if (char === '&') {
+        if (bracketDepth === 0 && !inPipe) {
+          return true;
+        }
       }
-    } else if (char === "'" && !inDoubleQuotes && !inBackticks) {
-      if (i === 0 || s[i - 1] !== '\\') {
-        inSingleQuotes = !inSingleQuotes;
-      }
-    } else if (char === '`' && !inDoubleQuotes && !inSingleQuotes) {
-      inBackticks = !inBackticks;
-    } else if (char === '&' && !inDoubleQuotes && !inSingleQuotes && !inBackticks) {
-      return true;
     }
   }
   return false;
@@ -558,6 +580,17 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
     });
   }
 
+  // Deduplicate warnings by: type + line + raw + message
+  const uniqueWarnings: MermaidImportWarning[] = [];
+  const seenWarnings = new Set<string>();
+  for (const w of warnings) {
+    const key = `${w.type}:${w.line ?? ''}:${w.raw ?? ''}:${w.message}`;
+    if (!seenWarnings.has(key)) {
+      seenWarnings.add(key);
+      uniqueWarnings.push(w);
+    }
+  }
+
   const diagram: CanonicalDiagram = {
     schemaVersion: 1,
     diagramType: 'flowchart',
@@ -567,7 +600,7 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
     textBoxes: [],
   };
 
-  return { diagram, warnings };
+  return { diagram, warnings: uniqueWarnings };
 }
 
 // Phase 2 details: parses a single line for a chain of nodes and edges
