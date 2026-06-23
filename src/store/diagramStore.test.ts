@@ -46,6 +46,26 @@ describe('Zustand diagram store tests', () => {
     });
   });
 
+  test('addNode shifts overlapping nodes diagonally', () => {
+    const store = useDiagramStore.getState();
+    
+    // Add multiple nodes at the exact same position
+    const id1 = store.addNode('process', 100, 100);
+    const id2 = store.addNode('decision', 100, 100);
+    const id3 = store.addNode('rounded', 100, 100);
+
+    expect(id1).toBe('n1');
+    expect(id2).toBe('n2');
+    expect(id3).toBe('n3');
+
+    const state = useDiagramStore.getState().diagram;
+    expect(state.nodes).toHaveLength(3);
+    
+    expect(state.nodes[0].position).toEqual({ x: 100, y: 100 });
+    expect(state.nodes[1].position).toEqual({ x: 120, y: 120 });
+    expect(state.nodes[2].position).toEqual({ x: 140, y: 140 });
+  });
+
   test('AC8 — Renaming a node does not modify its internal ID', () => {
     const store = useDiagramStore.getState();
     const id = store.addNode('rounded', 0, 0);

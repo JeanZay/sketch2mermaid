@@ -104,11 +104,20 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   addNode: (shape, x, y) => {
     const newId = getNextNodeId(get().diagram.nodes);
+    
+    let targetX = x;
+    let targetY = y;
+    const nodes = get().diagram.nodes;
+    while (nodes.some((n) => n.position.x === targetX && n.position.y === targetY)) {
+      targetX += 20;
+      targetY += 20;
+    }
+
     const newNode: DiagramNode = {
       id: newId,
       label: 'Nouveau nœud',
       shape,
-      position: { x, y },
+      position: { x: targetX, y: targetY },
     };
     set((state) => ({
       diagram: {
