@@ -33,6 +33,7 @@ function FlowInner() {
   const addEdge = useDiagramStore((state) => state.addEdge);
   const deleteEdge = useDiagramStore((state) => state.deleteEdge);
   const updateTextBoxPosition = useDiagramStore((state) => state.updateTextBoxPosition);
+  const updateTextBoxSize = useDiagramStore((state) => state.updateTextBoxSize);
   const deleteTextBox = useDiagramStore((state) => state.deleteTextBox);
 
   const { screenToFlowPosition } = useReactFlow();
@@ -62,13 +63,19 @@ function FlowInner() {
       id: tb.id,
       type: 'textBox' as const,
       position: tb.position,
-      data: { text: tb.text, style: tb.style },
+      data: {
+        text: tb.text,
+        style: tb.style,
+        width: tb.width,
+        height: tb.height,
+        updateTextBoxSize,
+      },
       selected: selectedNodeIds.has(tb.id),
       connectable: false,
     }));
 
     return [...diagramNodes, ...textBoxNodes];
-  }, [diagram.nodes, diagram.textBoxes, selectedNodeIds, updateNodeSize]);
+  }, [diagram.nodes, diagram.textBoxes, selectedNodeIds, updateNodeSize, updateTextBoxSize]);
 
   // Derive React Flow edges from diagram store + selection state
   const rfEdges = useMemo(() => {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, test, expect, vi } from 'vitest';
-import { useDiagramStore, getNextNodeId, getNextEdgeId, getNextTextBoxId, loadInitialDiagram } from './diagramStore';
+import { useDiagramStore, getNextNodeId, getNextEdgeId, getNextTextBoxId, loadInitialDiagram, normalizeDiagram } from './diagramStore';
 import type { DiagramNode, DiagramEdge, TextBox } from '../core/types';
 
 // Mock localStorage for Node test environment
@@ -213,6 +213,8 @@ describe('Zustand diagram store tests', () => {
       id: 'tb1',
       text: 'Text',
       position: { x: 100, y: 200 },
+      width: 150,
+      height: 80,
       style: {
         fontSize: 14,
         bold: false,
@@ -273,6 +275,82 @@ describe('Zustand diagram store tests', () => {
     const state = useDiagramStore.getState().diagram;
     expect(state.textBoxes).toHaveLength(1);
     expect(state.textBoxes[0].id).toBe('tb2');
+  });
+
+  test('addTextBox initializes with default dimensions', () => {
+    const store = useDiagramStore.getState();
+    store.addTextBox(10, 20);
+    const tb = useDiagramStore.getState().diagram.textBoxes[0];
+    expect(tb.width).toBe(150);
+    expect(tb.height).toBe(80);
+  });
+
+  test('updateTextBoxSize updates width and height and clamps to minimums', () => {
+    const store = useDiagramStore.getState();
+    store.addTextBox(0, 0);
+    const tbId = useDiagramStore.getState().diagram.textBoxes[0].id;
+    
+    // Valid resizing
+    store.updateTextBoxSize(tbId, 200, 100);
+    let tb = useDiagramStore.getState().diagram.textBoxes[0];
+    expect(tb.width).toBe(200);
+    expect(tb.height).toBe(100);
+
+    // Below minimum limits
+    store.updateTextBoxSize(tbId, 30, 20);
+    tb = useDiagramStore.getState().diagram.textBoxes[0];
+    expect(tb.width).toBe(80); // MIN_TEXT_BOX_WIDTH
+    expect(tb.height).toBe(40); // MIN_TEXT_BOX_HEIGHT
+  });
+
+  test('updateTextBoxStyle normalizes empty color values to undefined', () => {
+    const store = useDiagramStore.getState();
+    store.addTextBox(0, 0);
+    const tbId = useDiagramStore.getState().diagram.textBoxes[0].id;
+
+    // Normalizing empty strings
+    store.updateTextBoxStyle(tbId, { backgroundColor: '  ', borderColor: '' });
+    let tb = useDiagramStore.getState().diagram.textBoxes[0];
+    expect(tb.style.backgroundColor).toBeUndefined();
+    expect(tb.style.borderColor).toBeUndefined();
+
+    // Solid color values
+    store.updateTextBoxStyle(tbId, { backgroundColor: '#ffffff', borderColor: '#000000' });
+    tb = useDiagramStore.getState().diagram.textBoxes[0];
+    expect(tb.style.backgroundColor).toBe('#ffffff');
+    expect(tb.style.borderColor).toBe('#000000');
+  });
+
+  test('normalizeDiagram clamps dimensions and handles invalid/NaN values', () => {
+    const raw = {
+      schemaVersion: 1,
+      diagramType: 'flowchart' as const,
+      direction: 'TD' as const,
+      nodes: [],
+      edges: [],
+      textBoxes: [
+        {
+          id: 'tb1',
+          text: 'hello',
+          position: { x: 0, y: 0 },
+          width: NaN,
+          height: -20,
+          style: {
+            backgroundColor: '  ',
+            borderColor: ' #123456 '
+          }
+        }
+      ]
+    };
+
+    const normalized = normalizeDiagram(raw);
+    const tb = normalized.textBoxes[0];
+    // NaN and negative values normalized/clamped:
+    expect(tb.width).toBe(150); // DEFAULT_TEXT_BOX_WIDTH
+    expect(tb.height).toBe(40);  // MIN_TEXT_BOX_HEIGHT (clamped -20)
+    // Empty background stripped, spaces on border trimmed:
+    expect(tb.style.backgroundColor).toBeUndefined();
+    expect(tb.style.borderColor).toBe('#123456');
   });
 
   test('getNextTextBoxId computes correct ID', () => {

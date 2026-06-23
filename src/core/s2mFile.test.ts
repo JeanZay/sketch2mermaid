@@ -56,7 +56,17 @@ function makeTestDiagram(): CanonicalDiagram {
         id: 'tb1',
         text: 'Annotation',
         position: { x: 300, y: 100 },
-        style: { fontSize: 14, bold: false, italic: false, textAlign: 'left', color: '#374151' },
+        width: 150,
+        height: 80,
+        style: {
+          fontSize: 14,
+          bold: false,
+          italic: false,
+          textAlign: 'left',
+          color: '#374151',
+          backgroundColor: undefined,
+          borderColor: undefined,
+        },
       },
     ],
   };

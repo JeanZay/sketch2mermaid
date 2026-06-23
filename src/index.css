@@ -1322,30 +1322,49 @@ body {
   border: 1.5px dashed transparent;
   border-radius: 4px;
   cursor: grab;
+  box-sizing: border-box;
   transition: border-color 0.15s ease, background-color 0.15s ease;
+  display: flex;
+  flex-direction: column;
 }
 
-.text-box-node:hover {
+.text-box-node:hover:not([style*="border-color"]) {
   border-color: var(--border-secondary, #4b5563);
+}
+
+.text-box-node:hover:not([style*="background-color"]) {
   background: rgba(255, 255, 255, 0.03);
 }
 
-.text-box-node.text-box-selected {
+.text-box-node.text-box-selected:not([style*="border-color"]) {
   border-color: var(--accent, #8b5cf6);
+}
+
+.text-box-node.text-box-selected:not([style*="background-color"]) {
   background: rgba(139, 92, 246, 0.05);
 }
 
-.text-box-node.text-box-editing {
-  cursor: text;
+.text-box-node.text-box-editing:not([style*="border-color"]) {
   border-color: var(--accent, #8b5cf6);
+}
+
+.text-box-node.text-box-editing:not([style*="background-color"]) {
   background: rgba(139, 92, 246, 0.08);
 }
 
+/* Ensure selected outline is hidden for text-box in React Flow */
+.react-flow__node.selected > .text-box-node {
+  outline: none !important;
+}
+
 .text-box-content {
+  width: 100%;
+  height: 100%;
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.4;
   user-select: none;
+  overflow: hidden;
 }
 
 .text-box-node.text-box-editing .text-box-content {
@@ -1354,16 +1373,35 @@ body {
 
 .text-box-input {
   width: 100%;
-  min-width: 80px;
-  min-height: 28px;
+  height: 100%;
   background: transparent;
   border: none;
   outline: none;
-  resize: both;
+  resize: none;
   font-family: inherit;
   line-height: 1.4;
   color: inherit;
   padding: 0;
+  overflow-y: auto;
+}
+
+/* Clear color styling in properties panel */
+.clear-color-btn {
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-secondary, #4b5563);
+  border-radius: 4px;
+  color: var(--text-secondary, #9ca3af);
+  font-size: 11px;
+  cursor: pointer;
+  margin-left: 8px;
+  transition: all 0.15s ease;
+}
+
+.clear-color-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #ffffff);
+  border-color: var(--accent, #8b5cf6);
 }
 
 /* ============================

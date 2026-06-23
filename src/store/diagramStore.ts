@@ -86,12 +86,36 @@ export const DEFAULT_TEXT_BOX_STYLE: TextBoxStyle = {
   color: '#374151',
 };
 
+export const DEFAULT_TEXT_BOX_WIDTH = 150;
+export const DEFAULT_TEXT_BOX_HEIGHT = 80;
+export const MIN_TEXT_BOX_WIDTH = 80;
+export const MIN_TEXT_BOX_HEIGHT = 40;
+
+function normalizeDimension(value: unknown, fallback: number, min: number): number {
+  const n = typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  return Math.max(min, Math.round(n));
+}
+
 /**
  * Centralizes diagram normalization: ensures all optional/additive fields
  * are present with correct defaults. Called at load and import boundaries.
  */
 export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
-  const textBoxes = Array.isArray(raw.textBoxes) ? raw.textBoxes : [];
+  const textBoxes = Array.isArray(raw.textBoxes)
+    ? raw.textBoxes.map((tb) => {
+        const style = tb.style || {};
+        return {
+          ...tb,
+          width: normalizeDimension(tb.width, DEFAULT_TEXT_BOX_WIDTH, MIN_TEXT_BOX_WIDTH),
+          height: normalizeDimension(tb.height, DEFAULT_TEXT_BOX_HEIGHT, MIN_TEXT_BOX_HEIGHT),
+          style: {
+            ...style,
+            backgroundColor: style.backgroundColor?.trim() || undefined,
+            borderColor: style.borderColor?.trim() || undefined,
+          },
+        };
+      })
+    : [];
   const nodes = Array.isArray(raw.nodes)
     ? raw.nodes.map((node) => {
         // @ts-expect-error - legacy field migration
@@ -167,6 +191,7 @@ export interface DiagramState {
   addTextBox: (x: number, y: number) => string;
   updateTextBoxText: (id: string, text: string) => void;
   updateTextBoxStyle: (id: string, style: Partial<TextBoxStyle>) => void;
+  updateTextBoxSize: (id: string, width: number, height: number) => void;
   updateTextBoxPosition: (id: string, x: number, y: number) => void;
   deleteTextBox: (id: string) => void;
   resetDiagram: () => void;
@@ -412,6 +437,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       text: 'Text',
       position: { x: targetX, y: targetY },
       style: { ...DEFAULT_TEXT_BOX_STYLE },
+      width: DEFAULT_TEXT_BOX_WIDTH,
+      height: DEFAULT_TEXT_BOX_HEIGHT,
     };
     set((state) => ({
       diagram: {
@@ -433,13 +460,37 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     }));
   },
 
-  updateTextBoxStyle: (id, style) => {
+  updateTextBoxStyle: (id, stylePatch) => {
     set((state) => ({
       diagram: {
         ...state.diagram,
-        textBoxes: state.diagram.textBoxes.map((tb) =>
-          tb.id === id ? { ...tb, style: { ...tb.style, ...style } } : tb
-        ),
+        textBoxes: state.diagram.textBoxes.map((tb) => {
+          if (tb.id !== id) return tb;
+          const newStyle = { ...tb.style, ...stylePatch };
+          if (newStyle.backgroundColor !== undefined) {
+            newStyle.backgroundColor = newStyle.backgroundColor.trim() || undefined;
+          }
+          if (newStyle.borderColor !== undefined) {
+            newStyle.borderColor = newStyle.borderColor.trim() || undefined;
+          }
+          return { ...tb, style: newStyle };
+        }),
+      },
+    }));
+  },
+
+  updateTextBoxSize: (id, width, height) => {
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        textBoxes: state.diagram.textBoxes.map((tb) => {
+          if (tb.id !== id) return tb;
+          return {
+            ...tb,
+            width: Math.max(MIN_TEXT_BOX_WIDTH, Math.round(width)),
+            height: Math.max(MIN_TEXT_BOX_HEIGHT, Math.round(height)),
+          };
+        }),
       },
     }));
   },

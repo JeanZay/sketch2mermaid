@@ -51,13 +51,18 @@ export interface NodeStyle {
   text?: TextStyle;
 }
 
-export type TextBoxStyle = TextStyle;
+export interface TextBoxStyle extends TextStyle {
+  backgroundColor?: string;
+  borderColor?: string;
+}
 
 export interface TextBox {
   id: string;
   text: string;
   position: { x: number; y: number };
   style: TextBoxStyle;
+  width?: number;
+  height?: number;
 }
 
 export interface CanonicalDiagram {

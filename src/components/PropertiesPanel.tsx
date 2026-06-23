@@ -94,6 +94,62 @@ export const PropertiesPanel = () => {
           </div>
 
           <div className="property-group">
+            <label className="property-label">Background Color</label>
+            <div className="color-input-row">
+              <input
+                type="color"
+                value={style.backgroundColor || '#ffffff'}
+                onChange={(e) => handleStyleChange({ backgroundColor: e.target.value.trim() || undefined })}
+                className="color-picker"
+              />
+              <input
+                type="text"
+                value={style.backgroundColor || ''}
+                placeholder="Transparent"
+                onChange={(e) => handleStyleChange({ backgroundColor: e.target.value.trim() || undefined })}
+                className="property-input color-text-input"
+              />
+              {style.backgroundColor && (
+                <button
+                  className="clear-color-btn"
+                  onClick={() => handleStyleChange({ backgroundColor: undefined })}
+                  title="Make transparent"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="property-group">
+            <label className="property-label">Border Color</label>
+            <div className="color-input-row">
+              <input
+                type="color"
+                value={style.borderColor || '#c4c5d7'}
+                onChange={(e) => handleStyleChange({ borderColor: e.target.value.trim() || undefined })}
+                className="color-picker"
+              />
+              <input
+                type="text"
+                value={style.borderColor || ''}
+                placeholder="Transparent"
+                onChange={(e) => handleStyleChange({ borderColor: e.target.value.trim() || undefined })}
+                className="property-input color-text-input"
+              />
+              {style.borderColor && (
+                <button
+                  className="clear-color-btn"
+                  onClick={() => handleStyleChange({ borderColor: undefined })}
+                  title="Make transparent"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="property-group">
             <label className="property-label">Font Size</label>
             <FontSizeControl
               value={style.fontSize ?? DEFAULT_TEXT_BOX_STYLE.fontSize!}
@@ -146,7 +202,7 @@ export const PropertiesPanel = () => {
           </div>
 
           <div className="property-group">
-            <label className="property-label">Color</label>
+            <label className="property-label">Text Color</label>
             <div className="color-input-row">
               <input
                 type="color"

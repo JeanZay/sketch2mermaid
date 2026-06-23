@@ -203,13 +203,32 @@ describe('toMermaid pure serialization tests', () => {
           id: 'tb1',
           text: 'This is an annotation',
           position: { x: 50, y: 50 },
-          style: { fontSize: 14, bold: false, italic: false, textAlign: 'left', color: '#374151' }
+          width: 180,
+          height: 90,
+          style: {
+            fontSize: 14,
+            bold: false,
+            italic: false,
+            textAlign: 'left',
+            color: '#374151',
+            backgroundColor: '#ff0000',
+            borderColor: '#00ff00'
+          }
         },
         {
           id: 'tb2',
           text: 'Another note',
           position: { x: 200, y: 200 },
-          style: { fontSize: 16, bold: true, italic: false, textAlign: 'center', color: '#000000' }
+          width: 100,
+          height: 50,
+          style: {
+            fontSize: 16,
+            bold: true,
+            italic: false,
+            textAlign: 'center',
+            color: '#000000',
+            backgroundColor: '#ffffff'
+          }
         }
       ]
     };
