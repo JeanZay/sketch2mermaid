@@ -1,0 +1,30 @@
+# Tasks - Sketch2Mermaid v0
+
+- [x] Scaffolding & Configuration (Lot 0)
+  - [x] Initialize Vite + React + TypeScript project
+  - [x] Configure Tailwind/Vanilla CSS & assets
+  - [x] Add config files (.gitignore, .nvmrc, dependabot.yml, CI workflows)
+  - [x] Install dependencies (xyflow, zustand, mermaid, vitest)
+  - [x] Add OSS repo files (README, LICENSE, CONTRIBUTING, SECURITY)
+- [x] Core Module & Vitest Suite (Lot 1)
+  - [x] Define types for canonical JSON model
+  - [x] Implement `escapeLabel` character-by-character scan
+  - [x] Implement pure deterministic `toMermaid` serializer
+  - [x] Write unit tests for core module (`mermaid.test.ts`)
+- [x] Zustand State Store (Lot 0/1/4)
+  - [x] Create store with node/edge CRUD actions
+  - [x] Implement max ID calculation & sequential ID generator
+  - [x] Implement debounced localStorage auto-save & versioned load
+  - [x] Write store unit tests (`diagramStore.test.ts`)
+- [x] UI - Editor Canvas (Lot 2)
+  - [x] Build toolbar with shape palette & direction
+  - [x] Create CustomNode with 6 SVG/HTML shapes and top/bottom/left/right handles
+  - [x] Implement inline double-click editing for node labels
+  - [x] Build Canvas container wrapper for React Flow (drag, connect, select)
+  - [x] Implement keyboard deletion (Delete/Backspace) of nodes and edges (AC13)
+- [x] UI - Preview & Validation (Lot 3)
+  - [x] Build PreviewPanel with raw Mermaid code panel & "Copier" button
+  - [x] Implement safe Mermaid renderer for live SVG preview with error catching
+- [x] UI - Polish & Verification
+  - [x] Apply premium dark/light glassmorphic styling
+  - [x] Verify build and correct base path rendering (AC10-AC14)
