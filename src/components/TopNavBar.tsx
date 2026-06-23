@@ -1,14 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
+import { useReactFlow } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
 import { toMermaid } from '../core/mermaid';
-import type { DiagramDirection } from '../core/types';
+import {
+  serializeSketch2MermaidFile,
+  parseSketch2MermaidFile,
+  generateS2mFilename,
+  MAX_FILE_SIZE_BYTES,
+} from '../core/s2mFile';
+import { downloadTextFile } from '../utils/downloadFile';
+import { useToast } from './useToast';
+import { ConfirmModal } from './ConfirmModal';
+import type { DiagramDirection, S2mViewport } from '../core/types';
 
 export const TopNavBar = () => {
   const diagram = useDiagramStore((state) => state.diagram);
   const setDirection = useDiagramStore((state) => state.setDirection);
   const resetDiagram = useDiagramStore((state) => state.resetDiagram);
+  const loadDiagram = useDiagramStore((state) => state.loadDiagram);
+
+  const { getViewport, setViewport, fitView } = useReactFlow();
+  const { showToast } = useToast();
 
   const [copied, setCopied] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
+
+  // Hidden file input ref — only accessed in event handlers (not render)
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleNew = () => {
     if (window.confirm('Voulez-vous vraiment réinitialiser le diagramme ? Cette action effacera tout.')) {
@@ -27,6 +49,111 @@ export const TopNavBar = () => {
     }
   };
 
+  // ---- Export .s2m ----
+  const handleExport = useCallback(() => {
+    try {
+      const viewport = getViewport();
+      const s2mViewport: S2mViewport = {
+        x: viewport.x,
+        y: viewport.y,
+        zoom: viewport.zoom,
+      };
+      const json = serializeSketch2MermaidFile(diagram, s2mViewport);
+      const filename = generateS2mFilename();
+      downloadTextFile(json, filename);
+      showToast('Diagram exported successfully.', 'success');
+    } catch (err) {
+      console.error('Export failed', err);
+      showToast('Export failed. Please try again.', 'error');
+    }
+  }, [diagram, getViewport, showToast]);
+
+  // ---- Import .s2m ----
+  const applyImport = useCallback(
+    (diagramData: Parameters<typeof loadDiagram>[0], viewport?: S2mViewport, warnings?: string[]) => {
+      loadDiagram(diagramData);
+
+      // Restore viewport after React Flow has injected the nodes
+      requestAnimationFrame(() => {
+        if (viewport) {
+          setViewport(viewport, { duration: 0 });
+        } else {
+          fitView({ duration: 200 });
+        }
+      });
+
+      if (warnings && warnings.length > 0) {
+        showToast(warnings.join(' '), 'warning');
+      } else {
+        showToast('Diagram imported successfully.', 'success');
+      }
+    },
+    [loadDiagram, setViewport, fitView, showToast],
+  );
+
+  const isDiagramEmpty = useCallback(() => {
+    return (
+      diagram.nodes.length === 0 &&
+      diagram.edges.length === 0 &&
+      (diagram.textBoxes?.length ?? 0) === 0
+    );
+  }, [diagram]);
+
+  const handleFileSelected = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      // Reset file input so the same file can be re-imported
+      event.target.value = '';
+
+      // Size check (UI-side)
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        showToast(
+          `File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed size is 2 MB.`,
+          'error',
+        );
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const raw = reader.result as string;
+        const result = parseSketch2MermaidFile(raw);
+
+        if (!result.ok) {
+          showToast(result.error, 'error');
+          return;
+        }
+
+        if (isDiagramEmpty()) {
+          applyImport(result.diagram, result.viewport, result.warnings);
+        } else {
+          setConfirmModal({
+            title: 'Replace current diagram?',
+            message:
+              'The current diagram will be replaced by the imported file. This action cannot be undone.',
+            onConfirm: () => {
+              applyImport(result.diagram, result.viewport, result.warnings);
+              setConfirmModal(null);
+            },
+          });
+        }
+      };
+
+      reader.onerror = () => {
+        showToast('Failed to read the file.', 'error');
+      };
+
+      reader.readAsText(file, 'utf-8');
+    },
+    [applyImport, isDiagramEmpty, showToast],
+  );
+
+  const handleImport = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
   const directions: { val: DiagramDirection; label: string }[] = [
     { val: 'TD', label: 'TD' },
     { val: 'LR', label: 'LR' },
@@ -35,56 +162,92 @@ export const TopNavBar = () => {
   ];
 
   return (
-    <header className="app-header">
-      <div className="logo-section">
-        <span className="logo-text">Sketch2Mermaid</span>
-      </div>
+    <>
+      <header className="app-header">
+        <div className="logo-section">
+          <span className="logo-text">Sketch2Mermaid</span>
+        </div>
 
-      <div className="nav-center-section">
-        <nav className="direction-nav">
-          {directions.map((d) => (
-            <button
-              key={d.val}
-              onClick={() => setDirection(d.val)}
-              className={`nav-dir-btn ${diagram.direction === d.val ? 'active' : ''}`}
-              title={`Changer la direction en ${d.val}`}
-            >
-              {d.val}
-            </button>
-          ))}
-        </nav>
-      </div>
+        <div className="nav-center-section">
+          <nav className="direction-nav">
+            {directions.map((d) => (
+              <button
+                key={d.val}
+                onClick={() => setDirection(d.val)}
+                className={`nav-dir-btn ${diagram.direction === d.val ? 'active' : ''}`}
+                title={`Changer la direction en ${d.val}`}
+              >
+                {d.val}
+              </button>
+            ))}
+          </nav>
+        </div>
 
-      <div className="actions-right-section">
-        <button 
-          onClick={handleNew} 
-          className="header-action-btn border-btn"
-          title="Créer un nouveau diagramme vide"
-        >
-          New
-        </button>
-        <button 
-          onClick={handleCopy} 
-          className="header-action-btn primary-btn"
-          title="Copier le code Mermaid"
-        >
-          {copied ? 'Copié !' : 'Copy Mermaid'}
-        </button>
-        <div className="header-divider"></div>
-        <button 
-          className="header-action-btn disabled-btn" 
-          disabled 
-          title="Coming in v2"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}>
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="17 8 12 3 7 8"></polyline>
-            <line x1="12" y1="3" x2="12" y2="15"></line>
-          </svg>
-          Import Mermaid
-        </button>
-      </div>
-    </header>
+        <div className="actions-right-section">
+          <button 
+            onClick={handleNew} 
+            className="header-action-btn border-btn"
+            title="Créer un nouveau diagramme vide"
+          >
+            New
+          </button>
+          <button 
+            onClick={handleCopy} 
+            className="header-action-btn primary-btn"
+            title="Copier le code Mermaid"
+          >
+            {copied ? 'Copié !' : 'Copy Mermaid'}
+          </button>
+          <div className="header-divider"></div>
+          <button
+            onClick={handleExport}
+            className="header-action-btn border-btn"
+            title="Export .s2m file"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}>
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Export .s2m
+          </button>
+          <button
+            onClick={handleImport}
+            className="header-action-btn border-btn"
+            title="Import .s2m file"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}>
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            Import .s2m
+          </button>
+        </div>
+      </header>
+
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".s2m"
+        style={{ display: 'none' }}
+        onChange={handleFileSelected}
+      />
+
+      {/* Confirmation modal for import overwrite */}
+      {confirmModal && (
+        <ConfirmModal
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmLabel="Replace"
+          cancelLabel="Cancel"
+          onConfirm={confirmModal.onConfirm}
+          onCancel={() => setConfirmModal(null)}
+          variant="danger"
+        />
+      )}
+    </>
   );
 };
 

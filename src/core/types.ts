@@ -71,3 +71,20 @@ export interface CanonicalDiagram {
 
 export type MermaidExportFormat = 'markdown' | 'html' | 'raw';
 
+/** Viewport state captured from the canvas. Named S2m- to avoid conflict with React Flow's Viewport type. */
+export interface S2mViewport {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+/** Root structure of a .s2m file (JSON UTF-8) */
+export interface Sketch2MermaidFile {
+  fileType: 'sketch2mermaid';
+  fileVersion: 1;
+  appVersion: string;
+  exportedAt: string; // ISO 8601
+  diagram: CanonicalDiagram;
+  viewport?: S2mViewport;
+}
+
