@@ -69,12 +69,26 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
     </>
   );
 
+  // Selection bounding box overlay
+  const renderSelectionOverlay = () => {
+    if (!selected) return null;
+    return (
+      <div className="node-selection-overlay">
+        <div className="selection-handle top-left" />
+        <div className="selection-handle top-right" />
+        <div className="selection-handle bottom-left" />
+        <div className="selection-handle bottom-right" />
+      </div>
+    );
+  };
+
   if (shape === 'decision') {
     return (
       <div className={`decision-wrapper ${selected ? 'node-selected' : ''}`}>
         <div className="decision-bg"></div>
         <div className="decision-text">{renderInner()}</div>
         {renderHandles()}
+        {renderSelectionOverlay()}
       </div>
     );
   }
@@ -84,6 +98,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
       <div className={`event-circle ${selected ? 'node-selected' : ''}`}>
         <div className="event-inner">{renderInner()}</div>
         {renderHandles()}
+        {renderSelectionOverlay()}
       </div>
     );
   }
@@ -95,6 +110,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
           <div className="event-inner">{renderInner()}</div>
         </div>
         {renderHandles()}
+        {renderSelectionOverlay()}
       </div>
     );
   }
@@ -108,6 +124,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
     <div className={`custom-node ${shapeClass} ${selected ? 'node-selected' : ''}`}>
       {renderInner()}
       {renderHandles()}
+      {renderSelectionOverlay()}
     </div>
   );
 };
