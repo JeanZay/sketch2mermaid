@@ -133,9 +133,9 @@ export function toMermaid(diagram: CanonicalDiagram): string {
         case 'parallelogram':
           open = '[/'; close = '/]'; break;
         case 'parallelogramAlt':
-          open = '[\\'; close = '\\\]'; break;
+          open = '[\\'; close = '\\' + ']'; break;
         case 'trapezoid':
-          open = '[/'; close = '\\\]'; break;
+          open = '[/'; close = '\\' + ']'; break;
         case 'trapezoidAlt':
           open = '[\\'; close = '/]'; break;
         case 'asymmetric':

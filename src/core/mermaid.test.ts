@@ -124,8 +124,8 @@ describe('toMermaid pure serialization tests', () => {
     expect(output).toContain('n1[["Sub"]]');
     expect(output).toContain('n2{{"Hex"}}');
     expect(output).toContain('n3[/"Para"/]');
-    expect(output).toContain('n4[\\"ParaAlt"\\\]');
-    expect(output).toContain('n5[/"Trap"\\\]');
+    expect(output).toContain('n4[\\"ParaAlt"' + '\\' + ']');
+    expect(output).toContain('n5[/"Trap"' + '\\' + ']');
     expect(output).toContain('n6[\\"TrapAlt"/]');
     expect(output).toContain('n7>"Asym"]');
     expect(output).toContain('n8@{ shape: docs, label: "Docs" }');
