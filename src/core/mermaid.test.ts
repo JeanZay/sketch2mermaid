@@ -76,12 +76,30 @@ describe('toMermaid pure serialization tests', () => {
     expect(escapeLabel('>')).toBe('&gt;');
     expect(escapeLabel('"')).toBe('#quot;');
     expect(escapeLabel('#')).toBe('#35;');
+    expect(escapeLabel('\\')).toBe('\\\\');
     expect(escapeLabel('\n')).toBe('<br/>');
     
     // Combined string, evaluating character-by-character to prevent double-escaping
-    expect(escapeLabel('A & B < C > D "E" #F\nG')).toBe(
-      'A &amp; B &lt; C &gt; D #quot;E#quot; #35;F<br/>G'
+    expect(escapeLabel('A & B < C > D "E" #F\nG \\ H')).toBe(
+      'A &amp; B &lt; C &gt; D #quot;E#quot; #35;F<br/>G \\\\ H'
     );
+  });
+
+  test('Serialization of Database and File shapes', () => {
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'LR',
+      nodes: [
+        { id: 'n1', label: 'DB Node', shape: 'database', position: { x: 0, y: 0 } },
+        { id: 'n2', label: 'File \\ Node', shape: 'file', position: { x: 0, y: 100 } }
+      ],
+      edges: [],
+      textBoxes: []
+    };
+    const output = toMermaid(diagram);
+    expect(output).toContain('n1[("DB Node")]');
+    expect(output).toContain('n2@{ shape: doc, label: "File \\\\ Node" }');
   });
 
   test('AC6 — Node IDs starting with o and x do not conflict with shape edge types', () => {

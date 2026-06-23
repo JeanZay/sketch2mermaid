@@ -2,6 +2,7 @@ import React from 'react';
 import { useEdges, useReactFlow } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
 import type { NodeShape } from '../core/types';
+import { SHAPE_CONFIGS } from './shapeConfig';
 
 export const Toolbar = () => {
   const addNode = useDiagramStore((state) => state.addNode);
@@ -18,17 +19,15 @@ export const Toolbar = () => {
 
   // Computes the center of the current canvas viewport to place new nodes
   const getCenterCoordinates = () => {
-    try {
-      const clientWidth = window.innerWidth * 0.5; // Approx canvas width
-      const clientHeight = window.innerHeight * 0.7; // Approx canvas height
-      
+    const canvasEl = document.querySelector('.react-flow');
+    if (canvasEl) {
+      const rect = canvasEl.getBoundingClientRect();
       return screenToFlowPosition({
-        x: clientWidth,
-        y: clientHeight,
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
       });
-    } catch {
-      return { x: 150, y: 150 };
     }
+    return { x: 150, y: 150 };
   };
 
   const handleShapeClick = (shape: NodeShape) => {
@@ -48,43 +47,7 @@ export const Toolbar = () => {
   };
 
   // Shapes configuration
-  const shapes: { type: NodeShape; label: string; svg: React.ReactNode }[] = [
-    {
-      type: 'process',
-      label: 'Process',
-      svg: <rect x="3" y="6" width="18" height="12" rx="1"></rect>,
-    },
-    {
-      type: 'rounded',
-      label: 'Rounded',
-      svg: <rect x="3" y="6" width="18" height="12" rx="4"></rect>,
-    },
-    {
-      type: 'stadium',
-      label: 'Start / End',
-      svg: <rect x="3" y="8" width="18" height="8" rx="4"></rect>,
-    },
-    {
-      type: 'decision',
-      label: 'Decision',
-      svg: <rect x="8" y="8" width="8" height="8" transform="rotate(45 12 12)"></rect>,
-    },
-    {
-      type: 'event',
-      label: 'Event',
-      svg: <circle cx="12" cy="12" r="8"></circle>,
-    },
-    {
-      type: 'endEvent',
-      label: 'End Event',
-      svg: (
-        <>
-          <circle cx="12" cy="12" r="9"></circle>
-          <circle cx="12" cy="12" r="6"></circle>
-        </>
-      ),
-    },
-  ];
+  const shapes = SHAPE_CONFIGS;
 
   return (
     <aside className="sidebar-palette">

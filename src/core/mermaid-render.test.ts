@@ -108,4 +108,25 @@ describe('Mermaid empirical SVG rendering verification under strict security', (
     const element = doc.querySelector(`.node ${expectedTag}`);
     expect(element).not.toBeNull();
   });
+
+  test('Compilation of Database and File shapes to non-empty SVG', async () => {
+    const code = [
+      'flowchart TD',
+      '  db[(Base de données)]',
+      '  file@{ shape: doc, label: "Fichier" }'
+    ].join('\n');
+    
+    const renderId = `shapes-compile-test-${Math.floor(Math.random() * 100000)}`;
+    const { svg } = await mermaid.render(renderId, code);
+    
+    expect(svg).toBeDefined();
+    expect(svg.length).toBeGreaterThan(0);
+    
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svg, 'image/svg+xml');
+    
+    // Ensure there is no parsing/compilation error indicated in the SVG
+    const errorNode = doc.querySelector('.error-icon, .error-text, #error-div');
+    expect(errorNode).toBeNull();
+  });
 });

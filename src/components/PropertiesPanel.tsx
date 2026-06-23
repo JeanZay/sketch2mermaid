@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNodes, useEdges, useReactFlow } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
-import type { NodeShape, TextBoxStyle } from '../core/types';
+import type { TextBoxStyle } from '../core/types';
+import { SHAPE_CONFIGS } from './shapeConfig';
 
 export const PropertiesPanel = () => {
   const nodes = useNodes();
@@ -187,43 +188,7 @@ export const PropertiesPanel = () => {
     const inEdges = diagram.edges.filter((e) => e.to === selectedNode.id).length;
     const outEdges = diagram.edges.filter((e) => e.from === selectedNode.id).length;
 
-    const shapes: { type: NodeShape; label: string; svg: React.ReactNode }[] = [
-      {
-        type: 'process',
-        label: 'Process',
-        svg: <rect x="3" y="6" width="18" height="12" rx="1"></rect>,
-      },
-      {
-        type: 'rounded',
-        label: 'Rounded',
-        svg: <rect x="3" y="6" width="18" height="12" rx="4"></rect>,
-      },
-      {
-        type: 'stadium',
-        label: 'Start / End',
-        svg: <rect x="3" y="8" width="18" height="8" rx="4"></rect>,
-      },
-      {
-        type: 'decision',
-        label: 'Decision',
-        svg: <rect x="8" y="8" width="8" height="8" transform="rotate(45 12 12)"></rect>,
-      },
-      {
-        type: 'event',
-        label: 'Event',
-        svg: <circle cx="12" cy="12" r="8"></circle>,
-      },
-      {
-        type: 'endEvent',
-        label: 'End Event',
-        svg: (
-          <>
-            <circle cx="12" cy="12" r="9"></circle>
-            <circle cx="12" cy="12" r="6"></circle>
-          </>
-        ),
-      },
-    ];
+    const shapes = SHAPE_CONFIGS;
 
     return (
       <div className="properties-panel-content">

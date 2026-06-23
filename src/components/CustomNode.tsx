@@ -126,6 +126,26 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
     );
   }
 
+  if (shape === 'database') {
+    return (
+      <div className={`database-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`}>
+        <div className="database-text">{renderInner()}</div>
+        {renderHandles()}
+        {renderSelectionOverlay()}
+      </div>
+    );
+  }
+
+  if (shape === 'file') {
+    return (
+      <div className={`file-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`}>
+        {renderInner()}
+        {renderHandles()}
+        {renderSelectionOverlay()}
+      </div>
+    );
+  }
+
   // process, rounded, stadium
   let shapeClass = 'shape-process';
   if (shape === 'rounded') shapeClass = 'shape-rounded';

@@ -9,6 +9,7 @@
 - **Always run the full CI gate locally before pushing**: Run `npm run typecheck`, `npm run lint`, and `npm run test` locally before committing. The CI environment may have stricter behavior than the local dev server (e.g., lint rules that only surface in `--max-warnings 0` mode).
 - **Check deployment status after push**: Use `gh run list --limit 3` to verify that the CI and Deploy pipelines completed successfully. Do not assume a push is deployed until confirmed.
 - **Mandatory Commit, Push, and Deploy**: All completed changes must be committed, pushed, and verified as deployed in production, enabling direct verification in the deployed environment.
+- **Production Notification**: Always inform the user VERY clearly at the end of each task that the changes have been successfully pushed to production (POUSSES EN PROD).
 
 ## React 19 Lint Rules (Strict)
 

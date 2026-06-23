@@ -38,6 +38,7 @@ export function escapeLabel(label: string): string {
       case '>': result += '&gt;'; break;
       case '"': result += '#quot;'; break;
       case '#': result += '#35;'; break;
+      case '\\': result += '\\\\'; break;
       case '\n': result += '<br/>'; break;
       default: result += char;
     }
@@ -58,23 +59,29 @@ export function toMermaid(diagram: CanonicalDiagram): string {
 
   for (const node of sortedNodes) {
     const escaped = escapeLabel(node.label);
-    let open = '[';
-    let close = ']';
-    switch (node.shape) {
-      case 'process':
-        open = '['; close = ']'; break;
-      case 'rounded':
-        open = '('; close = ')'; break;
-      case 'stadium':
-        open = '(['; close = '])'; break;
-      case 'decision':
-        open = '{'; close = '}'; break;
-      case 'event':
-        open = '(('; close = '))'; break;
-      case 'endEvent':
-        open = '((('; close = ')))'; break;
+    if (node.shape === 'file') {
+      lines.push(`  ${node.id}@{ shape: doc, label: "${escaped}" }`);
+    } else {
+      let open = '[';
+      let close = ']';
+      switch (node.shape) {
+        case 'process':
+          open = '['; close = ']'; break;
+        case 'rounded':
+          open = '('; close = ')'; break;
+        case 'stadium':
+          open = '(['; close = '])'; break;
+        case 'decision':
+          open = '{'; close = '}'; break;
+        case 'event':
+          open = '(('; close = '))'; break;
+        case 'endEvent':
+          open = '((('; close = ')))'; break;
+        case 'database':
+          open = '[('; close = ')]'; break;
+      }
+      lines.push(`  ${node.id}${open}"${escaped}"${close}`);
     }
-    lines.push(`  ${node.id}${open}"${escaped}"${close}`);
   }
 
   // Sort edges by ID ascending (numerically on the numeric suffix)
