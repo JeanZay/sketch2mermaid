@@ -102,33 +102,57 @@ describe('toMermaid pure serialization tests', () => {
     expect(output).toContain('n2@{ shape: doc, label: "File \\\\ Node" }');
   });
 
-  test('Serialization of 8 new shapes', () => {
+  test('Exact string match for all 16 shapes and special characters escaping', () => {
     const diagram: CanonicalDiagram = {
       schemaVersion: 1,
       diagramType: 'flowchart',
-      direction: 'LR',
+      direction: 'TD',
       nodes: [
-        { id: 'n1', label: 'Sub', shape: 'subroutine', position: { x: 0, y: 0 } },
-        { id: 'n2', label: 'Hex', shape: 'hexagon', position: { x: 0, y: 100 } },
-        { id: 'n3', label: 'Para', shape: 'parallelogram', position: { x: 0, y: 200 } },
-        { id: 'n4', label: 'ParaAlt', shape: 'parallelogramAlt', position: { x: 0, y: 300 } },
-        { id: 'n5', label: 'Trap', shape: 'trapezoid', position: { x: 0, y: 400 } },
-        { id: 'n6', label: 'TrapAlt', shape: 'trapezoidAlt', position: { x: 0, y: 500 } },
-        { id: 'n7', label: 'Asym', shape: 'asymmetric', position: { x: 0, y: 600 } },
-        { id: 'n8', label: 'Docs', shape: 'documents', position: { x: 0, y: 700 } }
+        { id: 'n1', label: 'Process', shape: 'process', position: { x: 0, y: 0 } },
+        { id: 'n2', label: 'Rounded', shape: 'rounded', position: { x: 0, y: 100 } },
+        { id: 'n3', label: 'Stadium', shape: 'stadium', position: { x: 0, y: 200 } },
+        { id: 'n4', label: 'Decision', shape: 'decision', position: { x: 0, y: 300 } },
+        { id: 'n5', label: 'Event', shape: 'event', position: { x: 0, y: 400 } },
+        { id: 'n6', label: 'EndEvent', shape: 'endEvent', position: { x: 0, y: 500 } },
+        { id: 'n7', label: 'Database', shape: 'database', position: { x: 0, y: 600 } },
+        { id: 'n8', label: 'File', shape: 'file', position: { x: 0, y: 700 } },
+        { id: 'n9', label: 'Subroutine', shape: 'subroutine', position: { x: 0, y: 800 } },
+        { id: 'n10', label: 'Hexagon', shape: 'hexagon', position: { x: 0, y: 900 } },
+        { id: 'n11', label: 'Parallelogram', shape: 'parallelogram', position: { x: 0, y: 1000 } },
+        { id: 'n12', label: 'Parallelogram alt', shape: 'parallelogramAlt', position: { x: 0, y: 1100 } },
+        { id: 'n13', label: 'Trapezoid', shape: 'trapezoid', position: { x: 0, y: 1200 } },
+        { id: 'n14', label: 'Trapezoid alt', shape: 'trapezoidAlt', position: { x: 0, y: 1300 } },
+        { id: 'n15', label: 'Asymmetric', shape: 'asymmetric', position: { x: 0, y: 1400 } },
+        { id: 'n16', label: 'Documents', shape: 'documents', position: { x: 0, y: 1500 } },
+        { id: 'n17', label: 'Special "Chars" \\ / [] {} |', shape: 'process', position: { x: 0, y: 1600 } }
       ],
       edges: [],
       textBoxes: []
     };
+
     const output = toMermaid(diagram);
-    expect(output).toContain('n1[["Sub"]]');
-    expect(output).toContain('n2{{"Hex"}}');
-    expect(output).toContain('n3[/"Para"/]');
-    expect(output).toContain('n4[\\"ParaAlt"' + '\\' + ']');
-    expect(output).toContain('n5[/"Trap"' + '\\' + ']');
-    expect(output).toContain('n6[\\"TrapAlt"/]');
-    expect(output).toContain('n7>"Asym"]');
-    expect(output).toContain('n8@{ shape: docs, label: "Docs" }');
+    const expected = [
+      'flowchart TD',
+      '  n1["Process"]',
+      '  n2("Rounded")',
+      '  n3(["Stadium"])',
+      '  n4{"Decision"}',
+      '  n5(("Event"))',
+      '  n6((("EndEvent")))',
+      '  n7[("Database")]',
+      '  n8@{ shape: doc, label: "File" }',
+      '  n9[["Subroutine"]]',
+      '  n10{{"Hexagon"}}',
+      '  n11[/"Parallelogram"/]',
+      '  n12[\\"Parallelogram alt"\\]',
+      '  n13[/"Trapezoid"\\]',
+      '  n14[\\"Trapezoid alt"/]',
+      '  n15>"Asymmetric"]',
+      '  n16@{ shape: docs, label: "Documents" }',
+      '  n17["Special #quot;Chars#quot; \\\\ / [] {} |"]'
+    ].join('\n');
+
+    expect(output).toBe(expected);
   });
 
   test('AC6 — Node IDs starting with o and x do not conflict with shape edge types', () => {

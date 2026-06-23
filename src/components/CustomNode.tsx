@@ -133,7 +133,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (shape === 'decision') {
     return (
-      <div className={`decision-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
+      <div className={`decision-wrapper s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
         {renderResizer()}
         <div className="decision-bg"></div>
         <div className="decision-text">{renderInner()}</div>
@@ -144,7 +144,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (shape === 'event') {
     return (
-      <div className={`event-circle ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
+      <div className={`event-circle s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
         {renderResizer()}
         <div className="event-inner">{renderInner()}</div>
         {renderHandles()}
@@ -154,7 +154,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (shape === 'endEvent') {
     return (
-      <div className={`end-event-circle-outer ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
+      <div className={`end-event-circle-outer s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
         {renderResizer()}
         <div className="end-event-circle-inner">
           <div className="event-inner">{renderInner()}</div>
@@ -166,7 +166,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (shape === 'database') {
     return (
-      <div className={`database-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
+      <div className={`database-wrapper s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
         {renderResizer()}
         <div className="database-text">{renderInner()}</div>
         {renderHandles()}
@@ -176,7 +176,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (shape === 'file') {
     return (
-      <div className={`file-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
+      <div className={`file-wrapper s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
         {renderResizer()}
         {renderInner()}
         {renderHandles()}
@@ -186,7 +186,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (shape === 'subroutine') {
     return (
-      <div className={`subroutine-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
+      <div className={`subroutine-wrapper s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
         {renderResizer()}
         {renderInner()}
         {renderHandles()}
@@ -196,7 +196,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (['hexagon', 'parallelogram', 'parallelogramAlt', 'trapezoid', 'trapezoidAlt', 'asymmetric'].includes(shape)) {
     return (
-      <div className={`${shape}-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
+      <div className={`${shape}-wrapper s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
         {renderResizer()}
         <div className={`${shape}-bg`}></div>
         <div className={`${shape}-text`}>{renderInner()}</div>
@@ -207,7 +207,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
 
   if (shape === 'documents') {
     return (
-      <div className={`documents-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
+      <div className={`documents-wrapper s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
         {renderResizer()}
         <div className="documents-bg-back"></div>
         <div className="documents-bg-middle"></div>
@@ -225,7 +225,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   if (shape === 'stadium') shapeClass = 'shape-stadium';
 
   return (
-    <div className={`custom-node ${shapeClass} ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
+    <div className={`custom-node ${shapeClass} s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
       {renderResizer()}
       {renderInner()}
       {renderHandles()}

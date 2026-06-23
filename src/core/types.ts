@@ -1,3 +1,25 @@
+/**
+ * Map of Mermaid syntax to Sketch2Mermaid NodeShape identifiers:
+ *
+ * Mermaid syntax                      -> NodeShape
+ * --------------------------------------------------
+ * A[Label]                            -> process
+ * A(Label)                            -> rounded
+ * A([Label])                          -> stadium
+ * A{Label}                            -> decision
+ * A((Label))                          -> event
+ * A(((Label)))                        -> endEvent
+ * A[(Label)]                          -> database
+ * A@{ shape: doc, label: "Label" }      -> file
+ * A[[Label]]                          -> subroutine
+ * A{{Label}}                          -> hexagon
+ * A[/Label/]                          -> parallelogram
+ * A[\Label\]                          -> parallelogramAlt
+ * A[/Label\]                          -> trapezoid
+ * A[\Label/]                          -> trapezoidAlt
+ * A>Label]                            -> asymmetric
+ * A@{ shape: docs, label: "Label" }     -> documents
+ */
 export type NodeShape = 'process' | 'rounded' | 'stadium' | 'decision' | 'event' | 'endEvent' | 'database' | 'file' | 'subroutine' | 'hexagon' | 'parallelogram' | 'parallelogramAlt' | 'trapezoid' | 'trapezoidAlt' | 'asymmetric' | 'documents';
 export type EdgeStyle = 'solid' | 'dotted';
 export type DiagramDirection = 'TD' | 'LR' | 'BT' | 'RL';

@@ -555,4 +555,47 @@ describe('store integration — export/import round-trip', () => {
     expect(restoredDiagram.textBoxes).toEqual(originalDiagram.textBoxes);
     expect(result.viewport).toEqual(viewport);
   });
+
+  it('consolidated round-trip for 8 new shapes verifies schema preservation', () => {
+    const originalDiagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        { id: 'n1', label: 'Subroutine Node', shape: 'subroutine', position: { x: 10, y: 20 }, width: 155, height: 57, style: { backgroundColor: '#f0f0f0', borderColor: '#ff0000', text: { bold: true } } },
+        { id: 'n2', label: 'Hexagon Node', shape: 'hexagon', position: { x: 100, y: 120 }, width: 165, height: 58 },
+        { id: 'n3', label: 'Parallelogram Node', shape: 'parallelogram', position: { x: 200, y: 220 }, width: 175, height: 59 },
+        { id: 'n4', label: 'ParallelogramAlt Node', shape: 'parallelogramAlt', position: { x: 300, y: 320 }, width: 185, height: 60 },
+        { id: 'n5', label: 'Trapezoid Node', shape: 'trapezoid', position: { x: 400, y: 420 }, width: 195, height: 61 },
+        { id: 'n6', label: 'TrapezoidAlt Node', shape: 'trapezoidAlt', position: { x: 500, y: 520 }, width: 205, height: 62 },
+        { id: 'n7', label: 'Asymmetric Node', shape: 'asymmetric', position: { x: 600, y: 620 }, width: 215, height: 63 },
+        { id: 'n8', label: 'Documents Node', shape: 'documents', position: { x: 700, y: 720 }, width: 225, height: 64 }
+      ],
+      edges: [
+        { id: 'e1', from: 'n1', to: 'n2', label: 'Link', style: 'solid' }
+      ],
+      textBoxes: []
+    };
+
+    const json = serializeSketch2MermaidFile(originalDiagram, testViewport);
+    const result = parseSketch2MermaidFile(json);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.diagram.nodes.length).toBe(8);
+    for (let i = 0; i < 8; i++) {
+      const orig = originalDiagram.nodes[i];
+      const rest = result.diagram.nodes[i];
+      expect(rest.id).toBe(orig.id);
+      expect(rest.label).toBe(orig.label);
+      expect(rest.shape).toBe(orig.shape);
+      expect(rest.position).toEqual(orig.position);
+      expect(rest.width).toBe(orig.width);
+      expect(rest.height).toBe(orig.height);
+      expect(rest.style).toEqual(orig.style);
+    }
+    expect(result.diagram.edges).toEqual(originalDiagram.edges);
+    expect(result.viewport).toEqual(testViewport);
+  });
 });

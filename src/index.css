@@ -218,7 +218,9 @@ body {
 
 .palette-shape-btn {
   width: 100%;
-  height: 56px;
+  min-height: 56px;
+  height: auto;
+  padding: 6px 4px;
   background: #ffffff;
   border: 1px solid var(--border-color);
   border-radius: 4px;
@@ -230,6 +232,7 @@ body {
   gap: 4px;
   color: var(--text-secondary);
   transition: all 0.2s;
+  box-sizing: border-box;
 }
 
 .palette-shape-btn:hover {
@@ -244,8 +247,12 @@ body {
 }
 
 .palette-shape-btn-text {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
+  word-break: break-word;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.1;
 }
 
 .sidebar-divider {
@@ -366,6 +373,7 @@ body {
   clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
   background-color: var(--border-color);
   transition: background-color 0.15s;
+  pointer-events: none;
 }
 
 /* Fill layer — slightly inset diamond in white, creating a visible border */
@@ -609,6 +617,7 @@ body {
   clip-path: polygon(15% 0%, 85% 0%, 100% 50%, 85% 100%, 15% 100%, 0% 50%);
   background-color: var(--border-color);
   transition: background-color 0.15s;
+  pointer-events: none;
 }
 .hexagon-bg::after {
   content: '';
@@ -644,6 +653,7 @@ body {
   clip-path: polygon(15% 0%, 100% 0%, 85% 100%, 0% 100%);
   background-color: var(--border-color);
   transition: background-color 0.15s;
+  pointer-events: none;
 }
 .parallelogram-bg::after {
   content: '';
@@ -679,6 +689,7 @@ body {
   clip-path: polygon(0% 0%, 85% 0%, 100% 100%, 15% 100%);
   background-color: var(--border-color);
   transition: background-color 0.15s;
+  pointer-events: none;
 }
 .parallelogramAlt-bg::after {
   content: '';
@@ -714,6 +725,7 @@ body {
   clip-path: polygon(15% 0%, 85% 0%, 100% 100%, 0% 100%);
   background-color: var(--border-color);
   transition: background-color 0.15s;
+  pointer-events: none;
 }
 .trapezoid-bg::after {
   content: '';
@@ -749,6 +761,7 @@ body {
   clip-path: polygon(0% 0%, 100% 0%, 85% 100%, 15% 100%);
   background-color: var(--border-color);
   transition: background-color 0.15s;
+  pointer-events: none;
 }
 .trapezoidAlt-bg::after {
   content: '';
@@ -784,6 +797,7 @@ body {
   clip-path: polygon(0% 0%, 85% 0%, 100% 50%, 85% 100%, 0% 100%);
   background-color: var(--border-color);
   transition: background-color 0.15s;
+  pointer-events: none;
 }
 .asymmetric-bg::after {
   content: '';
@@ -884,17 +898,10 @@ body {
 
 /* Selected States on canvas nodes */
 .node-selected,
-.node-selected .decision-bg,
 .node-selected.end-event-circle-outer,
 .node-selected.database-wrapper,
 .node-selected.file-wrapper,
 .node-selected.subroutine-wrapper,
-.node-selected .hexagon-bg,
-.node-selected .parallelogram-bg,
-.node-selected .parallelogramAlt-bg,
-.node-selected .trapezoid-bg,
-.node-selected .trapezoidAlt-bg,
-.node-selected .asymmetric-bg,
 .node-selected.documents-wrapper .documents-bg-back,
 .node-selected.documents-wrapper .documents-bg-middle,
 .node-selected.documents-wrapper .documents-front {
@@ -904,10 +911,23 @@ body {
 .node-selected.database-wrapper::before,
 .node-selected.database-wrapper::after,
 .node-selected.file-wrapper::before,
-.node-selected.subroutine-wrapper::before,
-.node-selected.subroutine-wrapper::after,
 .node-selected.documents-wrapper .documents-front::before {
   border-color: var(--border-color-active) !important;
+}
+
+.node-selected .decision-bg,
+.node-selected .hexagon-bg,
+.node-selected .parallelogram-bg,
+.node-selected .parallelogramAlt-bg,
+.node-selected .trapezoid-bg,
+.node-selected .trapezoidAlt-bg,
+.node-selected .asymmetric-bg {
+  background-color: var(--border-color-active) !important;
+}
+
+.node-selected.subroutine-wrapper::before,
+.node-selected.subroutine-wrapper::after {
+  background-color: var(--border-color-active) !important;
 }
 
 /* Node Handle Styling */
@@ -922,24 +942,9 @@ body {
 }
 
 /* Scoped visibility rules for node handles */
-.custom-node:hover .node-handle,
-.custom-node.node-selected .node-handle,
-.custom-node.is-connecting .node-handle,
-.decision-wrapper:hover .node-handle,
-.decision-wrapper.node-selected .node-handle,
-.decision-wrapper.is-connecting .node-handle,
-.event-circle:hover .node-handle,
-.event-circle.node-selected .node-handle,
-.event-circle.is-connecting .node-handle,
-.end-event-circle-outer:hover .node-handle,
-.end-event-circle-outer.node-selected .node-handle,
-.end-event-circle-outer.is-connecting .node-handle,
-.database-wrapper:hover .node-handle,
-.database-wrapper.node-selected .node-handle,
-.database-wrapper.is-connecting .node-handle,
-.file-wrapper:hover .node-handle,
-.file-wrapper.node-selected .node-handle,
-.file-wrapper.is-connecting .node-handle {
+.s2m-node-wrapper:hover .node-handle,
+.s2m-node-wrapper.node-selected .node-handle,
+.s2m-node-wrapper.is-connecting .node-handle {
   opacity: 1;
 }
 
