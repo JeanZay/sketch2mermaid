@@ -325,17 +325,18 @@ body {
 
 /* Custom Nodes inside Canvas */
 .custom-node {
-  padding: 10px 16px;
   background-color: #ffffff;
   border: 1px solid var(--border-color);
   color: var(--text-primary);
   font-size: 13px;
   text-align: center;
-  min-width: 100px;
-  max-width: 180px;
   word-wrap: break-word;
   transition: border-color 0.15s, box-shadow 0.15s;
   box-shadow: var(--shadow-sm);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .custom-node:hover {
@@ -352,14 +353,11 @@ body {
 
 .shape-stadium {
   border-radius: 9999px;
-  padding: 10px 20px;
 }
 
 /* Decision Node (Diamond) styling */
 .decision-wrapper {
   position: relative;
-  width: 105px;
-  height: 105px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -367,10 +365,10 @@ body {
 
 .decision-bg {
   position: absolute;
-  top: 15px;
-  left: 15px;
-  width: 75px;
-  height: 75px;
+  top: 12.5%;
+  left: 12.5%;
+  width: 75%;
+  height: 75%;
   transform: rotate(45deg);
   background-color: #ffffff;
   border: 1px solid var(--border-color);
@@ -385,18 +383,16 @@ body {
 .decision-text {
   position: relative;
   z-index: 2;
-  font-size: 11px;
   color: var(--text-primary);
   text-align: center;
-  max-width: 75px;
+  max-width: 70%;
   word-wrap: break-word;
   line-height: 1.2;
+  padding: 4px 14px;
 }
 
 /* Event Node (Circle) styling */
 .event-circle {
-  width: 68px;
-  height: 68px;
   border-radius: 50%;
   background-color: #ffffff;
   border: 1px solid var(--border-color);
@@ -412,16 +408,14 @@ body {
 }
 
 .event-inner {
-  font-size: 11px;
   text-align: center;
-  max-width: 54px;
+  max-width: 80%;
   word-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* End Event Node (Double Circle) styling */
 .end-event-circle-outer {
-  width: 68px;
-  height: 68px;
   border-radius: 50%;
   background-color: #ffffff;
   border: 1px solid var(--border-color);
@@ -452,8 +446,6 @@ body {
 /* Database cylinder styling */
 .database-wrapper {
   position: relative;
-  min-width: 100px;
-  max-width: 180px;
   padding: 18px 16px 14px 16px;
   background-color: #ffffff;
   border-left: 1px solid var(--border-color);
@@ -462,6 +454,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -517,8 +510,6 @@ body {
 /* File / Document Node styling */
 .file-wrapper {
   position: relative;
-  min-width: 100px;
-  max-width: 180px;
   padding: 10px 20px 10px 14px;
   background-color: #ffffff;
   border: 1px solid var(--border-color);
@@ -527,8 +518,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
   text-align: center;
+  box-sizing: border-box;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -638,6 +629,18 @@ body {
   cursor: text;
   user-select: none;
   min-height: 1em;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.2;
 }
 
 /* Custom Edge styling */
@@ -1282,59 +1285,28 @@ body {
 
 /* Legacy error/empty classes removed — now handled by SvgPreviewViewer component styles */
 
-/* Shape Selection Overlay System */
-.node-selection-overlay {
-  position: absolute;
-  top: -6px;
-  left: -6px;
-  right: -6px;
-  bottom: -6px;
-  border: 1.5px solid var(--accent-color);
-  border-radius: 4px;
-  pointer-events: none;
-  z-index: 10;
-  box-shadow: var(--shadow-glow);
-  opacity: 0;
-  transform: scale(0.98);
-  animation: selection-overlay-in 0.12s ease-out forwards;
+/* NodeResizer Handle & Line Styling */
+.node-resize-handle {
+  width: 8px !important;
+  height: 8px !important;
+  background-color: #ffffff !important;
+  border: 1.5px solid var(--accent-color) !important;
+  border-radius: 1px !important;
 }
 
-@keyframes selection-overlay-in {
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+.node-resize-line {
+  border-color: var(--accent-color) !important;
+  border-width: 1.5px !important;
 }
 
-.selection-handle {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  background-color: #ffffff;
-  border: 1.5px solid var(--accent-color);
-  border-radius: 1px; /* Slight rounded look for squares */
-  box-sizing: border-box;
-  pointer-events: none !important;
-}
-
-.selection-handle.top-left {
-  top: -3.5px;
-  left: -3.5px;
-}
-
-.selection-handle.top-right {
-  top: -3.5px;
-  right: -3.5px;
-}
-
-.selection-handle.bottom-left {
-  bottom: -3.5px;
-  left: -3.5px;
-}
-
-.selection-handle.bottom-right {
-  bottom: -3.5px;
-  right: -3.5px;
+/* Hide React Flow's default selection outline since NodeResizer replaces it */
+.react-flow__node.selected > .custom-node,
+.react-flow__node.selected > .decision-wrapper,
+.react-flow__node.selected > .event-circle,
+.react-flow__node.selected > .end-event-circle-outer,
+.react-flow__node.selected > .database-wrapper,
+.react-flow__node.selected > .file-wrapper {
+  outline: none !important;
 }
 
 /* ============================

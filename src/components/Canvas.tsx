@@ -29,6 +29,7 @@ function FlowInner() {
   const diagram = useDiagramStore((state) => state.diagram);
   const addNode = useDiagramStore((state) => state.addNode);
   const updateNodePosition = useDiagramStore((state) => state.updateNodePosition);
+  const updateNodeSize = useDiagramStore((state) => state.updateNodeSize);
   const deleteNode = useDiagramStore((state) => state.deleteNode);
   const addEdge = useDiagramStore((state) => state.addEdge);
   const deleteEdge = useDiagramStore((state) => state.deleteEdge);
@@ -47,7 +48,13 @@ function FlowInner() {
       id: node.id,
       type: 'customNode' as const,
       position: node.position,
-      data: { label: node.label, shape: node.shape },
+      data: {
+        label: node.label,
+        shape: node.shape,
+        width: node.width,
+        height: node.height,
+        updateNodeSize,
+      },
       selected: selectedNodeIds.has(node.id),
     }));
 
@@ -61,7 +68,7 @@ function FlowInner() {
     }));
 
     return [...diagramNodes, ...textBoxNodes];
-  }, [diagram.nodes, diagram.textBoxes, selectedNodeIds]);
+  }, [diagram.nodes, diagram.textBoxes, selectedNodeIds, updateNodeSize]);
 
   // Derive React Flow edges from diagram store + selection state
   const rfEdges = useMemo(() => {

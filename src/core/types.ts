@@ -7,6 +7,13 @@ export interface DiagramNode {
   label: string;
   shape: NodeShape;
   position: { x: number; y: number };
+
+  /**
+   * Canvas-only visual dimensions.
+   * These are used by the React Flow canvas and must not be exported to Mermaid.
+   */
+  width?: number;
+  height?: number;
 }
 
 export interface DiagramEdge {

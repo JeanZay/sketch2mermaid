@@ -257,3 +257,59 @@ describe('formatMermaidExport formatting tests', () => {
   });
 });
 
+describe('Mermaid invariance — width/height must never appear in output', () => {
+  test('node.width and node.height are ignored by toMermaid', () => {
+    const diagramWithout: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        { id: 'n1', label: 'Start', shape: 'stadium', position: { x: 0, y: 0 } },
+        { id: 'n2', label: 'Check?', shape: 'decision', position: { x: 0, y: 100 } },
+      ],
+      edges: [
+        { id: 'e1', from: 'n1', to: 'n2', label: '', style: 'solid' },
+      ],
+      textBoxes: [],
+    };
+
+    const diagramWith: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        { id: 'n1', label: 'Start', shape: 'stadium', position: { x: 0, y: 0 }, width: 300, height: 200 },
+        { id: 'n2', label: 'Check?', shape: 'decision', position: { x: 0, y: 100 }, width: 500, height: 400 },
+      ],
+      edges: [
+        { id: 'e1', from: 'n1', to: 'n2', label: '', style: 'solid' },
+      ],
+      textBoxes: [],
+    };
+
+    expect(toMermaid(diagramWith)).toBe(toMermaid(diagramWithout));
+  });
+
+  test('formatMermaidExport is unchanged with width/height on nodes', () => {
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'LR',
+      nodes: [
+        { id: 'n1', label: 'DB', shape: 'database', position: { x: 0, y: 0 }, width: 250, height: 150 },
+      ],
+      edges: [],
+      textBoxes: [],
+    };
+
+    const code = toMermaid(diagram);
+    expect(code).not.toContain('width');
+    expect(code).not.toContain('height');
+    expect(code).not.toContain('250');
+    expect(code).not.toContain('150');
+
+    const formatted = formatMermaidExport(code, 'markdown');
+    expect(formatted).not.toContain('width');
+    expect(formatted).not.toContain('height');
+  });
+});

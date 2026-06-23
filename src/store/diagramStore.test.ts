@@ -42,7 +42,9 @@ describe('Zustand diagram store tests', () => {
       id: 'n1',
       label: 'Nouveau nœud',
       shape: 'process',
-      position: { x: 10, y: 20 }
+      position: { x: 10, y: 20 },
+      width: 140,
+      height: 56,
     });
   });
 
@@ -288,5 +290,42 @@ describe('Zustand diagram store tests', () => {
 
     store.resetDiagram();
     expect(useDiagramStore.getState().diagram.textBoxes).toHaveLength(0);
+  });
+
+  test('new node receives default width and height from shape config', () => {
+    const store = useDiagramStore.getState();
+    store.addNode('decision', 50, 50);
+    const node = useDiagramStore.getState().diagram.nodes[0];
+    expect(node.width).toBe(120);
+    expect(node.height).toBe(90);
+  });
+
+  test('updateNodeSize persists dimensions on the node', () => {
+    const store = useDiagramStore.getState();
+    store.addNode('process', 10, 10);
+    store.updateNodeSize('n1', 200, 100);
+    const node = useDiagramStore.getState().diagram.nodes[0];
+    expect(node.width).toBe(200);
+    expect(node.height).toBe(100);
+  });
+
+  test('updateNodeSize clamps below minimum dimensions', () => {
+    const store = useDiagramStore.getState();
+    store.addNode('process', 10, 10); // minWidth: 90, minHeight: 44
+    store.updateNodeSize('n1', 30, 20);
+    const node = useDiagramStore.getState().diagram.nodes[0];
+    expect(node.width).toBe(90);
+    expect(node.height).toBe(44);
+  });
+
+  test('updateNodeShape resets dimensions to new shape defaults', () => {
+    const store = useDiagramStore.getState();
+    store.addNode('process', 10, 10);
+    store.updateNodeSize('n1', 300, 200);
+    store.updateNodeShape('n1', 'decision');
+    const node = useDiagramStore.getState().diagram.nodes[0];
+    expect(node.shape).toBe('decision');
+    expect(node.width).toBe(120);
+    expect(node.height).toBe(90);
   });
 });

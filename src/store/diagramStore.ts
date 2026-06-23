@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { CanonicalDiagram, DiagramNode, DiagramEdge, TextBox, TextBoxStyle, NodeShape, EdgeStyle, DiagramDirection } from '../core/types';
+import { NODE_SIZE_DEFAULTS } from '../core/nodeSizeConfig';
 
 const SCHEMA_VERSION = 1;
 const STORAGE_KEY = 'sketch2mermaid_diagram_v1';
@@ -117,6 +118,7 @@ export interface DiagramState {
   updateNodeLabel: (id: string, label: string) => void;
   updateNodeShape: (id: string, shape: NodeShape) => void;
   updateNodePosition: (id: string, x: number, y: number) => void;
+  updateNodeSize: (id: string, width: number, height: number) => void;
   deleteNode: (id: string) => void;
   addEdge: (from: string, to: string, style?: EdgeStyle, sourceHandle?: string, targetHandle?: string) => string;
   updateEdgeLabel: (id: string, label: string) => void;
@@ -152,11 +154,14 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       targetY += 30;
     }
 
+    const sizeDefaults = NODE_SIZE_DEFAULTS[shape];
     const newNode: DiagramNode = {
       id: newId,
       label: 'Nouveau nœud',
       shape,
       position: { x: targetX, y: targetY },
+      width: sizeDefaults.width,
+      height: sizeDefaults.height,
     };
     set((state) => ({
       diagram: {
@@ -179,11 +184,14 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   updateNodeShape: (id, shape) => {
+    const sizeDefaults = NODE_SIZE_DEFAULTS[shape];
     set((state) => ({
       diagram: {
         ...state.diagram,
         nodes: state.diagram.nodes.map((node) =>
-          node.id === id ? { ...node, shape } : node
+          node.id === id
+            ? { ...node, shape, width: sizeDefaults.width, height: sizeDefaults.height }
+            : node
         ),
       },
     }));
@@ -196,6 +204,23 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
         nodes: state.diagram.nodes.map((node) =>
           node.id === id ? { ...node, position: { x, y } } : node
         ),
+      },
+    }));
+  },
+
+  updateNodeSize: (id, width, height) => {
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        nodes: state.diagram.nodes.map((node) => {
+          if (node.id !== id) return node;
+          const sizeConfig = NODE_SIZE_DEFAULTS[node.shape];
+          return {
+            ...node,
+            width: Math.max(sizeConfig.minWidth, Math.round(width)),
+            height: Math.max(sizeConfig.minHeight, Math.round(height)),
+          };
+        }),
       },
     }));
   },

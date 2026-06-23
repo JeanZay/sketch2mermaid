@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
-import { Handle, Position, type NodeProps, useConnection } from '@xyflow/react';
+import { Handle, Position, type NodeProps, useConnection, NodeResizer } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
 import type { NodeShape } from '../core/types';
+import { NODE_SIZE_DEFAULTS } from '../core/nodeSizeConfig';
+import { computeNodeFontSize } from '../core/nodeText';
 
 export const CustomNode = ({ id, selected, data }: NodeProps) => {
   const label = (data.label as string) || '';
   const shape = (data.shape as NodeShape) || 'process';
+  const nodeWidth = (data.width as number | undefined);
+  const nodeHeight = (data.height as number | undefined);
+  const updateNodeSize = data.updateNodeSize as ((id: string, w: number, h: number) => void) | undefined;
   
   const updateNodeLabel = useDiagramStore((state) => state.updateNodeLabel);
   
@@ -15,6 +20,14 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   const connection = useConnection();
   const isConnecting = connection.inProgress;
   const connectingClass = isConnecting ? 'is-connecting' : '';
+
+  // Resolve dimensions from data or config defaults
+  const sizeConfig = NODE_SIZE_DEFAULTS[shape];
+  const width = nodeWidth ?? sizeConfig.width;
+  const height = nodeHeight ?? sizeConfig.height;
+
+  // Compute auto-fit font size
+  const fontSize = computeNodeFontSize({ label, width, height });
 
   const handleStartEditing = () => {
     setTempLabel(label);
@@ -36,6 +49,10 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
     }
   };
 
+  const handleResizeEnd = (_event: unknown, params: { width: number; height: number }) => {
+    updateNodeSize?.(id, params.width, params.height);
+  };
+
   // Node inner label text
   const renderInner = () => {
     if (isEditing) {
@@ -48,6 +65,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
           onKeyDown={handleKeyDown}
           autoFocus
           className="node-input"
+          style={{ fontSize }}
         />
       );
     }
@@ -56,12 +74,26 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
       <div 
         className="node-label" 
         onDoubleClick={handleStartEditing}
-        title="Double-cliquer pour modifier le label"
+        title={label}
+        style={{ fontSize }}
       >
         {label || 'Double-clic...'}
       </div>
     );
   };
+
+  // NodeResizer — visible only when selected
+  const renderResizer = () => (
+    <NodeResizer
+      isVisible={!!selected}
+      minWidth={sizeConfig.minWidth}
+      minHeight={sizeConfig.minHeight}
+      keepAspectRatio={shape === 'event' || shape === 'endEvent'}
+      onResizeEnd={handleResizeEnd}
+      lineClassName="node-resize-line"
+      handleClassName="node-resize-handle"
+    />
+  );
 
   // Four handles for flexible connections (each side has both target and source)
   const renderHandles = () => (
@@ -80,68 +112,55 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
     </>
   );
 
-  // Selection bounding box overlay
-  const renderSelectionOverlay = () => {
-    if (!selected) return null;
-    return (
-      <div className="node-selection-overlay">
-        <div className="selection-handle top-left" />
-        <div className="selection-handle top-right" />
-        <div className="selection-handle bottom-left" />
-        <div className="selection-handle bottom-right" />
-      </div>
-    );
-  };
-
   if (shape === 'decision') {
     return (
-      <div className={`decision-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`}>
+      <div className={`decision-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={{ width, height }}>
+        {renderResizer()}
         <div className="decision-bg"></div>
         <div className="decision-text">{renderInner()}</div>
         {renderHandles()}
-        {renderSelectionOverlay()}
       </div>
     );
   }
 
   if (shape === 'event') {
     return (
-      <div className={`event-circle ${selected ? 'node-selected' : ''} ${connectingClass}`}>
+      <div className={`event-circle ${selected ? 'node-selected' : ''} ${connectingClass}`} style={{ width, height }}>
+        {renderResizer()}
         <div className="event-inner">{renderInner()}</div>
         {renderHandles()}
-        {renderSelectionOverlay()}
       </div>
     );
   }
 
   if (shape === 'endEvent') {
     return (
-      <div className={`end-event-circle-outer ${selected ? 'node-selected' : ''} ${connectingClass}`}>
+      <div className={`end-event-circle-outer ${selected ? 'node-selected' : ''} ${connectingClass}`} style={{ width, height }}>
+        {renderResizer()}
         <div className="end-event-circle-inner">
           <div className="event-inner">{renderInner()}</div>
         </div>
         {renderHandles()}
-        {renderSelectionOverlay()}
       </div>
     );
   }
 
   if (shape === 'database') {
     return (
-      <div className={`database-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`}>
+      <div className={`database-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={{ width, height }}>
+        {renderResizer()}
         <div className="database-text">{renderInner()}</div>
         {renderHandles()}
-        {renderSelectionOverlay()}
       </div>
     );
   }
 
   if (shape === 'file') {
     return (
-      <div className={`file-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`}>
+      <div className={`file-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={{ width, height }}>
+        {renderResizer()}
         {renderInner()}
         {renderHandles()}
-        {renderSelectionOverlay()}
       </div>
     );
   }
@@ -152,10 +171,10 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   if (shape === 'stadium') shapeClass = 'shape-stadium';
 
   return (
-    <div className={`custom-node ${shapeClass} ${selected ? 'node-selected' : ''} ${connectingClass}`}>
+    <div className={`custom-node ${shapeClass} ${selected ? 'node-selected' : ''} ${connectingClass}`} style={{ width, height }}>
+      {renderResizer()}
       {renderInner()}
       {renderHandles()}
-      {renderSelectionOverlay()}
     </div>
   );
 };
