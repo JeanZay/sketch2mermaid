@@ -9,7 +9,6 @@ import {
   type Connection,
   type NodeChange,
   type EdgeChange,
-  type Node,
   MarkerType
 } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
@@ -115,7 +114,7 @@ function FlowInner() {
     };
   }, [nodes, updateNodePosition]);
 
-  // Handle ALL node changes — selection tracked in state, position synced on drag stop
+  // Handle ALL node changes — selection tracked in state, position updated continuously
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     let selectionChanged = false;
     let nextSelected: Set<string> | null = null;
@@ -130,17 +129,14 @@ function FlowInner() {
           nextSelected.delete(change.id);
         }
         selectionChanged = true;
+      } else if (change.type === 'position' && change.position) {
+        updateNodePosition(change.id, change.position.x, change.position.y);
       }
     }
     if (selectionChanged && nextSelected) {
       setSelectedNodeIds(nextSelected);
     }
-  }, [selectedNodeIds]);
-
-  // Sync final position to diagram store only when drag ends
-  const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
-    updateNodePosition(node.id, node.position.x, node.position.y);
-  }, [updateNodePosition]);
+  }, [selectedNodeIds, updateNodePosition]);
 
   // Handle ALL edge changes — selection tracked in state
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
@@ -198,7 +194,6 @@ function FlowInner() {
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onNodeDragStop={onNodeDragStop}
         onConnect={onConnect}
         onPaneDoubleClick={onPaneDoubleClick}
         onNodesDelete={(nodes) => nodes.forEach((n) => deleteNode(n.id))}
