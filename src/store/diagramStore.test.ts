@@ -128,6 +128,30 @@ describe('Zustand diagram store tests', () => {
     expect(state.edges[0].style).toBe('dotted');
   });
 
+  test('addEdge with sourceHandle and targetHandle and prevents duplicate handles edges', () => {
+    const store = useDiagramStore.getState();
+    store.addNode('process', 0, 0); // n1
+    store.addNode('decision', 0, 0); // n2
+
+    const edgeId1 = store.addEdge('n1', 'n2', 'solid', 'r-source', 'l-target');
+    expect(edgeId1).toBe('e1');
+
+    // Adding the exact same connection (same handles) returns the existing edge ID
+    const edgeId2 = store.addEdge('n1', 'n2', 'solid', 'r-source', 'l-target');
+    expect(edgeId2).toBe('e1');
+
+    // Adding a connection from different handles creates a new edge
+    const edgeId3 = store.addEdge('n1', 'n2', 'solid', 't-source', 'b-target');
+    expect(edgeId3).toBe('e2');
+
+    const state = useDiagramStore.getState().diagram;
+    expect(state.edges).toHaveLength(2);
+    expect(state.edges[0].sourceHandle).toBe('r-source');
+    expect(state.edges[0].targetHandle).toBe('l-target');
+    expect(state.edges[1].sourceHandle).toBe('t-source');
+    expect(state.edges[1].targetHandle).toBe('b-target');
+  });
+
   test('getNextNodeId and getNextEdgeId logic', () => {
     const nodes: DiagramNode[] = [
       { id: 'n1', label: '', shape: 'process', position: { x: 0, y: 0 } },

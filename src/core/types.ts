@@ -13,6 +13,8 @@ export interface DiagramEdge {
   id: string;
   from: string; // references a node.id
   to: string;   // references a node.id
+  sourceHandle?: string;
+  targetHandle?: string;
   label: string; // "" means no label
   style: EdgeStyle;
 }

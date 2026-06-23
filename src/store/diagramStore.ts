@@ -85,7 +85,7 @@ export interface DiagramState {
   updateNodeShape: (id: string, shape: NodeShape) => void;
   updateNodePosition: (id: string, x: number, y: number) => void;
   deleteNode: (id: string) => void;
-  addEdge: (from: string, to: string, style?: EdgeStyle) => string;
+  addEdge: (from: string, to: string, style?: EdgeStyle, sourceHandle?: string, targetHandle?: string) => string;
   updateEdgeLabel: (id: string, label: string) => void;
   toggleEdgeStyle: (id: string) => void;
   deleteEdge: (id: string) => void;
@@ -174,9 +174,15 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     }));
   },
 
-  addEdge: (from, to, style = 'solid') => {
-    // Prevent duplicate edges
-    const existing = get().diagram.edges.find((e) => e.from === from && e.to === to);
+  addEdge: (from, to, style = 'solid', sourceHandle, targetHandle) => {
+    // Prevent duplicate edges considering nodes and handles
+    const existing = get().diagram.edges.find(
+      (e) =>
+        e.from === from &&
+        e.to === to &&
+        e.sourceHandle === sourceHandle &&
+        e.targetHandle === targetHandle
+    );
     if (existing) return existing.id;
 
     const newId = getNextEdgeId(get().diagram.edges);
@@ -184,6 +190,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       id: newId,
       from,
       to,
+      sourceHandle,
+      targetHandle,
       label: '',
       style,
     };

@@ -466,6 +466,15 @@ body {
   transition: background-color 0.15s, transform 0.15s;
 }
 
+/* Ensure overlapping handles stack correctly so that source is on top to start drags */
+.node-handle[data-handle-type="source"] {
+  z-index: 5 !important;
+}
+
+.node-handle[data-handle-type="target"] {
+  z-index: 4 !important;
+}
+
 .node-handle:hover {
   background-color: var(--accent-color) !important;
   transform: scale(1.3);
@@ -1025,6 +1034,7 @@ body {
   border: 1.5px solid var(--accent-color);
   border-radius: 1px; /* Slight rounded look for squares */
   box-sizing: border-box;
+  pointer-events: none !important;
 }
 
 .selection-handle.top-left {

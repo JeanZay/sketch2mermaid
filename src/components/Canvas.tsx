@@ -54,6 +54,8 @@ function FlowInner() {
       id: edge.id,
       source: edge.from,
       target: edge.to,
+      sourceHandle: edge.sourceHandle,
+      targetHandle: edge.targetHandle,
       label: edge.label,
       type: 'customEdge',
       selected: selectedEdgeIds.has(edge.id),
@@ -158,7 +160,13 @@ function FlowInner() {
   // Handle edge connections
   const onConnect = useCallback((connection: Connection) => {
     if (connection.source && connection.target) {
-      addEdge(connection.source, connection.target);
+      addEdge(
+        connection.source,
+        connection.target,
+        'solid',
+        connection.sourceHandle ?? undefined,
+        connection.targetHandle ?? undefined
+      );
     }
   }, [addEdge]);
 
