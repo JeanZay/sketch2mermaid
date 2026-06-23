@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { 
   ReactFlow, 
   Background, 
@@ -6,8 +6,13 @@ import {
   MiniMap, 
   useReactFlow, 
   useNodes,
+  applyNodeChanges,
+  applyEdgeChanges,
   type Connection,
-  type NodeChange
+  type NodeChange,
+  type EdgeChange,
+  type Node,
+  type Edge
 } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
 import CustomNode from './CustomNode';
@@ -30,6 +35,41 @@ function FlowInner() {
   const deleteEdge = useDiagramStore((state) => state.deleteEdge);
 
   const { screenToFlowPosition } = useReactFlow();
+
+  // Local React Flow state for nodes and edges, preserving selection
+  const [rfNodes, setRfNodes] = useState<Node[]>([]);
+  const [rfEdges, setRfEdges] = useState<Edge[]>([]);
+
+  // Sync diagram store → React Flow nodes, preserving selection state
+  useEffect(() => {
+    setRfNodes((prev) => {
+      const selectedIds = new Set(prev.filter((n) => n.selected).map((n) => n.id));
+      return diagram.nodes.map((node) => ({
+        id: node.id,
+        type: 'customNode',
+        position: node.position,
+        data: { label: node.label, shape: node.shape },
+        selected: selectedIds.has(node.id),
+      }));
+    });
+  }, [diagram.nodes]);
+
+  // Sync diagram store → React Flow edges, preserving selection state
+  useEffect(() => {
+    setRfEdges((prev) => {
+      const selectedIds = new Set(prev.filter((e) => e.selected).map((e) => e.id));
+      return diagram.edges.map((edge) => ({
+        id: edge.id,
+        source: edge.from,
+        target: edge.to,
+        label: edge.label,
+        type: 'customEdge',
+        selected: selectedIds.has(edge.id),
+      }));
+    });
+  }, [diagram.edges]);
+
+  // Access React Flow's internal node list for keyboard nudging
   const nodes = useNodes();
 
   // Handle keyboard nudging with safeguards
@@ -75,35 +115,22 @@ function FlowInner() {
     };
   }, [nodes, updateNodePosition]);
 
-  // Map canonical nodes to React Flow nodes format
-  const rfNodes = useMemo(() => {
-    return diagram.nodes.map((node) => ({
-      id: node.id,
-      type: 'customNode',
-      position: node.position,
-      data: { label: node.label, shape: node.shape },
-    }));
-  }, [diagram.nodes]);
-
-  // Map canonical edges to React Flow edges format
-  const rfEdges = useMemo(() => {
-    return diagram.edges.map((edge) => ({
-      id: edge.id,
-      source: edge.from,
-      target: edge.to,
-      label: edge.label,
-      type: 'customEdge',
-    }));
-  }, [diagram.edges]);
-
-  // Handle node dragging
+  // Handle ALL node changes (selection, position, dimensions, etc.)
   const onNodesChange = useCallback((changes: NodeChange[]) => {
+    setRfNodes((nds) => applyNodeChanges(changes, nds));
+
+    // Sync position changes back to diagram store
     changes.forEach((change) => {
       if (change.type === 'position' && change.position) {
         updateNodePosition(change.id, change.position.x, change.position.y);
       }
     });
   }, [updateNodePosition]);
+
+  // Handle ALL edge changes (selection, etc.)
+  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+    setRfEdges((eds) => applyEdgeChanges(changes, eds));
+  }, []);
 
   // Handle edge connections
   const onConnect = useCallback((connection: Connection) => {
@@ -132,6 +159,7 @@ function FlowInner() {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onPaneDoubleClick={onPaneDoubleClick}
         onNodesDelete={(nodes) => nodes.forEach((n) => deleteNode(n.id))}
