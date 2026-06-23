@@ -191,11 +191,165 @@ describe('Mermaid Flowchart Import Tests', () => {
     expect(res.diagram.edges[1].to).toBe('C');
   });
 
-  // 22. ampersand syntax emits ampersandSkipped
-  test('22. ampersand syntax emits ampersandSkipped', () => {
+  // 22. ampersand syntax parses and expands edges
+  test('22. ampersand syntax parses and expands edges', () => {
     const res = importMermaidFlowchart('graph TD\n  A --> B & C');
-    expect(res.diagram.edges.length).toBe(0);
-    expect(res.warnings.some(w => w.type === 'ampersandSkipped')).toBe(true);
+    expect(res.diagram.edges.length).toBe(2);
+    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'B')).toBe(true);
+    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
+    expect(res.warnings.some(w => w.type === 'ampersandSkipped')).toBe(false);
+  });
+
+  // 22a. ampersand syntax with multiple sources
+  test('22a. ampersand syntax with multiple sources', () => {
+    const res = importMermaidFlowchart('graph TD\n  A & B --> C');
+    expect(res.diagram.edges.length).toBe(2);
+    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
+    expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'C')).toBe(true);
+  });
+
+  // 22b. ampersand syntax with multiple sources and targets
+  test('22b. ampersand syntax with multiple sources and targets', () => {
+    const res = importMermaidFlowchart('graph TD\n  A & B --> C & D');
+    expect(res.diagram.edges.length).toBe(4);
+    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
+    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'D')).toBe(true);
+    expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'C')).toBe(true);
+    expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'D')).toBe(true);
+  });
+
+  // 22c. inline node definitions in groups
+  test('22c. inline node definitions in groups', () => {
+    const res = importMermaidFlowchart('graph TD\n  A[Start] --> B[Step B] & C{Decision}');
+    expect(res.diagram.edges.length).toBe(2);
+    const nodeA = res.diagram.nodes.find(n => n.id === 'A');
+    const nodeB = res.diagram.nodes.find(n => n.id === 'B');
+    const nodeC = res.diagram.nodes.find(n => n.id === 'C');
+    expect(nodeA?.label).toBe('Start');
+    expect(nodeA?.shape).toBe('process');
+    expect(nodeB?.label).toBe('Step B');
+    expect(nodeB?.shape).toBe('process');
+    expect(nodeC?.label).toBe('Decision');
+    expect(nodeC?.shape).toBe('decision');
+  });
+
+  // 22d. inline node definitions in source group
+  test('22d. inline node definitions in source group', () => {
+    const res = importMermaidFlowchart('graph TD\n  A[Left] & B[Right] --> C[Merge]');
+    expect(res.diagram.edges.length).toBe(2);
+    const nodeA = res.diagram.nodes.find(n => n.id === 'A');
+    const nodeB = res.diagram.nodes.find(n => n.id === 'B');
+    const nodeC = res.diagram.nodes.find(n => n.id === 'C');
+    expect(nodeA?.label).toBe('Left');
+    expect(nodeB?.label).toBe('Right');
+    expect(nodeC?.label).toBe('Merge');
+  });
+
+  // 22e. ampersands inside node labels do not split
+  test('22e. ampersands inside node labels do not split', () => {
+    const res = importMermaidFlowchart('graph TD\n  A[Research & Development] & B[Sales & Marketing] --> C[Decision]');
+    expect(res.diagram.edges.length).toBe(2);
+    const nodeA = res.diagram.nodes.find(n => n.id === 'A');
+    const nodeB = res.diagram.nodes.find(n => n.id === 'B');
+    expect(nodeA?.label).toBe('Research & Development');
+    expect(nodeB?.label).toBe('Sales & Marketing');
+    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
+    expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'C')).toBe(true);
+  });
+
+  // 22f. labelled pipe edge with multiple targets
+  test('22f. labelled pipe edge with multiple targets', () => {
+    const res = importMermaidFlowchart('graph TD\n  A -->|Yes| B & C');
+    expect(res.diagram.edges.length).toBe(2);
+    expect(res.diagram.edges[0].label).toBe('Yes');
+    expect(res.diagram.edges[1].label).toBe('Yes');
+  });
+
+  // 22g. labelled text edge with multiple targets
+  test('22g. labelled text edge with multiple targets', () => {
+    const res = importMermaidFlowchart('graph TD\n  A -- approved --> B & C');
+    expect(res.diagram.edges.length).toBe(2);
+    expect(res.diagram.edges[0].label).toBe('approved');
+    expect(res.diagram.edges[1].label).toBe('approved');
+  });
+
+  // 22h. dotted edge with multiple targets
+  test('22h. dotted edge with multiple targets', () => {
+    const res = importMermaidFlowchart('graph TD\n  A -.-> B & C');
+    expect(res.diagram.edges.length).toBe(2);
+    expect(res.diagram.edges[0].style).toBe('dotted');
+    expect(res.diagram.edges[1].style).toBe('dotted');
+  });
+
+  // 22i. dotted labelled edge with multiple targets
+  test('22i. dotted labelled edge with multiple targets', () => {
+    const res = importMermaidFlowchart('graph TD\n  A -. optional .-> B & C');
+    expect(res.diagram.edges.length).toBe(2);
+    expect(res.diagram.edges[0].style).toBe('dotted');
+    expect(res.diagram.edges[0].label).toBe('optional');
+    expect(res.diagram.edges[1].style).toBe('dotted');
+    expect(res.diagram.edges[1].label).toBe('optional');
+  });
+
+  // 22j. thick edge fallback with ampersand
+  test('22j. thick edge fallback with ampersand', () => {
+    const res = importMermaidFlowchart('graph TD\n  A ==> B & C');
+    expect(res.diagram.edges.length).toBe(2);
+    expect(res.diagram.edges[0].style).toBe('solid');
+    expect(res.diagram.edges[1].style).toBe('solid');
+    // Only one warning for unsupported edge on this line
+    expect(res.warnings.filter(w => w.type === 'unsupportedEdge').length).toBe(1);
+  });
+
+  // 22k. open link fallback with ampersand
+  test('22k. open link fallback with ampersand', () => {
+    const res = importMermaidFlowchart('graph TD\n  A --- B & C');
+    expect(res.diagram.edges.length).toBe(2);
+    expect(res.diagram.edges[0].style).toBe('solid');
+    expect(res.diagram.edges[1].style).toBe('solid');
+    expect(res.warnings.filter(w => w.type === 'unsupportedEdge').length).toBe(1);
+  });
+
+  // 22l. bidirectional fallback with ampersand
+  test('22l. bidirectional fallback with ampersand', () => {
+    const res = importMermaidFlowchart('graph TD\n  A <--> B & C');
+    expect(res.diagram.edges.length).toBe(2);
+    expect(res.diagram.edges[0].style).toBe('solid');
+    expect(res.diagram.edges[1].style).toBe('solid');
+    expect(res.warnings.filter(w => w.type === 'unsupportedEdge').length).toBe(1);
+  });
+
+  // 22m. ampersand inside edge label does not expand
+  test('22m. ampersand inside edge label does not expand', () => {
+    const res = importMermaidFlowchart('graph TD\n  A -->|Sales & Marketing| B');
+    expect(res.diagram.edges.length).toBe(1);
+    expect(res.diagram.edges[0].label).toBe('Sales & Marketing');
+    expect(res.warnings.some(w => w.type === 'ampersandSkipped')).toBe(false);
+  });
+
+  // 22n. malformed ampersand lines emit ampersandSkipped
+  test('22n. malformed ampersand lines emit ampersandSkipped', () => {
+    const cases = [
+      'graph TD\n  A --> &',
+      'graph TD\n  & --> B',
+      'graph TD\n  A & --> B',
+      'graph TD\n  A --> B &',
+      'graph TD\n  A && B --> C'
+    ];
+    for (const c of cases) {
+      const res = importMermaidFlowchart(c);
+      expect(res.warnings.some(w => w.type === 'ampersandSkipped')).toBe(true);
+    }
+  });
+
+  // 22o. chained ampersand edges
+  test('22o. chained ampersand edges', () => {
+    const res = importMermaidFlowchart('graph TD\n  A --> B & C --> D');
+    expect(res.diagram.edges.length).toBe(4);
+    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'B')).toBe(true);
+    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
+    expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'D')).toBe(true);
+    expect(res.diagram.edges.some(e => e.from === 'C' && e.to === 'D')).toBe(true);
   });
 
   // 23. comments are ignored
@@ -258,5 +412,21 @@ describe('Mermaid Flowchart Import Tests', () => {
     expect(res.diagram.diagramType).toBe('flowchart');
     expect(res.diagram.nodes.length).toBe(2);
     expect(res.diagram.edges.length).toBe(1);
+  });
+
+  // 31. manual verification diagram case
+  test('31. manual verification diagram case', () => {
+    const code = `flowchart TD
+  A[Start] --> B & C
+  B --> D[End]
+  C --> D`;
+    const res = importMermaidFlowchart(code);
+    expect(res.warnings.length).toBe(0);
+    expect(res.diagram.nodes.length).toBe(4);
+    expect(res.diagram.edges.length).toBe(4);
+    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'B')).toBe(true);
+    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
+    expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'D')).toBe(true);
+    expect(res.diagram.edges.some(e => e.from === 'C' && e.to === 'D')).toBe(true);
   });
 });

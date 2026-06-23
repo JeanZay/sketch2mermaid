@@ -258,16 +258,6 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
       continue;
     }
 
-    // Check for ampersand syntax in line (outside quotes)
-    if (hasUnquotedAmpersand(text)) {
-      warnings.push({
-        type: 'ampersandSkipped',
-        line: lineObj.index,
-        message: `Ligne ignorée car la syntaxe d'arête multiple '&' n'est pas supportée.`,
-        raw: text,
-      });
-      continue;
-    }
 
     // Subgraph match
     const subgraphMatch = text.match(/^subgraph\b\s*(.*)$/i);
@@ -362,32 +352,22 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
 
     // Parse general node and edge chains
     const chainElements = parseChain(text, lineObj.index, warnings);
-    if (!chainElements || chainElements.length === 0) {
-      warnings.push({
-        type: 'lineSkipped',
-        line: lineObj.index,
-        message: `Ligne ignorée car elle n'a pas pu être analysée.`,
-        raw: text,
-      });
-      continue;
-    }
 
-    // Process parsed elements from the chain
-    // The chain must alternate Node, Edge, Node, Edge, Node ...
-    // Verify structure
+    // Verify structure of the chain: must alternate nodeGroup and edge, starting and ending with nodeGroup
     let isValidChain = true;
-    if (chainElements.length % 2 === 0) {
-      // Must be odd number of items: Node, Edge, Node
+    if (!chainElements || chainElements.length === 0) {
+      isValidChain = false;
+    } else if (chainElements.length % 2 === 0) {
       isValidChain = false;
     } else {
       for (let j = 0; j < chainElements.length; j++) {
         const isNodeIndex = j % 2 === 0;
         const item = chainElements[j];
-        if (isNodeIndex && !('id' in item)) {
+        if (isNodeIndex && item.kind !== 'nodeGroup') {
           isValidChain = false;
           break;
         }
-        if (!isNodeIndex && !('from' in item)) {
+        if (!isNodeIndex && item.kind !== 'edge') {
           isValidChain = false;
           break;
         }
@@ -395,26 +375,46 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
     }
 
     if (!isValidChain) {
-      warnings.push({
-        type: 'lineSkipped',
-        line: lineObj.index,
-        message: `Ligne ignorée car la structure de chaîne de diagramme est invalide.`,
-        raw: text,
-      });
+      if (hasUnquotedAmpersand(text)) {
+        warnings.push({
+          type: 'ampersandSkipped',
+          line: lineObj.index,
+          message: `Ligne ignorée car la syntaxe d'arête multiple '&' est malformée ou non supportée.`,
+          raw: text,
+        });
+      } else {
+        warnings.push({
+          type: 'lineSkipped',
+          line: lineObj.index,
+          message: `Ligne ignorée car la structure de chaîne de diagramme est invalide.`,
+          raw: text,
+        });
+      }
       continue;
     }
 
     // Add nodes and edges from valid chain
     for (let j = 0; j < chainElements.length; j++) {
       if (j % 2 === 0) {
-        parsedNodes.push(chainElements[j] as ParsedNode);
+        const nodeGroup = (chainElements[j] as { kind: 'nodeGroup'; nodes: ParsedNode[] }).nodes;
+        for (const node of nodeGroup) {
+          parsedNodes.push(node);
+        }
       } else {
-        const edge = chainElements[j] as ParsedEdge;
-        // The parser set placeholder from/to since it doesn't know adjacent nodes in parseChain
-        // Set them now
-        edge.from = (chainElements[j - 1] as ParsedNode).id;
-        edge.to = (chainElements[j + 1] as ParsedNode).id;
-        parsedEdges.push(edge);
+        const edgeTemplate = (chainElements[j] as { kind: 'edge'; edge: ParsedEdge }).edge;
+        const sourceGroup = (chainElements[j - 1] as { kind: 'nodeGroup'; nodes: ParsedNode[] }).nodes;
+        const targetGroup = (chainElements[j + 1] as { kind: 'nodeGroup'; nodes: ParsedNode[] }).nodes;
+
+        // Expand edges: sourceGroup x targetGroup
+        for (const srcNode of sourceGroup) {
+          for (const tgtNode of targetGroup) {
+            parsedEdges.push({
+              ...edgeTemplate,
+              from: srcNode.id,
+              to: tgtNode.id,
+            });
+          }
+        }
       }
     }
   }
@@ -537,14 +537,22 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
 
   // Convert parsed edges to final DiagramEdges
   let edgeCounter = 1;
-  const finalEdges: DiagramEdge[] = parsedEdges.map(edge => {
+  const finalEdges: DiagramEdge[] = [];
+  const warnedUnsupportedEdges = new Set<string>();
+  const seenEdges = new Set<string>();
+
+  for (const edge of parsedEdges) {
     if (edge.unsupported) {
-      warnings.push({
-        type: 'unsupportedEdge',
-        line: edge.line,
-        message: `L'opérateur d'arête "${edge.rawOperator}" n'est pas supporté. Remplacé par une arête standard.`,
-        raw: edge.rawOperator,
-      });
+      const warnKey = `${edge.line}_${edge.rawOperator}`;
+      if (!warnedUnsupportedEdges.has(warnKey)) {
+        warnedUnsupportedEdges.add(warnKey);
+        warnings.push({
+          type: 'unsupportedEdge',
+          line: edge.line,
+          message: `L'opérateur d'arête "${edge.rawOperator}" n'est pas supporté. Remplacé par une arête standard.`,
+          raw: edge.rawOperator,
+        });
+      }
     }
 
     let finalEdgeLabel = edge.label;
@@ -561,14 +569,20 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
       }
     }
 
-    return {
+    const edgeKey = `${edge.from}->${edge.to}||${finalEdgeLabel}||${edge.style}`;
+    if (seenEdges.has(edgeKey)) {
+      continue;
+    }
+    seenEdges.add(edgeKey);
+
+    finalEdges.push({
       id: `e${edgeCounter++}`,
       from: edge.from,
       to: edge.to,
       label: finalEdgeLabel,
       style: edge.style,
-    };
-  });
+    });
+  }
 
   // Layout Computation
   const usedLayoutFallback = computeLayout(finalNodes, finalEdges, direction, orderOfAppearance);
@@ -604,8 +618,46 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
 }
 
 // Phase 2 details: parses a single line for a chain of nodes and edges
-function parseChain(lineText: string, lineIndex: number, warnings: MermaidImportWarning[]): (ParsedNode | ParsedEdge)[] | null {
-  const result: (ParsedNode | ParsedEdge)[] = [];
+type ParsedChainElement =
+  | { kind: 'nodeGroup'; nodes: ParsedNode[] }
+  | { kind: 'edge'; edge: ParsedEdge };
+
+function scanNodeGroup(
+  s: string,
+  start: number,
+  lineIndex: number,
+  warnings: MermaidImportWarning[]
+): { nodes: ParsedNode[]; nextIndex: number } | null {
+  let idx = start;
+  const nodes: ParsedNode[] = [];
+
+  const firstNodeRes = scanNodeRef(s, idx, lineIndex, warnings);
+  if (!firstNodeRes) return null;
+  nodes.push(firstNodeRes.node);
+  idx = firstNodeRes.nextIndex;
+
+  while (idx < s.length) {
+    let wsIdx = idx;
+    while (wsIdx < s.length && /\s/.test(s[wsIdx])) wsIdx++;
+
+    if (wsIdx < s.length && s[wsIdx] === '&') {
+      idx = wsIdx + 1;
+      while (idx < s.length && /\s/.test(s[idx])) idx++;
+
+      const nextNodeRes = scanNodeRef(s, idx, lineIndex, warnings);
+      if (!nextNodeRes) return null;
+      nodes.push(nextNodeRes.node);
+      idx = nextNodeRes.nextIndex;
+    } else {
+      break;
+    }
+  }
+
+  return { nodes, nextIndex: idx };
+}
+
+function parseChain(lineText: string, lineIndex: number, warnings: MermaidImportWarning[]): ParsedChainElement[] | null {
+  const result: ParsedChainElement[] = [];
   let i = 0;
   const s = lineText.trim();
   if (!s) return null;
@@ -615,12 +667,12 @@ function parseChain(lineText: string, lineIndex: number, warnings: MermaidImport
     while (i < s.length && /\s/.test(s[i])) i++;
     if (i >= s.length) break;
 
-    // 1. Scan Node Reference
-    const nodeRes = scanNodeRef(s, i, lineIndex, warnings);
+    // 1. Scan Node Group
+    const nodeRes = scanNodeGroup(s, i, lineIndex, warnings);
     if (!nodeRes) {
       return null; // parse failure
     }
-    result.push(nodeRes.node);
+    result.push({ kind: 'nodeGroup', nodes: nodeRes.nodes });
     i = nodeRes.nextIndex;
 
     // Skip whitespace
@@ -630,11 +682,10 @@ function parseChain(lineText: string, lineIndex: number, warnings: MermaidImport
     // 2. Scan Edge Reference
     const edgeRes = scanEdgeRef(s, i);
     if (!edgeRes) {
-      // If we are at the end of string or hit something else, it might be a parse error
-      // unless we successfully finished at a node, but we checked whitespace and we aren't at end
       return null;
     }
-    result.push(edgeRes.edge);
+    edgeRes.edge.line = lineIndex;
+    result.push({ kind: 'edge', edge: edgeRes.edge });
     i = edgeRes.nextIndex;
   }
 

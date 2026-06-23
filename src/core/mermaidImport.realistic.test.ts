@@ -67,18 +67,22 @@ describe('Mermaid Import Realistic & Hardening Tests', () => {
       expect(res.warnings.some(w => w.type === 'ampersandSkipped')).toBe(false);
     });
 
-    test('A --> B & C emits ampersandSkipped warning and skips edge', () => {
+    test('A --> B & C expands edges successfully', () => {
       const code = 'flowchart TD\n  A --> B & C';
       const res = importMermaidFlowchart(code);
-      expect(res.diagram.edges.length).toBe(0);
-      expect(res.warnings.some(w => w.type === 'ampersandSkipped')).toBe(true);
+      expect(res.diagram.edges.length).toBe(2);
+      expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'B')).toBe(true);
+      expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
+      expect(res.warnings.some(w => w.type === 'ampersandSkipped')).toBe(false);
     });
 
-    test('A & B --> C emits ampersandSkipped warning and skips edge', () => {
+    test('A & B --> C expands edges successfully', () => {
       const code = 'flowchart TD\n  A & B --> C';
       const res = importMermaidFlowchart(code);
-      expect(res.diagram.edges.length).toBe(0);
-      expect(res.warnings.some(w => w.type === 'ampersandSkipped')).toBe(true);
+      expect(res.diagram.edges.length).toBe(2);
+      expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
+      expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'C')).toBe(true);
+      expect(res.warnings.some(w => w.type === 'ampersandSkipped')).toBe(false);
     });
   });
 
@@ -300,8 +304,8 @@ flowchart TD
 
       const res = importMermaidFlowchart(code);
 
-      // Warnings
-      expect(res.warnings.some(w => w.type === 'ampersandSkipped')).toBe(true);
+      // Warnings (unsupportedClass warning is expected, but ampersandSkipped should be false)
+      expect(res.warnings.some(w => w.type === 'ampersandSkipped')).toBe(false);
       expect(res.warnings.some(w => w.type === 'unsupportedClass')).toBe(true);
 
       // B, C, D still imported
@@ -309,7 +313,10 @@ flowchart TD
       expect(res.diagram.nodes.some(n => n.id === 'C')).toBe(true);
       expect(res.diagram.nodes.some(n => n.id === 'D')).toBe(true);
 
-      // Recovered edges
+      // Recovered/expanded edges (4 total: A->B, A->C, B->D, C->D)
+      expect(res.diagram.edges.length).toBe(4);
+      expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'B')).toBe(true);
+      expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
       expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'D')).toBe(true);
       expect(res.diagram.edges.some(e => e.from === 'C' && e.to === 'D')).toBe(true);
 
@@ -409,6 +416,42 @@ flowchart TD
       res.diagram.nodes[0].label = 'Mutated';
       const res2 = importMermaidFlowchart(code);
       expect(res2.diagram.nodes[0].label).toBe('A');
+    });
+  });
+
+  // 5. Ampersand round-trip and layout stability
+  describe('Ampersand round-trip and layout stability', () => {
+    test('Import -> Export -> Render works for ampersand expanded edges', async () => {
+      const code = 'flowchart TD\n  A[Start] --> B & C{Check} --> D[End]';
+      const res = importMermaidFlowchart(code);
+      
+      expect(res.diagram.nodes.length).toBe(4);
+      expect(res.diagram.edges.length).toBe(4);
+      
+      const exported = toMermaid(res.diagram);
+      // Verify exported code compiles with Mermaid
+      await assertMermaidCompiles(exported, 'amp_roundtrip');
+      
+      // Re-import exported code and verify the structures are equivalent
+      const reimported = importMermaidFlowchart(exported);
+      expect(reimported.diagram.nodes.length).toBe(4);
+      expect(reimported.diagram.edges.length).toBe(4);
+    });
+
+    test('Deterministic layout remains stable after ampersand expansion', () => {
+      const code = 'flowchart TD\n  A[Start] --> B & C{Check} --> D[End]';
+      const res1 = importMermaidFlowchart(code);
+      const res2 = importMermaidFlowchart(code);
+      
+      // Ensure determinism
+      expect(res1.diagram.nodes).toEqual(res2.diagram.nodes);
+      expect(res1.diagram.edges).toEqual(res2.diagram.edges);
+      
+      // Verify layout positions are finite numbers and not NaN
+      for (const node of res1.diagram.nodes) {
+        expect(Number.isFinite(node.position.x)).toBe(true);
+        expect(Number.isFinite(node.position.y)).toBe(true);
+      }
     });
   });
 
