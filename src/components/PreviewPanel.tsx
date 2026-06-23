@@ -3,9 +3,11 @@ import mermaid from 'mermaid';
 import { toMermaid, formatMermaidExport } from '../core/mermaid';
 import type { MermaidExportFormat } from '../core/types';
 import { useDiagramStore } from '../store/diagramStore';
-import { Copy, Check, AlertCircle } from 'lucide-react';
+import { Copy, Check } from 'lucide-react';
 import { useNodes, useEdges } from '@xyflow/react';
 import PropertiesPanel from './PropertiesPanel';
+import SvgPreviewViewer from './SvgPreviewViewer';
+import SvgPreviewModal from './SvgPreviewModal';
 
 // Initialize mermaid with strict security level to prevent script injections and script execution
 if (typeof window !== 'undefined') {
@@ -31,6 +33,7 @@ export const PreviewPanel = () => {
   const [copied, setCopied] = useState(false);
   const [svgHtml, setSvgHtml] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const nodes = useNodes();
   const edges = useEdges();
@@ -168,36 +171,23 @@ export const PreviewPanel = () => {
         <span className="panel-title">Prévisualisation SVG</span>
       </div>
 
-      {/* SVG rendering area */}
-      <div className="svg-view-wrapper">
-        {error ? (
-          <div className="error-container">
-            <AlertCircle size={20} className="error-icon" />
-            <div className="error-details">
-              <span className="error-title">Erreur de syntaxe Mermaid</span>
-              <p className="error-message">{error}</p>
-            </div>
-          </div>
-        ) : svgHtml ? (
-          /* 
-            SECURITY EXPLANATION FOR dangerouslySetInnerHTML:
-            We are using dangerouslySetInnerHTML here solely to insert the SVG string returned by mermaid.render().
-            This is secure because:
-            1. Mermaid is initialized globally with `securityLevel: "strict"`.
-            2. All node and edge labels have been parsed and escaped character-by-character (e.g. converting " -> &quot;, # -> &#35;, etc.) prior to constructing the Mermaid code input.
-            3. No remote scripts, click handlers, or arbitrary HTML tags are supported or passed into the parser.
-            This meets the security guidelines of the implementation plan for controlled SVG rendering paths.
-          */
-          <div 
-            className="mermaid-svg-container"
-            dangerouslySetInnerHTML={{ __html: svgHtml }}
-          />
-        ) : (
-          <div className="empty-preview">
-            Aucun diagramme à prévisualiser. Ajoutez des nœuds pour commencer.
-          </div>
-        )}
-      </div>
+      {/* SVG Preview Viewer with zoom/pan/fit */}
+      <SvgPreviewViewer
+        svgHtml={svgHtml}
+        error={error}
+        compact={true}
+        showLargePreviewButton={true}
+        showDownloadButton={true}
+        onOpenLargePreview={() => setIsModalOpen(true)}
+      />
+
+      {/* Large preview modal */}
+      {isModalOpen && svgHtml && (
+        <SvgPreviewModal
+          svgHtml={svgHtml}
+          onClose={() => setIsModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

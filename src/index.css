@@ -666,40 +666,223 @@ body {
   color: #a78bfa;
 }
 
-/* SVG Rendering / Preview block (lower part) */
-.svg-view-wrapper {
+/* ================================================================
+   SVG Preview Viewer — light surface with zoom/pan/fit
+   ================================================================ */
+
+.svg-preview-viewer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 180px;
+  overflow: hidden;
+}
+
+.svg-preview-viewer.compact {
+  /* In the right panel, fill remaining space */
   height: 40%;
   min-height: 200px;
-  background-color: #1E1E2E; /* Dark Preview background for look */
-  border-top: 1px solid var(--border-color);
+}
+
+/* Toolbar strip */
+.svg-preview-toolbar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  overflow: auto;
-  position: relative;
-  padding: 16px;
+  gap: 4px;
+  padding: 6px 12px;
+  background-color: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
-.mermaid-svg-container {
-  width: 100%;
-  height: 100%;
-  display: flex;
+.svg-toolbar-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 3px;
+  transition: all 0.15s;
 }
 
-/* Set SVG texts/paths to render nicely inside dark preview background */
-.mermaid-svg-container svg {
-  max-width: 100%;
-  max-height: 100%;
-  height: auto;
+.svg-toolbar-btn:hover:not(:disabled) {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
 }
 
-.empty-preview {
-  color: var(--text-muted);
-  font-size: 12px;
+.svg-toolbar-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.svg-toolbar-zoom-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  min-width: 36px;
   text-align: center;
-  max-width: 80%;
+  user-select: none;
+}
+
+.svg-toolbar-separator {
+  width: 1px;
+  height: 14px;
+  background-color: var(--border-color);
+  margin: 0 4px;
+}
+
+/* Pan / zoom viewport */
+.svg-viewport {
+  flex: 1;
+  background-color: #F8F9FB;
+  border-top: 1px solid var(--border-color);
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+}
+
+.svg-viewport.is-panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+/* Inner transform target */
+.svg-inner {
+  transform-origin: 0 0;
+  display: inline-block;
+}
+
+.svg-inner svg {
+  display: block;
+}
+
+/* ---- Empty state ---- */
+.svg-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  background-color: #F8F9FB;
+}
+
+.svg-empty-icon {
+  color: var(--border-color);
+}
+
+.svg-empty-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.svg-empty-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ---- Error state ---- */
+.svg-error-state {
+  flex: 1;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 20px 16px;
+  background-color: #FEF2F2;
+}
+
+.svg-error-icon {
+  color: var(--danger-color);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.svg-error-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.svg-error-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger-color);
+}
+
+.svg-error-message {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ================================================================
+   SVG Preview Modal — portal overlay
+   ================================================================ */
+
+.svg-preview-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: modal-fade-in 0.15s ease-out;
+}
+
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.svg-preview-modal-card {
+  width: calc(100vw - 80px);
+  height: calc(100vh - 80px);
+  background: var(--bg-panel);
+  border-radius: 12px;
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.svg-preview-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.svg-preview-modal-close:hover {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
 }
 
 /* Properties Panel Content (inside upper part) */
@@ -975,50 +1158,7 @@ body {
   white-space: nowrap;
 }
 
-/* Error Handling container */
-.error-container {
-  display: flex;
-  gap: 12px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 8px;
-  padding: 12px;
-  max-width: 95%;
-}
-
-.error-icon {
-  color: var(--danger-color);
-  flex-shrink: 0;
-}
-
-.error-details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.error-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: #ffffff;
-}
-
-.error-message {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: #fca5a5;
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-/* Empty states */
-.empty-preview {
-  color: #6B7280;
-  font-size: 12px;
-  text-align: center;
-  max-width: 80%;
-}
+/* Legacy error/empty classes removed — now handled by SvgPreviewViewer component styles */
 
 /* Shape Selection Overlay System */
 .node-selection-overlay {
