@@ -19,12 +19,28 @@ export interface DiagramEdge {
   style: EdgeStyle;
 }
 
+export interface TextBoxStyle {
+  fontSize: number;
+  bold: boolean;
+  italic: boolean;
+  textAlign: 'left' | 'center' | 'right';
+  color: string;
+}
+
+export interface TextBox {
+  id: string;
+  text: string;
+  position: { x: number; y: number };
+  style: TextBoxStyle;
+}
+
 export interface CanonicalDiagram {
   schemaVersion: number;
   diagramType: 'flowchart';
   direction: DiagramDirection;
   nodes: DiagramNode[];
   edges: DiagramEdge[];
+  textBoxes: TextBox[];
 }
 
 export type MermaidExportFormat = 'markdown' | 'html' | 'raw';

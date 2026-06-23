@@ -9,7 +9,8 @@ describe('toMermaid pure serialization tests', () => {
       diagramType: 'flowchart',
       direction: 'TD',
       nodes: [],
-      edges: []
+      edges: [],
+      textBoxes: []
     };
     expect(toMermaid(diagram)).toBe('flowchart TD');
   });
@@ -25,7 +26,8 @@ describe('toMermaid pure serialization tests', () => {
       ],
       edges: [
         { id: 'e1', from: 'n1', to: 'n2', label: '', style: 'solid' }
-      ]
+      ],
+      textBoxes: []
     };
     const expected = [
       'flowchart TD',
@@ -44,7 +46,8 @@ describe('toMermaid pure serialization tests', () => {
       nodes: [
         { id: 'n1', label: 'Décision : valider (oui/non) ?', shape: 'decision', position: { x: 0, y: 0 } }
       ],
-      edges: []
+      edges: [],
+      textBoxes: []
     };
     const output = toMermaid(diagram);
     expect(output).toContain('n1{"Décision : valider (oui/non) ?"}');
@@ -58,7 +61,8 @@ describe('toMermaid pure serialization tests', () => {
       nodes: [
         { id: 'n1', label: 'end', shape: 'process', position: { x: 0, y: 0 } }
       ],
-      edges: []
+      edges: [],
+      textBoxes: []
     };
     const output = toMermaid(diagram);
     // Should render: n1["end"]
@@ -91,7 +95,8 @@ describe('toMermaid pure serialization tests', () => {
       ],
       edges: [
         { id: 'e1', from: 'o1', to: 'x1', label: '', style: 'solid' }
-      ]
+      ],
+      textBoxes: []
     };
     const output = toMermaid(diagram);
     expect(output).toContain('o1["Starts with o"]');
@@ -110,7 +115,8 @@ describe('toMermaid pure serialization tests', () => {
       ],
       edges: [
         { id: 'e1', from: 'n1', to: 'n2', label: 'Yes & Ok!', style: 'solid' }
-      ]
+      ],
+      textBoxes: []
     };
     const output = toMermaid(diagram);
     expect(output).toContain('n1 -->|"Yes &amp; Ok!"| n2');
@@ -124,7 +130,8 @@ describe('toMermaid pure serialization tests', () => {
       nodes: [
         { id: 'n1', label: 'Start', shape: 'process', position: { x: 999, y: 123 } }
       ],
-      edges: []
+      edges: [],
+      textBoxes: []
     };
     const output = toMermaid(diagram);
     expect(output).not.toContain('999');
@@ -144,7 +151,8 @@ describe('toMermaid pure serialization tests', () => {
       edges: [
         { id: 'e2', from: 'n2', to: 'n10', label: '', style: 'solid' },
         { id: 'e1', from: 'n1', to: 'n2', label: '', style: 'solid' }
-      ]
+      ],
+      textBoxes: []
     };
 
     const run1 = toMermaid(diagram);
@@ -158,6 +166,49 @@ describe('toMermaid pure serialization tests', () => {
     expect(lines[3]).toContain('n10');
     expect(lines[4]).toBe('  n1 --> n2');
     expect(lines[5]).toBe('  n2 --> n10');
+  });
+
+  test('Non-regression — toMermaid ignores textBoxes entirely', () => {
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        { id: 'n1', label: 'Start', shape: 'process', position: { x: 0, y: 0 } },
+        { id: 'n2', label: 'End', shape: 'process', position: { x: 0, y: 100 } }
+      ],
+      edges: [
+        { id: 'e1', from: 'n1', to: 'n2', label: '', style: 'solid' }
+      ],
+      textBoxes: [
+        {
+          id: 'tb1',
+          text: 'This is an annotation',
+          position: { x: 50, y: 50 },
+          style: { fontSize: 14, bold: false, italic: false, textAlign: 'left', color: '#374151' }
+        },
+        {
+          id: 'tb2',
+          text: 'Another note',
+          position: { x: 200, y: 200 },
+          style: { fontSize: 16, bold: true, italic: false, textAlign: 'center', color: '#000000' }
+        }
+      ]
+    };
+    const output = toMermaid(diagram);
+    // Text boxes must not appear in the Mermaid output
+    expect(output).not.toContain('tb1');
+    expect(output).not.toContain('tb2');
+    expect(output).not.toContain('annotation');
+    expect(output).not.toContain('Another note');
+    // Only the expected Mermaid content should be present
+    const expected = [
+      'flowchart TD',
+      '  n1["Start"]',
+      '  n2["End"]',
+      '  n1 --> n2'
+    ].join('\n');
+    expect(output).toBe(expected);
   });
 });
 

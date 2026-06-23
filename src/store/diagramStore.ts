@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, DiagramDirection } from '../core/types';
+import type { CanonicalDiagram, DiagramNode, DiagramEdge, TextBox, TextBoxStyle, NodeShape, EdgeStyle, DiagramDirection } from '../core/types';
 
 const SCHEMA_VERSION = 1;
 const STORAGE_KEY = 'sketch2mermaid_diagram_v1';
@@ -10,6 +10,7 @@ export const defaultDiagram: CanonicalDiagram = {
   direction: 'TD',
   nodes: [],
   edges: [],
+  textBoxes: [],
 };
 
 // Simple debounce function for autosave
@@ -47,6 +48,38 @@ export function getNextEdgeId(edges: DiagramEdge[]): string {
   return `e${max + 1}`;
 }
 
+// Scans existing text box IDs to compute the next incremental ID (tb1, tb2, ...)
+export function getNextTextBoxId(textBoxes: TextBox[]): string {
+  let max = 0;
+  for (const tb of textBoxes) {
+    const match = tb.id.match(/^tb(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > max) max = num;
+    }
+  }
+  return `tb${max + 1}`;
+}
+
+export const DEFAULT_TEXT_BOX_STYLE: TextBoxStyle = {
+  fontSize: 14,
+  bold: false,
+  italic: false,
+  textAlign: 'left',
+  color: '#374151',
+};
+
+/**
+ * Centralizes diagram normalization: ensures all optional/additive fields
+ * are present with correct defaults. Called at load and import boundaries.
+ */
+export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
+  return {
+    ...raw,
+    textBoxes: Array.isArray(raw.textBoxes) ? raw.textBoxes : [],
+  };
+}
+
 export function loadInitialDiagram(): CanonicalDiagram {
   if (typeof window === 'undefined') return defaultDiagram;
   try {
@@ -70,7 +103,7 @@ export function loadInitialDiagram(): CanonicalDiagram {
       return defaultDiagram;
     }
 
-    return parsed as CanonicalDiagram;
+    return normalizeDiagram(parsed as CanonicalDiagram);
   } catch (e) {
     console.error('Error loading diagram from localStorage. Fallback to empty diagram.', e);
     return defaultDiagram;
@@ -89,6 +122,11 @@ export interface DiagramState {
   updateEdgeLabel: (id: string, label: string) => void;
   toggleEdgeStyle: (id: string) => void;
   deleteEdge: (id: string) => void;
+  addTextBox: (x: number, y: number) => string;
+  updateTextBoxText: (id: string, text: string) => void;
+  updateTextBoxStyle: (id: string, style: Partial<TextBoxStyle>) => void;
+  updateTextBoxPosition: (id: string, x: number, y: number) => void;
+  deleteTextBox: (id: string) => void;
   resetDiagram: () => void;
   loadDiagram: (diagram: CanonicalDiagram) => void;
 }
@@ -238,12 +276,83 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     }));
   },
 
+  addTextBox: (x, y) => {
+    const newId = getNextTextBoxId(get().diagram.textBoxes);
+
+    let targetX = Math.round(x);
+    let targetY = Math.round(y);
+    const allPositions = [
+      ...get().diagram.nodes.map((n) => n.position),
+      ...get().diagram.textBoxes.map((tb) => tb.position),
+    ];
+    while (allPositions.some((p) => Math.abs(p.x - targetX) < 20 && Math.abs(p.y - targetY) < 20)) {
+      targetX += 30;
+      targetY += 30;
+    }
+
+    const newTextBox: TextBox = {
+      id: newId,
+      text: 'Text',
+      position: { x: targetX, y: targetY },
+      style: { ...DEFAULT_TEXT_BOX_STYLE },
+    };
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        textBoxes: [...state.diagram.textBoxes, newTextBox],
+      },
+    }));
+    return newId;
+  },
+
+  updateTextBoxText: (id, text) => {
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        textBoxes: state.diagram.textBoxes.map((tb) =>
+          tb.id === id ? { ...tb, text } : tb
+        ),
+      },
+    }));
+  },
+
+  updateTextBoxStyle: (id, style) => {
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        textBoxes: state.diagram.textBoxes.map((tb) =>
+          tb.id === id ? { ...tb, style: { ...tb.style, ...style } } : tb
+        ),
+      },
+    }));
+  },
+
+  updateTextBoxPosition: (id, x, y) => {
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        textBoxes: state.diagram.textBoxes.map((tb) =>
+          tb.id === id ? { ...tb, position: { x, y } } : tb
+        ),
+      },
+    }));
+  },
+
+  deleteTextBox: (id) => {
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        textBoxes: state.diagram.textBoxes.filter((tb) => tb.id !== id),
+      },
+    }));
+  },
+
   resetDiagram: () => {
-    set({ diagram: defaultDiagram });
+    set({ diagram: { ...defaultDiagram } });
   },
 
   loadDiagram: (diagram) => {
-    set({ diagram });
+    set({ diagram: normalizeDiagram(diagram) });
   },
 }));
 

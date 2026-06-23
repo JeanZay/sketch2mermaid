@@ -14,9 +14,11 @@ import {
 import { useDiagramStore } from '../store/diagramStore';
 import CustomNode from './CustomNode';
 import CustomEdge from './CustomEdge';
+import TextBoxNode from './TextBoxNode';
 
 const nodeTypes = {
   customNode: CustomNode,
+  textBox: TextBoxNode,
 };
 
 const edgeTypes = {
@@ -30,6 +32,8 @@ function FlowInner() {
   const deleteNode = useDiagramStore((state) => state.deleteNode);
   const addEdge = useDiagramStore((state) => state.addEdge);
   const deleteEdge = useDiagramStore((state) => state.deleteEdge);
+  const updateTextBoxPosition = useDiagramStore((state) => state.updateTextBoxPosition);
+  const deleteTextBox = useDiagramStore((state) => state.deleteTextBox);
 
   const { screenToFlowPosition } = useReactFlow();
 
@@ -39,14 +43,25 @@ function FlowInner() {
 
   // Derive React Flow nodes from diagram store + selection state
   const rfNodes = useMemo(() => {
-    return diagram.nodes.map((node) => ({
+    const diagramNodes = diagram.nodes.map((node) => ({
       id: node.id,
-      type: 'customNode',
+      type: 'customNode' as const,
       position: node.position,
       data: { label: node.label, shape: node.shape },
       selected: selectedNodeIds.has(node.id),
     }));
-  }, [diagram.nodes, selectedNodeIds]);
+
+    const textBoxNodes = diagram.textBoxes.map((tb) => ({
+      id: tb.id,
+      type: 'textBox' as const,
+      position: tb.position,
+      data: { text: tb.text, style: tb.style },
+      selected: selectedNodeIds.has(tb.id),
+      connectable: false,
+    }));
+
+    return [...diagramNodes, ...textBoxNodes];
+  }, [diagram.nodes, diagram.textBoxes, selectedNodeIds]);
 
   // Derive React Flow edges from diagram store + selection state
   const rfEdges = useMemo(() => {
@@ -114,6 +129,16 @@ function FlowInner() {
     };
   }, [nodes, updateNodePosition]);
 
+  // Build a lookup for node types from the current rfNodes to route changes
+  // by React Flow node type (refinement #1: avoid scattering ID prefix checks)
+  const nodeTypeById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const n of rfNodes) {
+      map.set(n.id, n.type);
+    }
+    return map;
+  }, [rfNodes]);
+
   // Handle ALL node changes — selection tracked in state, position updated continuously
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     let selectionChanged = false;
@@ -130,13 +155,18 @@ function FlowInner() {
         }
         selectionChanged = true;
       } else if (change.type === 'position' && change.position) {
-        updateNodePosition(change.id, change.position.x, change.position.y);
+        const nType = nodeTypeById.get(change.id);
+        if (nType === 'textBox') {
+          updateTextBoxPosition(change.id, change.position.x, change.position.y);
+        } else {
+          updateNodePosition(change.id, change.position.x, change.position.y);
+        }
       }
     }
     if (selectionChanged && nextSelected) {
       setSelectedNodeIds(nextSelected);
     }
-  }, [selectedNodeIds, updateNodePosition]);
+  }, [selectedNodeIds, updateNodePosition, updateTextBoxPosition, nodeTypeById]);
 
   // Handle ALL edge changes — selection tracked in state
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
@@ -196,7 +226,16 @@ function FlowInner() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onPaneDoubleClick={onPaneDoubleClick}
-        onNodesDelete={(nodes) => nodes.forEach((n) => deleteNode(n.id))}
+        onNodesDelete={(deletedNodes) => {
+          for (const n of deletedNodes) {
+            const nType = nodeTypeById.get(n.id);
+            if (nType === 'textBox') {
+              deleteTextBox(n.id);
+            } else {
+              deleteNode(n.id);
+            }
+          }
+        }}
         onEdgesDelete={(edges) => edges.forEach((e) => deleteEdge(e.id))}
         deleteKeyCode={['Delete', 'Backspace']}
         nodeDragThreshold={2}

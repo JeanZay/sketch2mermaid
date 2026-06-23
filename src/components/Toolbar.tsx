@@ -7,6 +7,7 @@ export const Toolbar = () => {
   const addNode = useDiagramStore((state) => state.addNode);
   const toggleEdgeStyle = useDiagramStore((state) => state.toggleEdgeStyle);
   const diagram = useDiagramStore((state) => state.diagram);
+  const addTextBox = useDiagramStore((state) => state.addTextBox);
 
   const edges = useEdges();
   const { screenToFlowPosition } = useReactFlow();
@@ -33,6 +34,11 @@ export const Toolbar = () => {
   const handleShapeClick = (shape: NodeShape) => {
     const coords = getCenterCoordinates();
     addNode(shape, coords.x, coords.y);
+  };
+
+  const handleAddTextBox = () => {
+    const coords = getCenterCoordinates();
+    addTextBox(coords.x, coords.y);
   };
 
   const handleToggleStyle = (targetDotted: boolean) => {
@@ -135,6 +141,23 @@ export const Toolbar = () => {
               Dotted
             </button>
           </div>
+        </div>
+
+        <div className="sidebar-divider"></div>
+
+        <h3 className="sidebar-section-title">Annotations</h3>
+        <div className="shapes-list">
+          <button
+            onClick={handleAddTextBox}
+            title="Add a text box annotation"
+            className="palette-shape-btn"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <text x="5" y="17" fontSize="16" fontWeight="bold" fontFamily="serif" fill="currentColor" stroke="none">T</text>
+              <line x1="5" y1="20" x2="19" y2="20" strokeWidth="1.5"></line>
+            </svg>
+            <span className="palette-shape-btn-text">Text</span>
+          </button>
         </div>
       </div>
 

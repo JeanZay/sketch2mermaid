@@ -1,6 +1,6 @@
 import { beforeEach, describe, test, expect, vi } from 'vitest';
-import { useDiagramStore, getNextNodeId, getNextEdgeId, loadInitialDiagram } from './diagramStore';
-import type { DiagramNode, DiagramEdge } from '../core/types';
+import { useDiagramStore, getNextNodeId, getNextEdgeId, getNextTextBoxId, loadInitialDiagram } from './diagramStore';
+import type { DiagramNode, DiagramEdge, TextBox } from '../core/types';
 
 // Mock localStorage for Node test environment
 const localStorageStore: Record<string, string> = {};
@@ -196,5 +196,97 @@ describe('Zustand diagram store tests', () => {
     );
 
     warnSpy.mockRestore();
+  });
+
+  // ====== TEXT BOX TESTS ======
+
+  test('addTextBox creates a text box with defaults', () => {
+    const store = useDiagramStore.getState();
+    const id = store.addTextBox(100, 200);
+    expect(id).toBe('tb1');
+
+    const state = useDiagramStore.getState().diagram;
+    expect(state.textBoxes).toHaveLength(1);
+    expect(state.textBoxes[0]).toEqual({
+      id: 'tb1',
+      text: 'Text',
+      position: { x: 100, y: 200 },
+      style: {
+        fontSize: 14,
+        bold: false,
+        italic: false,
+        textAlign: 'left',
+        color: '#374151',
+      },
+    });
+  });
+
+  test('addTextBox sequential IDs', () => {
+    const store = useDiagramStore.getState();
+    const id1 = store.addTextBox(0, 0);
+    const id2 = store.addTextBox(50, 50);
+    expect(id1).toBe('tb1');
+    expect(id2).toBe('tb2');
+  });
+
+  test('updateTextBoxText updates text content', () => {
+    const store = useDiagramStore.getState();
+    store.addTextBox(0, 0);
+    store.updateTextBoxText('tb1', 'Updated annotation');
+
+    const state = useDiagramStore.getState().diagram;
+    expect(state.textBoxes[0].text).toBe('Updated annotation');
+  });
+
+  test('updateTextBoxStyle merges partial style updates', () => {
+    const store = useDiagramStore.getState();
+    store.addTextBox(0, 0);
+    store.updateTextBoxStyle('tb1', { bold: true, fontSize: 20 });
+
+    const state = useDiagramStore.getState().diagram;
+    expect(state.textBoxes[0].style.bold).toBe(true);
+    expect(state.textBoxes[0].style.fontSize).toBe(20);
+    // Unchanged properties should remain at defaults
+    expect(state.textBoxes[0].style.italic).toBe(false);
+    expect(state.textBoxes[0].style.textAlign).toBe('left');
+    expect(state.textBoxes[0].style.color).toBe('#374151');
+  });
+
+  test('updateTextBoxPosition updates position', () => {
+    const store = useDiagramStore.getState();
+    store.addTextBox(0, 0);
+    store.updateTextBoxPosition('tb1', 300, 400);
+
+    const state = useDiagramStore.getState().diagram;
+    expect(state.textBoxes[0].position).toEqual({ x: 300, y: 400 });
+  });
+
+  test('deleteTextBox removes the text box', () => {
+    const store = useDiagramStore.getState();
+    store.addTextBox(0, 0);
+    store.addTextBox(50, 50);
+    expect(useDiagramStore.getState().diagram.textBoxes).toHaveLength(2);
+
+    store.deleteTextBox('tb1');
+    const state = useDiagramStore.getState().diagram;
+    expect(state.textBoxes).toHaveLength(1);
+    expect(state.textBoxes[0].id).toBe('tb2');
+  });
+
+  test('getNextTextBoxId computes correct ID', () => {
+    const textBoxes: TextBox[] = [
+      { id: 'tb1', text: '', position: { x: 0, y: 0 }, style: { fontSize: 14, bold: false, italic: false, textAlign: 'left', color: '#374151' } },
+      { id: 'tb5', text: '', position: { x: 0, y: 0 }, style: { fontSize: 14, bold: false, italic: false, textAlign: 'left', color: '#374151' } },
+    ];
+    expect(getNextTextBoxId(textBoxes)).toBe('tb6');
+  });
+
+  test('resetDiagram clears text boxes', () => {
+    const store = useDiagramStore.getState();
+    store.addTextBox(0, 0);
+    expect(useDiagramStore.getState().diagram.textBoxes).toHaveLength(1);
+
+    store.resetDiagram();
+    expect(useDiagramStore.getState().diagram.textBoxes).toHaveLength(0);
   });
 });
