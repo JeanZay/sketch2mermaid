@@ -39,6 +39,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
     color: textStyle?.color ?? 'inherit',
   };
 
+
   const handleStartEditing = () => {
     setTempLabel(label);
     setIsEditing(true);
