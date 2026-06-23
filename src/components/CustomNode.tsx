@@ -49,7 +49,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
     }
   };
 
-  const handleResizeEnd = (_event: unknown, params: { width: number; height: number }) => {
+  const handleResize = (_event: unknown, params: { width: number; height: number }) => {
     updateNodeSize?.(id, params.width, params.height);
   };
 
@@ -89,7 +89,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
       minWidth={sizeConfig.minWidth}
       minHeight={sizeConfig.minHeight}
       keepAspectRatio={shape === 'event' || shape === 'endEvent'}
-      onResizeEnd={handleResizeEnd}
+      onResize={handleResize}
       lineClassName="node-resize-line"
       handleClassName="node-resize-handle"
     />

@@ -363,21 +363,26 @@ body {
   justify-content: center;
 }
 
+/* Border layer — full-size diamond in border color */
 .decision-bg {
   position: absolute;
-  top: 12.5%;
-  left: 12.5%;
-  width: 75%;
-  height: 75%;
-  transform: rotate(45deg);
+  inset: 0;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  background-color: var(--border-color);
+  transition: background-color 0.15s;
+}
+
+/* Fill layer — slightly inset diamond in white, creating a visible border */
+.decision-bg::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
   background-color: #ffffff;
-  border: 1px solid var(--border-color);
-  box-shadow: var(--shadow-sm);
-  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .decision-wrapper:hover .decision-bg {
-  border-color: rgba(79, 110, 247, 0.4);
+  background-color: rgba(79, 110, 247, 0.4);
 }
 
 .decision-text {
@@ -385,10 +390,10 @@ body {
   z-index: 2;
   color: var(--text-primary);
   text-align: center;
-  max-width: 70%;
+  max-width: 55%;
   word-wrap: break-word;
   line-height: 1.2;
-  padding: 4px 14px;
+  padding: 4px 8px;
 }
 
 /* Event Node (Circle) styling */
