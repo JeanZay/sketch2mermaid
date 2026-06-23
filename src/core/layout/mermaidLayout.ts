@@ -14,6 +14,40 @@ import type { DiagramNode, DiagramEdge, DiagramDirection } from '../types';
 import { NODE_SIZE_DEFAULTS } from '../nodeSizeConfig';
 
 // ---------------------------------------------------------------------------
+// Label-sizing constants for Dagre edge-label proxies
+// ---------------------------------------------------------------------------
+// Dagre's `makeSpaceForEdgeLabels` inserts a proxy node for each edge with
+// non-zero width/height. We estimate label size deterministically (no
+// `measureText`) so layout is environment-stable and reproducible.
+//
+// Derivation:
+//   - LABEL_CHAR_WIDTH = 7 px/char — conservative over-estimate. The true
+//     average advance of a 10px sans-serif font is ~5–5.5 px/char. The ~35%
+//     safety margin absorbs wide glyphs (W, M, @) and avoids overlap at the
+//     cost of slightly generous inter-rank gaps. This is intentional: overlap
+//     is a bug, extra whitespace is a cosmetic trade-off. NOT a measured font
+//     metric — an empirical safety factor.
+//   - LABEL_PADDING_X = 32 px — CSS pill padding (3+8 px/side = 22px) plus
+//     visual clearance so the pill doesn't abut a node box.
+//   - LABEL_LINE_HEIGHT = 20 px — single-line height including CSS border,
+//     padding, and shadow of `.edge-label-container`.
+// ---------------------------------------------------------------------------
+export const LABEL_CHAR_WIDTH  = 7;
+export const LABEL_PADDING_X   = 32;
+export const LABEL_LINE_HEIGHT = 20;
+
+// ---------------------------------------------------------------------------
+// Graph spacing constants
+// ---------------------------------------------------------------------------
+// Dagre's `makeSpaceForEdgeLabels` halves `ranksep` internally (→ 30) then
+// doubles each labeled edge's `minlen`, so net unlabeled spacing ≈ 60.
+// The proxy node's size adds on top for labeled edges.
+// ---------------------------------------------------------------------------
+export const BASE_RANK_GAP  = 60;
+export const BASE_NODE_GAP  = 50;
+export const BASE_EDGE_GAP  = 10;
+
+// ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
 
@@ -25,8 +59,10 @@ export interface HandlePair {
 export interface LayoutResult {
   /** Top-left positions for React Flow nodes, keyed by node id. */
   positions: Map<string, { x: number; y: number }>;
-  /** Handle pair for each edge, keyed by edge id. */
+  /** Direction-aware handles for React Flow edges, keyed by edge id. */
   handles: Map<string, HandlePair>;
+  /** Dagre's computed center coordinates for edge labels, keyed by edge id. */
+  edgeLabelPositions?: Map<string, { x: number; y: number }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +233,7 @@ export function layoutImportedDiagram(
   orderOfAppearance: string[],
 ): LayoutResult {
   if (nodes.length === 0) {
-    return { positions: new Map(), handles: new Map() };
+    return { positions: new Map(), handles: new Map(), edgeLabelPositions: new Map() };
   }
 
   try {
@@ -222,8 +258,9 @@ function dagreLayout(
     rankdir,
     ranker: 'network-simplex',
     acyclicer: 'greedy',
-    nodesep: 50,
-    ranksep: 60,
+    nodesep: BASE_NODE_GAP,
+    ranksep: BASE_RANK_GAP,
+    edgesep: BASE_EDGE_GAP,
     marginx: 20,
     marginy: 20,
   });
@@ -247,6 +284,10 @@ function dagreLayout(
   // 3. Insert edges in stable order
   const sortedEdges = [...edges].sort(stableEdgeOrder);
   for (const edge of sortedEdges) {
+    const label = edge.label || '';
+    const w = label ? label.length * LABEL_CHAR_WIDTH + LABEL_PADDING_X : 0;
+    const h = label ? LABEL_LINE_HEIGHT : 0;
+
     // All edge types (directed, undirected, bidirectional) are given to Dagre
     // to influence rank and proximity. For undirected/bidirectional edges,
     // use a deterministic orientation (lexicographic) for Dagre's DAG.
@@ -257,9 +298,9 @@ function dagreLayout(
       const [from, to] = edge.from <= edge.to
         ? [edge.from, edge.to]
         : [edge.to, edge.from];
-      g.setEdge(from, to, {}, edge.id);
+      g.setEdge(from, to, { width: w, height: h, labelpos: 'c' }, edge.id);
     } else {
-      g.setEdge(edge.from, edge.to, {}, edge.id);
+      g.setEdge(edge.from, edge.to, { width: w, height: h, labelpos: 'c' }, edge.id);
     }
   }
 
@@ -308,5 +349,30 @@ function dagreLayout(
     }
   }
 
-  return { positions, handles };
+  // 7. Extract edge label positions computed by Dagre
+  const edgeLabelPositions = new Map<string, { x: number; y: number }>();
+  for (const edge of sortedEdges) {
+    if (!edge.label) continue;
+    
+    // Dagre requires querying the edge using the exact from/to direction
+    // that was passed to g.setEdge. We used 'directed' behavior.
+    let from = edge.from;
+    let to = edge.to;
+    
+    // For undirected/bidirectional edges we sorted from/to alphabetically in setEdge
+    const dir = edge.direction ?? 'directed';
+    if (dir === 'undirected' || dir === 'bidirectional') {
+      if (edge.from > edge.to) {
+        from = edge.to;
+        to = edge.from;
+      }
+    }
+    
+    const dagreEdge = g.edge(from, to, edge.id);
+    if (dagreEdge && dagreEdge.x !== undefined && dagreEdge.y !== undefined) {
+      edgeLabelPositions.set(edge.id, { x: dagreEdge.x, y: dagreEdge.y });
+    }
+  }
+
+  return { positions, handles, edgeLabelPositions };
 }

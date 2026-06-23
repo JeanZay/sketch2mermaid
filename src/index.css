@@ -2280,3 +2280,23 @@ body {
   white-space: nowrap;
 }
 
+/* Edge labels must paint above node boxes.
+ *
+ * React Flow DOM order inside .react-flow__viewport:
+ *   1. .react-flow__edges           (SVG, no z-index)
+ *   2. .react-flow__edgelabel-renderer (position:absolute, no z-index)
+ *   3. .react-flow__nodes           (position:absolute, no z-index — NOT a stacking context)
+ *        └─ .react-flow__node       (inline z-index: 0 default, 1000 when selected)
+ *
+ * .react-flow__nodes has position:absolute but no z-index, so it does NOT
+ * create a stacking context. Individual node z-indices (0 default, 1000
+ * selected via SELECTED_NODE_Z) participate in the viewport's stacking
+ * context, competing directly with .react-flow__edgelabel-renderer.
+ *
+ * z-index: 1001 ensures labels float above even selected nodes (z:1000).
+ * This is acceptable because Task A reserves spatial clearance — labels
+ * and nodes shouldn't overlap in the first place — so the paint-order
+ * fix is a safety net, not a layout crutch. */
+.react-flow__edgelabel-renderer {
+  z-index: 1001;
+}

@@ -59,6 +59,12 @@ export interface DiagramEdge {
    * Not exported to Mermaid.
    */
   textStyle?: TextStyle;
+
+  /**
+   * Canvas-only position for the edge label, computed by Dagre.
+   * If present, overrides the default Bezier midpoint.
+   */
+  labelPosition?: { x: number; y: number };
 }
 
 export interface TextStyle {

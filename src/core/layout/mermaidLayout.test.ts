@@ -6,9 +6,18 @@
  * handle coherence, cycle handling, and disconnected component separation.
  */
 import { describe, it, expect } from 'vitest';
-import { layoutImportedDiagram } from './mermaidLayout';
+import { getBezierPath, Position } from '@xyflow/system';
+import {
+  layoutImportedDiagram,
+  LABEL_CHAR_WIDTH,
+  LABEL_PADDING_X,
+  LABEL_LINE_HEIGHT,
+  BASE_RANK_GAP,
+  type HandlePair,
+} from './mermaidLayout';
 import type { DiagramNode, DiagramEdge, DiagramDirection } from '../types';
 import { NODE_SIZE_DEFAULTS } from '../nodeSizeConfig';
+import { toMermaid } from '../mermaid';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -32,8 +41,9 @@ function makeEdge(
   to: string,
   direction: DiagramEdge['direction'] = 'directed',
   style: DiagramEdge['style'] = 'solid',
+  label: string = '',
 ): DiagramEdge {
-  return { id, from, to, label: '', style, direction };
+  return { id, from, to, label, style, direction };
 }
 
 function boundingBox(pos: { x: number; y: number }, node: DiagramNode) {
@@ -503,4 +513,238 @@ describe('layoutImportedDiagram — all directions on branching', () => {
       }
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Edge Label Spacing (Dagre proxies vs React Flow bezier render)
+// ---------------------------------------------------------------------------
+
+/**
+ * Map handle ID to @xyflow/system Position enum.
+ *
+ * COUPLING NOTE: This must match the handle naming convention in CustomNode.tsx
+ * ({t,b,l,r}-{source,target}). If the convention changes, this function and
+ * the renderer must be updated in lockstep.
+ */
+function handleToPosition(handle: string): Position {
+  const side = handle.split('-')[0];
+  switch (side) {
+    case 't': return Position.Top;
+    case 'b': return Position.Bottom;
+    case 'l': return Position.Left;
+    case 'r': return Position.Right;
+    default:  return Position.Bottom;
+  }
+}
+
+/**
+ * Compute label bbox at the EXACT position the renderer will place it.
+ *
+ * Uses getBezierPath (the same function CustomEdge.tsx calls) with
+ * handle-anchor coordinates derived from layout output. This ensures the
+ * test validates the real render point, not a hand-calculated midpoint.
+ *
+ * INVARIANT: CustomEdge.tsx must use getBezierPath for all edge types.
+ * If the renderer ever branches by edge type (e.g. getSmoothStepPath),
+ * this helper must branch identically.
+ */
+function labelBBox(
+  edge: DiagramEdge,
+  positions: Map<string, { x: number; y: number }>,
+  handles: Map<string, HandlePair>,
+  nodeById: Map<string, DiagramNode>,
+  edgeLabelPositions?: Map<string, { x: number; y: number }>,
+) {
+  const label = edge.label || '';
+  if (!label) return null;
+
+  const srcPos = positions.get(edge.from)!;
+  const tgtPos = positions.get(edge.to)!;
+  const srcNode = nodeById.get(edge.from)!;
+  const tgtNode = nodeById.get(edge.to)!;
+  const handle = handles.get(edge.id)!;
+
+  const srcW = srcNode.width ?? NODE_SIZE_DEFAULTS[srcNode.shape].width;
+  const srcH = srcNode.height ?? NODE_SIZE_DEFAULTS[srcNode.shape].height;
+  const tgtW = tgtNode.width ?? NODE_SIZE_DEFAULTS[tgtNode.shape].width;
+  const tgtH = tgtNode.height ?? NODE_SIZE_DEFAULTS[tgtNode.shape].height;
+
+  const sourcePosition = handleToPosition(handle.sourceHandle);
+  const targetPosition = handleToPosition(handle.targetHandle);
+
+  // Handle anchor = point on the edge of the node box (centered on the edge)
+  const sourceX = sourcePosition === Position.Left ? srcPos.x
+    : sourcePosition === Position.Right ? srcPos.x + srcW
+    : srcPos.x + srcW / 2;
+  const sourceY = sourcePosition === Position.Top ? srcPos.y
+    : sourcePosition === Position.Bottom ? srcPos.y + srcH
+    : srcPos.y + srcH / 2;
+  const targetX = targetPosition === Position.Left ? tgtPos.x
+    : targetPosition === Position.Right ? tgtPos.x + tgtW
+    : tgtPos.x + tgtW / 2;
+  const targetY = targetPosition === Position.Top ? tgtPos.y
+    : targetPosition === Position.Bottom ? tgtPos.y + tgtH
+    : tgtPos.y + tgtH / 2;
+
+  let [, labelX, labelY] = getBezierPath({
+    sourceX, sourceY, sourcePosition,
+    targetX, targetY, targetPosition,
+  });
+
+  const dagreLabelPos = edgeLabelPositions?.get(edge.id);
+  if (dagreLabelPos) {
+    labelX = dagreLabelPos.x;
+    labelY = dagreLabelPos.y;
+  }
+
+  // Label pill dimensions — same formula as layout estimation
+  const w = label.length * LABEL_CHAR_WIDTH + LABEL_PADDING_X;
+  const h = LABEL_LINE_HEIGHT;
+
+  return {
+    left: labelX - w / 2,
+    right: labelX + w / 2,
+    top: labelY - h / 2,
+    bottom: labelY + h / 2,
+  };
+}
+
+describe('layoutImportedDiagram — edge label spacing', () => {
+  it('LR chain with long labels — labels do not overlap any node', () => {
+    const nodes = [makeNode('A'), makeNode('B'), makeNode('C'), makeNode('D'), makeNode('E'), makeNode('F')];
+    const nodeById = new Map(nodes.map(n => [n.id, n]));
+    const edges = [
+      makeEdge('e1', 'A', 'B', 'directed', 'solid', 'yes'),
+      makeEdge('e2', 'B', 'C', 'directed', 'solid', 'solid bidirectional edge'), // > 21 chars
+      makeEdge('e3', 'C', 'D', 'directed', 'solid', 'no'),
+      makeEdge('e4', 'D', 'E', 'directed', 'solid', 'another long label here'),
+      makeEdge('e5', 'E', 'F', 'directed', 'solid', 'end'),
+    ];
+
+    const r = layoutImportedDiagram(nodes, edges, 'LR', nodes.map(n => n.id));
+
+    for (const edge of edges) {
+      const lbox = labelBBox(edge, r.positions, r.handles, nodeById, r.edgeLabelPositions);
+      if (!lbox) continue;
+
+      for (const node of nodes) {
+        const nbox = boundingBox(r.positions.get(node.id)!, node);
+        expect(boxesOverlap(lbox, nbox)).toBe(false);
+      }
+    }
+  });
+
+  it('LR chain with no labels — spacing stays at baseline', () => {
+    const nodes = [makeNode('A'), makeNode('B'), makeNode('C')];
+    const edges = [
+      makeEdge('e1', 'A', 'B'),
+      makeEdge('e2', 'B', 'C'),
+    ];
+
+    const r = layoutImportedDiagram(nodes, edges, 'LR', ['A', 'B', 'C']);
+
+    const ax = r.positions.get('A')!.x;
+    const aw = nodes[0].width ?? NODE_SIZE_DEFAULTS[nodes[0].shape].width;
+    const bx = r.positions.get('B')!.x;
+    
+    const gap = bx - (ax + aw);
+    // Tolerance: Dagre's halving/doubling makes the exact gap depend on minlen, so we use a wide tolerance
+    expect(gap).toBeGreaterThanOrEqual(BASE_RANK_GAP * 0.4);
+    expect(gap).toBeLessThanOrEqual(BASE_RANK_GAP * 1.5);
+  });
+
+  it('TD chain with labels — labels do not overlap any node', () => {
+    const nodes = [makeNode('A'), makeNode('B'), makeNode('C')];
+    const nodeById = new Map(nodes.map(n => [n.id, n]));
+    const edges = [
+      makeEdge('e1', 'A', 'B', 'directed', 'solid', 'very long label for TD'),
+      makeEdge('e2', 'B', 'C', 'directed', 'solid', 'short'),
+    ];
+
+    const r = layoutImportedDiagram(nodes, edges, 'TD', ['A', 'B', 'C']);
+
+    for (const edge of edges) {
+      const lbox = labelBBox(edge, r.positions, r.handles, nodeById, r.edgeLabelPositions);
+      if (!lbox) continue;
+
+      for (const node of nodes) {
+        const nbox = boundingBox(r.positions.get(node.id)!, node);
+        expect(boxesOverlap(lbox, nbox)).toBe(false);
+      }
+    }
+  });
+
+  it('Branching graph with labels — siblings do not overlap', () => {
+    const nodes = [makeNode('A'), makeNode('B'), makeNode('C'), makeNode('D')];
+    const nodeById = new Map(nodes.map(n => [n.id, n]));
+    const edges = [
+      makeEdge('e1', 'A', 'B', 'directed', 'solid', 'yes'),
+      makeEdge('e2', 'A', 'C', 'directed', 'solid', 'no'),
+      makeEdge('e3', 'B', 'D'),
+      makeEdge('e4', 'C', 'D'),
+    ];
+
+    const r = layoutImportedDiagram(nodes, edges, 'TD', ['A', 'B', 'C', 'D']);
+
+    const lbox1 = labelBBox(edges[0], r.positions, r.handles, nodeById, r.edgeLabelPositions)!;
+    const lbox2 = labelBBox(edges[1], r.positions, r.handles, nodeById, r.edgeLabelPositions)!;
+
+    // Labels don't overlap each other
+    expect(boxesOverlap(lbox1, lbox2)).toBe(false);
+
+    // Labels don't overlap any nodes
+    for (const node of nodes) {
+      const nbox = boundingBox(r.positions.get(node.id)!, node);
+      expect(boxesOverlap(lbox1, nbox)).toBe(false);
+      expect(boxesOverlap(lbox2, nbox)).toBe(false);
+    }
+  });
+
+  it('Multi-rank edge with label does not overlap skipped node', () => {
+    const nodes = [makeNode('A'), makeNode('B'), makeNode('C')];
+    const nodeById = new Map(nodes.map(n => [n.id, n]));
+    const edges = [
+      makeEdge('e1', 'A', 'B'),
+      makeEdge('e2', 'B', 'C'),
+      makeEdge('e3', 'A', 'C', 'directed', 'solid', 'skip rank'),
+    ];
+
+    const r = layoutImportedDiagram(nodes, edges, 'LR', ['A', 'B', 'C']);
+
+    const skipLabelBox = labelBBox(edges[2], r.positions, r.handles, nodeById, r.edgeLabelPositions)!;
+    const boxB = boundingBox(r.positions.get('B')!, nodes[1]);
+
+    expect(boxesOverlap(skipLabelBox, boxB)).toBe(false);
+  });
+
+  it('toMermaid output is identical with and without layout applied', () => {
+    const nodes = [makeNode('A'), makeNode('B'), makeNode('C')];
+    const edges = [
+      makeEdge('e1', 'A', 'B', 'directed', 'solid', 'yes'),
+      makeEdge('e2', 'B', 'C', 'directed', 'solid', 'no'),
+    ];
+    const diagram = {
+      schemaVersion: 1 as const,
+      diagramType: 'flowchart' as const,
+      direction: 'LR' as DiagramDirection,
+      nodes,
+      edges,
+    };
+
+    // Export BEFORE layout
+    const exportBefore = toMermaid(diagram);
+
+    // Apply layout (mutates positions)
+    const result = layoutImportedDiagram(nodes, edges, 'LR', ['A', 'B', 'C']);
+    for (const node of nodes) {
+      const pos = result.positions.get(node.id);
+      if (pos) node.position = pos;
+    }
+
+    // Export AFTER layout
+    const exportAfter = toMermaid(diagram);
+
+    // Byte-identical — layout positions never leak into Mermaid output
+    expect(exportAfter).toBe(exportBefore);
+  });
 });

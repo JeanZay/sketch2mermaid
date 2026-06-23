@@ -360,3 +360,53 @@ Cœur                : toMermaid pur, déterministe, testé contre mermaid.parse
 Distribution        : web app open source, sans backend
 Différenciateur réel: destination LLM (v2)
 ```
+
+---
+
+## ADR Addendum — Edge Label Layout Spacing (June 2026)
+
+### Decision
+
+Edge label dimensions are passed to Dagre's `g.setEdge()` as `{ width, height, labelpos }`
+so that Dagre's native `makeSpaceForEdgeLabels` pipeline reserves space via proxy nodes.
+
+### Why deterministic estimation, not `measureText`
+
+Label size is estimated via `label.length * LABEL_CHAR_WIDTH + LABEL_PADDING_X` rather than
+DOM-based `measureText` or `canvas.measureText`. Rationale:
+- **Environment stability**: layout must be identical in Node.js tests and browser rendering.
+- **Reproducibility**: `measureText` varies across OS, font availability, and browser version.
+- **No DOM dependency**: the layout engine is a pure function with no React/DOM imports.
+- **Single-line assumed**: `LABEL_LINE_HEIGHT` is fixed. If labels ever support wrapping (e.g., `<br>`), width would be over-estimated and height under-estimated. For single-line Mermaid edge labels, this is exact.
+
+### Constants and their derivation
+
+| Constant | Value | Derivation |
+|---|---|---|
+| `LABEL_CHAR_WIDTH` | 7 px/char | **Conservative over-estimate**, not a font metric. True average advance of 10px sans-serif ≈ 5–5.5 px/char. The ~35% safety margin absorbs wide glyphs (W, M, @). Overlap is a bug; extra whitespace is a cosmetic trade-off. |
+| `LABEL_PADDING_X` | 32 px | CSS pill padding (3+8 px/side = 22px) + visual clearance. |
+| `LABEL_LINE_HEIGHT` | 20 px | Single-line height including CSS border, padding, shadow. |
+| `BASE_RANK_GAP` | 60 px | Dagre halves internally (→ 30) then doubles `minlen` for labeled edges. Net unlabeled ≈ 60. |
+| `BASE_NODE_GAP` | 50 px | Intra-rank node separation. |
+| `BASE_EDGE_GAP` | 10 px | Intra-rank edge separation. |
+
+### Heuristic nature of the fix
+
+Dagre reserves space at the **proxy node's** position (split-rank midpoint). The renderer
+draws the label at the **bezier curve's** t=0.5 midpoint between handles. These two points
+do not coincide for curved edges. Task A is therefore a heuristic that increases the
+probability of non-overlap by widening the gap between nodes. The test suite validates
+at the renderer's actual position using `getBezierPath`.
+
+If the heuristic proves insufficient for specific topologies (e.g. multi-rank edges with
+sharp curves), the fallback is to pass Dagre's computed label coordinates through to the
+renderer as a `labelX`/`labelY` override, reconciling the two positions.
+
+### Reliance on Dagre's native label proxy
+
+Dagre's `layout()` pipeline runs `makeSpaceForEdgeLabels` → `injectEdgeLabelProxies`.
+When an edge has non-zero `width`/`height`, a dummy node is inserted carrying those
+dimensions. This proxy participates in both ranking and coordinate assignment. The
+LR/RL coordinate-system swap maps axes automatically.
+
+No custom per-direction rank-gap formulas are needed.

@@ -42,7 +42,7 @@ export const CustomEdge = ({
   label,
   selected,
 }: EdgeProps) => {
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const bezier = getBezierPath({
     sourceX,
     sourceY,
     targetX,
@@ -50,11 +50,20 @@ export const CustomEdge = ({
     sourcePosition,
     targetPosition,
   });
+  
+  const edgePath = bezier[0];
+  let labelX = bezier[1];
+  let labelY = bezier[2];
 
   const updateEdgeLabel = useDiagramStore((state) => state.updateEdgeLabel);
   const storeEdge = useDiagramStore((state) => 
     state.diagram.edges.find((e) => e.id === id)
   );
+  
+  if (storeEdge?.labelPosition) {
+    labelX = storeEdge.labelPosition.x;
+    labelY = storeEdge.labelPosition.y;
+  }
   
   const [isEditing, setIsEditing] = useState(false);
   const [tempLabel, setTempLabel] = useState((label as string) || '');

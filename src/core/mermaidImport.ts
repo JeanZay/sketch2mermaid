@@ -602,11 +602,16 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
   }
 
   // Apply handles per edge (geometric, based on post-layout positions)
+  // and apply Dagre's calculated label position if available.
   for (const edge of finalEdges) {
     const handlePair = layoutResult.handles.get(edge.id);
     if (handlePair) {
       edge.sourceHandle = handlePair.sourceHandle;
       edge.targetHandle = handlePair.targetHandle;
+    }
+    const labelPos = layoutResult.edgeLabelPositions?.get(edge.id);
+    if (labelPos) {
+      edge.labelPosition = labelPos;
     }
   }
 
