@@ -50,28 +50,44 @@ export const SvgPreviewViewer: React.FC<SvgPreviewViewerProps> = ({
     const inner = innerRef.current;
     if (!viewport || !inner) return;
 
-    const svgEl = inner.querySelector('svg');
+    const svgEl = inner.querySelector('svg') as SVGSVGElement | null;
     if (!svgEl) return;
 
     const viewportRect = viewport.getBoundingClientRect();
     const viewportWidth = viewportRect.width;
     const viewportHeight = viewportRect.height;
 
-    // Determine intrinsic SVG dimensions from viewBox or width/height attributes
-    let svgWidth: number;
-    let svgHeight: number;
+    // Get the SVG's natural pixel dimensions (CSS layout, unaffected by parent transforms)
+    const svgNaturalWidth = svgEl.clientWidth;
+    const svgNaturalHeight = svgEl.clientHeight;
 
-    const viewBox = svgEl.getAttribute('viewBox');
-    if (viewBox) {
-      const parts = viewBox.split(/[\s,]+/).map(Number);
-      svgWidth = parts[2] ?? svgEl.clientWidth;
-      svgHeight = parts[3] ?? svgEl.clientHeight;
-    } else {
-      svgWidth = svgEl.clientWidth || svgEl.getBoundingClientRect().width;
-      svgHeight = svgEl.clientHeight || svgEl.getBoundingClientRect().height;
+    if (svgNaturalWidth <= 0 || svgNaturalHeight <= 0) return;
+
+    // Use getBBox() to get the tight bounding box of actual diagram content,
+    // excluding Mermaid's internal whitespace padding in the viewBox.
+    // Then convert from SVG coordinate space to pixel space for accurate fit.
+    let fitWidth = svgNaturalWidth;
+    let fitHeight = svgNaturalHeight;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    try {
+      const bbox = svgEl.getBBox();
+      const vb = svgEl.viewBox?.baseVal;
+
+      if (vb && vb.width > 0 && vb.height > 0 && bbox.width > 0 && bbox.height > 0) {
+        // Scale factor from SVG coordinate space to pixel space
+        const sx = svgNaturalWidth / vb.width;
+        const sy = svgNaturalHeight / vb.height;
+
+        fitWidth = bbox.width * sx;
+        fitHeight = bbox.height * sy;
+        offsetX = (bbox.x - vb.x) * sx;
+        offsetY = (bbox.y - vb.y) * sy;
+      }
+    } catch {
+      // getBBox() can throw if SVG is not rendered yet; fall back to full dimensions
     }
-
-    if (svgWidth <= 0 || svgHeight <= 0) return;
 
     const availW = viewportWidth - FIT_PADDING * 2;
     const availH = viewportHeight - FIT_PADDING * 2;
@@ -79,13 +95,14 @@ export const SvgPreviewViewer: React.FC<SvgPreviewViewerProps> = ({
     const scale = Math.max(
       MIN_ZOOM,
       Math.min(
-        Math.min(availW / svgWidth, availH / svgHeight),
+        Math.min(availW / fitWidth, availH / fitHeight),
         MAX_ZOOM,
       ),
     );
 
-    const newPanX = (viewportWidth - svgWidth * scale) / 2;
-    const newPanY = (viewportHeight - svgHeight * scale) / 2;
+    // Center on the actual content area, accounting for its offset within the SVG
+    const newPanX = (viewportWidth - fitWidth * scale) / 2 - offsetX * scale;
+    const newPanY = (viewportHeight - fitHeight * scale) / 2 - offsetY * scale;
 
     setZoom(scale);
     setPanX(newPanX);
