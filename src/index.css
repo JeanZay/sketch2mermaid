@@ -574,6 +574,49 @@ body {
   color: var(--text-primary);
 }
 
+/* Format Selection Tabs below the code header */
+.format-tabs {
+  display: flex;
+  background-color: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border-color);
+  padding: 6px 12px;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.format-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid transparent;
+  font-family: var(--font-family);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 5px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  text-align: center;
+  outline: none;
+}
+
+.format-tab-btn:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+  color: var(--text-primary);
+}
+
+.format-tab-btn.active {
+  background-color: var(--bg-panel);
+  color: var(--accent-color);
+  font-weight: 600;
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.format-tab-btn:focus-visible {
+  box-shadow: var(--shadow-glow);
+}
+
 /* Mermaid Raw Code Dark Panel (upper part) */
 .code-view-wrapper {
   flex: 1;

@@ -24,3 +24,6 @@ export interface CanonicalDiagram {
   nodes: DiagramNode[];
   edges: DiagramEdge[];
 }
+
+export type MermaidExportFormat = 'markdown' | 'html' | 'raw';
+

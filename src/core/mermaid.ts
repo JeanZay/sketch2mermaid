@@ -1,4 +1,4 @@
-import type { CanonicalDiagram } from './types';
+import type { CanonicalDiagram, MermaidExportFormat } from './types';
 
 /**
  * Helper to sort IDs numerically by their numeric suffix (e.g., n1, n2, n10).
@@ -92,4 +92,25 @@ export function toMermaid(diagram: CanonicalDiagram): string {
 
   return lines.join('\n');
 }
+
+/**
+ * Formats the Mermaid code according to the chosen export format.
+ */
+export function formatMermaidExport(code: string, format: MermaidExportFormat): string {
+  switch (format) {
+    case 'markdown':
+      return `\`\`\`mermaid\n${code}\n\`\`\``;
+    case 'html': {
+      const indented = code
+        .split('\n')
+        .map((line) => (line.trim() === '' ? '' : '    ' + line))
+        .join('\n');
+      return `<div class="mermaid">\n${indented}\n</div>`;
+    }
+    case 'raw':
+    default:
+      return code;
+  }
+}
+
 

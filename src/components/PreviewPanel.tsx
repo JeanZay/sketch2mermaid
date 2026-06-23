@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import mermaid from 'mermaid';
-import { toMermaid } from '../core/mermaid';
+import { toMermaid, formatMermaidExport } from '../core/mermaid';
+import type { MermaidExportFormat } from '../core/types';
 import { useDiagramStore } from '../store/diagramStore';
 import { Copy, Check, AlertCircle } from 'lucide-react';
 import { useNodes, useEdges } from '@xyflow/react';
@@ -20,6 +21,13 @@ export const PreviewPanel = () => {
   // Direct live conversion to Mermaid string
   const mermaidCode = toMermaid(diagram);
   
+  const [exportFormat, setExportFormat] = useState<MermaidExportFormat>('markdown');
+
+  // Derive formatted export string based on selected format
+  const formattedCode = React.useMemo(() => {
+    return formatMermaidExport(mermaidCode, exportFormat);
+  }, [mermaidCode, exportFormat]);
+  
   const [copied, setCopied] = useState(false);
   const [svgHtml, setSvgHtml] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -31,7 +39,7 @@ export const PreviewPanel = () => {
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(mermaidCode);
+      await navigator.clipboard.writeText(formattedCode);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -112,10 +120,44 @@ export const PreviewPanel = () => {
             </button>
           </div>
 
+          {/* Format Selection Tabs */}
+          <div className="format-tabs" role="tablist" aria-label="Format d'export Mermaid">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={exportFormat === 'markdown'}
+              aria-pressed={exportFormat === 'markdown'}
+              className={`format-tab-btn ${exportFormat === 'markdown' ? 'active' : ''}`}
+              onClick={() => setExportFormat('markdown')}
+            >
+              Markdown
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={exportFormat === 'html'}
+              aria-pressed={exportFormat === 'html'}
+              className={`format-tab-btn ${exportFormat === 'html' ? 'active' : ''}`}
+              onClick={() => setExportFormat('html')}
+            >
+              HTML / API
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={exportFormat === 'raw'}
+              aria-pressed={exportFormat === 'raw'}
+              className={`format-tab-btn ${exportFormat === 'raw' ? 'active' : ''}`}
+              onClick={() => setExportFormat('raw')}
+            >
+              Code Brut
+            </button>
+          </div>
+
           {/* Mermaid Raw Code View */}
           <div className="code-view-wrapper">
             <pre className="code-pre">
-              <code>{mermaidCode}</code>
+              <code>{formattedCode}</code>
             </pre>
           </div>
         </>

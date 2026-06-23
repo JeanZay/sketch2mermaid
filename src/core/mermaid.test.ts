@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { CanonicalDiagram } from './types';
-import { toMermaid, escapeLabel } from './mermaid';
+import { toMermaid, escapeLabel, formatMermaidExport } from './mermaid';
 
 describe('toMermaid pure serialization tests', () => {
   test('AC1 — Empty diagram returns flowchart TD', () => {
@@ -160,3 +160,31 @@ describe('toMermaid pure serialization tests', () => {
     expect(lines[5]).toBe('  n2 --> n10');
   });
 });
+
+describe('formatMermaidExport formatting tests', () => {
+  const codeSample = 'flowchart TD\n  n1["Début"]\n\n  n1 --> n2';
+
+  test('markdown format wraps code in triple backticks with mermaid identifier', () => {
+    const formatted = formatMermaidExport(codeSample, 'markdown');
+    expect(formatted).toBe('```mermaid\nflowchart TD\n  n1["Début"]\n\n  n1 --> n2\n```');
+  });
+
+  test('html format wraps code in div and indents non-empty lines with 4 spaces', () => {
+    const formatted = formatMermaidExport(codeSample, 'html');
+    const expected = [
+      '<div class="mermaid">',
+      '    flowchart TD',
+      '      n1["Début"]',
+      '',
+      '      n1 --> n2',
+      '</div>'
+    ].join('\n');
+    expect(formatted).toBe(expected);
+  });
+
+  test('raw format returns code unmodified', () => {
+    const formatted = formatMermaidExport(codeSample, 'raw');
+    expect(formatted).toBe(codeSample);
+  });
+});
+
