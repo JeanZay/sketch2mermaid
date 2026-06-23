@@ -1,4 +1,4 @@
-export type NodeShape = 'process' | 'rounded' | 'stadium' | 'decision' | 'event' | 'endEvent' | 'database' | 'file';
+export type NodeShape = 'process' | 'rounded' | 'stadium' | 'decision' | 'event' | 'endEvent' | 'database' | 'file' | 'subroutine' | 'hexagon' | 'parallelogram' | 'parallelogramAlt' | 'trapezoid' | 'trapezoidAlt' | 'asymmetric' | 'documents';
 export type EdgeStyle = 'solid' | 'dotted';
 export type DiagramDirection = 'TD' | 'LR' | 'BT' | 'RL';
 

@@ -30,6 +30,14 @@ export const VALID_NODE_SHAPES: ReadonlySet<NodeShape> = new Set<NodeShape>([
   'endEvent',
   'database',
   'file',
+  'subroutine',
+  'hexagon',
+  'parallelogram',
+  'parallelogramAlt',
+  'trapezoid',
+  'trapezoidAlt',
+  'asymmetric',
+  'documents',
 ]);
 
 const VALID_DIRECTIONS = new Set(['TD', 'LR', 'BT', 'RL']);

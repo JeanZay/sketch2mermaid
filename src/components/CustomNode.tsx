@@ -184,6 +184,41 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
     );
   }
 
+  if (shape === 'subroutine') {
+    return (
+      <div className={`subroutine-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
+        {renderResizer()}
+        {renderInner()}
+        {renderHandles()}
+      </div>
+    );
+  }
+
+  if (['hexagon', 'parallelogram', 'parallelogramAlt', 'trapezoid', 'trapezoidAlt', 'asymmetric'].includes(shape)) {
+    return (
+      <div className={`${shape}-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
+        {renderResizer()}
+        <div className={`${shape}-bg`}></div>
+        <div className={`${shape}-text`}>{renderInner()}</div>
+        {renderHandles()}
+      </div>
+    );
+  }
+
+  if (shape === 'documents') {
+    return (
+      <div className={`documents-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
+        {renderResizer()}
+        <div className="documents-bg-back"></div>
+        <div className="documents-bg-middle"></div>
+        <div className="documents-front">
+          {renderInner()}
+        </div>
+        {renderHandles()}
+      </div>
+    );
+  }
+
   // process, rounded, stadium
   let shapeClass = 'shape-process';
   if (shape === 'rounded') shapeClass = 'shape-rounded';

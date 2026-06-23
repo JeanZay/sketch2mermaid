@@ -105,8 +105,9 @@ export function toMermaid(diagram: CanonicalDiagram): string {
       finalLabel = `\`${markdownLabel}\``;
     }
 
-    if (node.shape === 'file') {
-      lines.push(`  ${node.id}@{ shape: doc, label: "${finalLabel}" }`);
+    if (node.shape === 'file' || node.shape === 'documents') {
+      const shapeName = node.shape === 'file' ? 'doc' : 'docs';
+      lines.push(`  ${node.id}@{ shape: ${shapeName}, label: "${finalLabel}" }`);
     } else {
       let open = '[';
       let close = ']';
@@ -125,6 +126,20 @@ export function toMermaid(diagram: CanonicalDiagram): string {
           open = '((('; close = ')))'; break;
         case 'database':
           open = '[('; close = ')]'; break;
+        case 'subroutine':
+          open = '[['; close = ']]'; break;
+        case 'hexagon':
+          open = '{{'; close = '}}'; break;
+        case 'parallelogram':
+          open = '[/'; close = '/]'; break;
+        case 'parallelogramAlt':
+          open = '[\\'; close = '\\\]'; break;
+        case 'trapezoid':
+          open = '[/'; close = '\\\]'; break;
+        case 'trapezoidAlt':
+          open = '[\\'; close = '/]'; break;
+        case 'asymmetric':
+          open = '>'; close = ']'; break;
       }
       lines.push(`  ${node.id}${open}"${finalLabel}"${close}`);
     }

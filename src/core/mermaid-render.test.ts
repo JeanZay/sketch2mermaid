@@ -129,4 +129,30 @@ describe('Mermaid empirical SVG rendering verification under strict security', (
     const errorNode = doc.querySelector('.error-icon, .error-text, #error-div');
     expect(errorNode).toBeNull();
   });
+
+  test('Compilation of 8 new shapes to non-empty SVG', async () => {
+    const code = [
+      'flowchart TD',
+      '  sub[["Subroutine"]]',
+      '  hex{{"Hexagon"}}',
+      '  para[/"Parallelogram"/]',
+      '  paraAlt[\\"Parallelogram Alt"\\]',
+      '  trap[/"Trapezoid"\\]',
+      '  trapAlt[\\"Trapezoid Alt"/]',
+      '  asym>"Asymmetric"]',
+      '  docs@{ shape: docs, label: "Documents" }'
+    ].join('\n');
+    
+    const renderId = `new-shapes-compile-test-${Math.floor(Math.random() * 100000)}`;
+    const { svg } = await mermaid.render(renderId, code);
+    
+    expect(svg).toBeDefined();
+    expect(svg.length).toBeGreaterThan(0);
+    
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svg, 'image/svg+xml');
+    
+    const errorNode = doc.querySelector('.error-icon, .error-text, #error-div');
+    expect(errorNode).toBeNull();
+  });
 });

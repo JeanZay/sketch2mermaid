@@ -102,6 +102,35 @@ describe('toMermaid pure serialization tests', () => {
     expect(output).toContain('n2@{ shape: doc, label: "File \\\\ Node" }');
   });
 
+  test('Serialization of 8 new shapes', () => {
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'LR',
+      nodes: [
+        { id: 'n1', label: 'Sub', shape: 'subroutine', position: { x: 0, y: 0 } },
+        { id: 'n2', label: 'Hex', shape: 'hexagon', position: { x: 0, y: 100 } },
+        { id: 'n3', label: 'Para', shape: 'parallelogram', position: { x: 0, y: 200 } },
+        { id: 'n4', label: 'ParaAlt', shape: 'parallelogramAlt', position: { x: 0, y: 300 } },
+        { id: 'n5', label: 'Trap', shape: 'trapezoid', position: { x: 0, y: 400 } },
+        { id: 'n6', label: 'TrapAlt', shape: 'trapezoidAlt', position: { x: 0, y: 500 } },
+        { id: 'n7', label: 'Asym', shape: 'asymmetric', position: { x: 0, y: 600 } },
+        { id: 'n8', label: 'Docs', shape: 'documents', position: { x: 0, y: 700 } }
+      ],
+      edges: [],
+      textBoxes: []
+    };
+    const output = toMermaid(diagram);
+    expect(output).toContain('n1[["Sub"]]');
+    expect(output).toContain('n2{{"Hex"}}');
+    expect(output).toContain('n3[/"Para"/]');
+    expect(output).toContain('n4[\\"ParaAlt"\\\]');
+    expect(output).toContain('n5[/"Trap"\\\]');
+    expect(output).toContain('n6[\\"TrapAlt"/]');
+    expect(output).toContain('n7>"Asym"]');
+    expect(output).toContain('n8@{ shape: docs, label: "Docs" }');
+  });
+
   test('AC6 — Node IDs starting with o and x do not conflict with shape edge types', () => {
     const diagram: CanonicalDiagram = {
       schemaVersion: 1,

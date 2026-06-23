@@ -254,7 +254,7 @@ describe('parseSketch2MermaidFile — invalid files', () => {
           schemaVersion: 1,
           diagramType: 'flowchart',
           direction: 'TD',
-          nodes: [{ id: 'n1', label: 'X', shape: 'hexagon', position: { x: 0, y: 0 } }],
+          nodes: [{ id: 'n1', label: 'X', shape: 'unknown-shape-here', position: { x: 0, y: 0 } }],
           edges: [],
         },
       }),

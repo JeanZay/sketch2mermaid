@@ -64,4 +64,57 @@ export const SHAPE_CONFIGS: ShapeConfig[] = [
       </>
     ),
   },
+  {
+    type: 'subroutine',
+    label: 'Subroutine',
+    svg: (
+      <>
+        <rect x="3" y="6" width="18" height="12" rx="1"></rect>
+        <line x1="7" y1="6" x2="7" y2="18" stroke="currentColor" strokeWidth="1.5" />
+        <line x1="17" y1="6" x2="17" y2="18" stroke="currentColor" strokeWidth="1.5" />
+      </>
+    ),
+  },
+  {
+    type: 'hexagon',
+    label: 'Hexagon',
+    svg: <polygon points="6 6 18 6 22 12 18 18 6 18 2 12" />,
+  },
+  {
+    type: 'parallelogram',
+    label: 'Parallelogram',
+    svg: <polygon points="6 6 22 6 18 18 2 18" />,
+  },
+  {
+    type: 'parallelogramAlt',
+    label: 'Parallelogram Alt',
+    svg: <polygon points="2 6 18 6 22 18 6 18" />,
+  },
+  {
+    type: 'trapezoid',
+    label: 'Trapezoid',
+    svg: <polygon points="6 6 18 6 22 18 2 18" />,
+  },
+  {
+    type: 'trapezoidAlt',
+    label: 'Trapezoid Alt',
+    svg: <polygon points="2 6 22 6 18 18 6 18" />,
+  },
+  {
+    type: 'asymmetric',
+    label: 'Asymmetric',
+    svg: <polygon points="3 6 18 6 22 12 18 18 3 18" />,
+  },
+  {
+    type: 'documents',
+    label: 'Documents',
+    svg: (
+      <>
+        <path d="M12 4H6a2 2 0 0 0-2 2v8" />
+        <path d="M14 6H8a2 2 0 0 0-2 2v8" />
+        <path d="M16 8H10a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-6z" />
+        <polyline points="16 8 16 12 20 12" />
+      </>
+    ),
+  },
 ];

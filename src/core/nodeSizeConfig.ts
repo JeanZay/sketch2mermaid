@@ -20,4 +20,12 @@ export const NODE_SIZE_DEFAULTS: Record<NodeShape, NodeSizeConfig> = {
   endEvent: { width: 88, height: 88, minWidth: 64, minHeight: 64 },
   database: { width: 150, height: 76, minWidth: 110, minHeight: 64 },
   file:     { width: 150, height: 76, minWidth: 110, minHeight: 64 },
+  subroutine:       { width: 150, height: 56, minWidth: 100, minHeight: 44 },
+  hexagon:          { width: 160, height: 56, minWidth: 110, minHeight: 44 },
+  parallelogram:    { width: 160, height: 56, minWidth: 110, minHeight: 44 },
+  parallelogramAlt: { width: 160, height: 56, minWidth: 110, minHeight: 44 },
+  trapezoid:        { width: 160, height: 56, minWidth: 110, minHeight: 44 },
+  trapezoidAlt:     { width: 160, height: 56, minWidth: 110, minHeight: 44 },
+  asymmetric:       { width: 150, height: 56, minWidth: 100, minHeight: 44 },
+  documents:        { width: 150, height: 76, minWidth: 110, minHeight: 64 },
 };
