@@ -11,13 +11,17 @@ import { downloadTextFile } from '../utils/downloadFile';
 import { useToast } from './useToast';
 import { ConfirmModal } from './ConfirmModal';
 import { ImportMermaidModal } from './ImportMermaidModal';
-import type { DiagramDirection, S2mViewport } from '../core/types';
+import type { CanonicalDiagram, DiagramDirection, S2mViewport } from '../core/types';
 
 export const TopNavBar = () => {
   const diagram = useDiagramStore((state) => state.diagram);
   const setDirection = useDiagramStore((state) => state.setDirection);
   const resetDiagram = useDiagramStore((state) => state.resetDiagram);
   const loadDiagram = useDiagramStore((state) => state.loadDiagram);
+  const past = useDiagramStore((state) => state.past);
+  const future = useDiagramStore((state) => state.future);
+  const undo = useDiagramStore((state) => state.undo);
+  const redo = useDiagramStore((state) => state.redo);
 
   const { getViewport, setViewport, fitView } = useReactFlow();
   const { showToast } = useToast();
@@ -61,7 +65,7 @@ export const TopNavBar = () => {
   // ---- Import .s2m ----
   const applyImport = useCallback(
     (diagramData: Parameters<typeof loadDiagram>[0], viewport?: S2mViewport, warnings?: string[]) => {
-      loadDiagram(diagramData);
+      loadDiagram(diagramData, { resetHistory: true });
 
       // Restore viewport after React Flow has injected the nodes
       requestAnimationFrame(() => {
@@ -83,7 +87,7 @@ export const TopNavBar = () => {
 
   const handleImportSuccess = useCallback(
     (importedDiagram: CanonicalDiagram) => {
-      loadDiagram(importedDiagram);
+      loadDiagram(importedDiagram, { resetHistory: false });
       
       requestAnimationFrame(() => {
         fitView({ duration: 200 });
@@ -184,6 +188,33 @@ export const TopNavBar = () => {
               </button>
             ))}
           </nav>
+
+          <div className="header-divider"></div>
+
+          <div className="undo-redo-group">
+            <button
+              onClick={undo}
+              disabled={past.length === 0}
+              className={`nav-dir-btn${past.length === 0 ? ' disabled-btn' : ''}`}
+              title="Undo (Ctrl+Z)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="1 4 1 10 7 10"></polyline>
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+              </svg>
+            </button>
+            <button
+              onClick={redo}
+              disabled={future.length === 0}
+              className={`nav-dir-btn${future.length === 0 ? ' disabled-btn' : ''}`}
+              title="Redo (Ctrl+Y)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="actions-right-section">

@@ -117,6 +117,19 @@ body {
   border-bottom: 2px solid var(--accent-color);
 }
 
+.nav-dir-btn.disabled-btn {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.undo-redo-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+}
+
 .actions-right-section {
   display: flex;
   align-items: center;

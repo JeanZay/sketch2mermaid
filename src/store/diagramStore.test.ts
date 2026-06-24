@@ -1,5 +1,5 @@
 import { beforeEach, describe, test, expect, vi } from 'vitest';
-import { useDiagramStore, getNextNodeId, getNextEdgeId, getNextTextBoxId, loadInitialDiagram, normalizeDiagram } from './diagramStore';
+import { useDiagramStore, getNextNodeId, getNextEdgeId, getNextTextBoxId, loadInitialDiagram, normalizeDiagram, areDiagramsEqual } from './diagramStore';
 import type { DiagramNode, DiagramEdge, TextBox } from '../core/types';
 
 // Mock localStorage for Node test environment
@@ -25,6 +25,8 @@ describe('Zustand diagram store tests', () => {
   beforeEach(() => {
     localStorageMock.clear();
     useDiagramStore.getState().resetDiagram();
+    // Reset history state for test isolation
+    useDiagramStore.setState({ past: [], future: [], checkpoint: null });
   });
 
   test('addNode and sequential stable ID generation', () => {
@@ -471,7 +473,7 @@ describe('Zustand diagram store tests', () => {
       textBoxes: []
     };
 
-    store.loadDiagram(legacyDiagram);
+    store.loadDiagram(legacyDiagram, { resetHistory: true });
     const node = useDiagramStore.getState().diagram.nodes[0];
     
     // Check it has been migrated to style.text
@@ -529,7 +531,7 @@ describe('Zustand diagram store tests', () => {
       textBoxes: []
     };
 
-    store.loadDiagram(badDiagram);
+    store.loadDiagram(badDiagram, { resetHistory: true });
     const edges = useDiagramStore.getState().diagram.edges;
     expect(edges[0].direction).toBe('directed');
     expect(edges[1].direction).toBe('directed');
@@ -554,10 +556,257 @@ describe('Zustand diagram store tests', () => {
       textBoxes: []
     };
 
-    store.loadDiagram(diagram);
+    store.loadDiagram(diagram, { resetHistory: true });
     const edges = useDiagramStore.getState().diagram.edges;
     expect(edges[0].direction).toBe('undirected');
     expect(edges[1].direction).toBe('bidirectional');
     expect(edges[2].direction).toBe('directed');
+  });
+
+  // ====== UNDO/REDO TESTS ======
+
+  describe('Undo/Redo history', () => {
+    test('undo restores the previous diagram after addNode', () => {
+      const store = useDiagramStore.getState();
+      expect(store.diagram.nodes).toHaveLength(0);
+
+      store.addNode('process', 10, 20);
+      expect(useDiagramStore.getState().diagram.nodes).toHaveLength(1);
+      expect(useDiagramStore.getState().past).toHaveLength(1);
+
+      useDiagramStore.getState().undo();
+      expect(useDiagramStore.getState().diagram.nodes).toHaveLength(0);
+      expect(useDiagramStore.getState().past).toHaveLength(0);
+      expect(useDiagramStore.getState().future).toHaveLength(1);
+    });
+
+    test('redo restores the undone diagram', () => {
+      const store = useDiagramStore.getState();
+      store.addNode('process', 10, 20);
+      useDiagramStore.getState().undo();
+      expect(useDiagramStore.getState().diagram.nodes).toHaveLength(0);
+
+      useDiagramStore.getState().redo();
+      expect(useDiagramStore.getState().diagram.nodes).toHaveLength(1);
+      expect(useDiagramStore.getState().future).toHaveLength(0);
+    });
+
+    test('a new mutation after undo clears the future stack', () => {
+      const store = useDiagramStore.getState();
+      store.addNode('process', 10, 20);
+      store.addNode('decision', 50, 50);
+      expect(useDiagramStore.getState().past).toHaveLength(2);
+
+      useDiagramStore.getState().undo();
+      expect(useDiagramStore.getState().future).toHaveLength(1);
+
+      // New mutation should clear future
+      useDiagramStore.getState().addNode('rounded', 100, 100);
+      expect(useDiagramStore.getState().future).toHaveLength(0);
+    });
+
+    test('a transaction with multiple mutations creates exactly one undo step', () => {
+      const store = useDiagramStore.getState();
+      store.addNode('process', 0, 0); // n1
+      store.addNode('process', 100, 0); // n2
+      const pastLenBefore = useDiagramStore.getState().past.length;
+
+      // Start transaction, do multiple mutations
+      useDiagramStore.getState().startTransaction();
+      useDiagramStore.getState().updateNodeLabel('n1', 'Modified');
+      useDiagramStore.getState().updateNodePosition('n1', 50, 50);
+      useDiagramStore.getState().commitTransaction();
+
+      // Should have added exactly one entry to past
+      expect(useDiagramStore.getState().past.length).toBe(pastLenBefore + 1);
+
+      // Undo should restore both label AND position in one step
+      useDiagramStore.getState().undo();
+      const node = useDiagramStore.getState().diagram.nodes.find(n => n.id === 'n1');
+      expect(node?.label).toBe('Nouveau nœud');
+      expect(node?.position).toEqual({ x: 0, y: 0 });
+    });
+
+    test('an empty transaction (no changes) creates no history entry', () => {
+      const store = useDiagramStore.getState();
+      store.addNode('process', 0, 0);
+      const pastLenBefore = useDiagramStore.getState().past.length;
+
+      useDiagramStore.getState().startTransaction();
+      // No mutations
+      useDiagramStore.getState().commitTransaction();
+
+      expect(useDiagramStore.getState().past.length).toBe(pastLenBefore);
+    });
+
+    test('nested startTransaction calls do not overwrite the existing checkpoint (idempotency)', () => {
+      const store = useDiagramStore.getState();
+      store.addNode('process', 0, 0);
+
+      useDiagramStore.getState().startTransaction();
+      const checkpointAfterFirst = useDiagramStore.getState().checkpoint;
+      
+      // Mutate during transaction
+      useDiagramStore.getState().updateNodeLabel('n1', 'Step1');
+      
+      // Second startTransaction should be a no-op (idempotent)
+      useDiagramStore.getState().startTransaction();
+      expect(useDiagramStore.getState().checkpoint).toBe(checkpointAfterFirst);
+
+      useDiagramStore.getState().commitTransaction();
+      // Undo should go back to original label, not 'Step1'
+      useDiagramStore.getState().undo();
+      const node = useDiagramStore.getState().diagram.nodes.find(n => n.id === 'n1');
+      expect(node?.label).toBe('Nouveau nœud');
+    });
+
+    test('takeSnapshot is ignored during an active transaction', () => {
+      const store = useDiagramStore.getState();
+      store.addNode('process', 0, 0);
+      const pastLenBefore = useDiagramStore.getState().past.length;
+
+      useDiagramStore.getState().startTransaction();
+      // Mutations inside transaction call takeSnapshot() internally but it should be no-op
+      useDiagramStore.getState().updateNodeLabel('n1', 'Inside Transaction');
+      useDiagramStore.getState().updateNodePosition('n1', 99, 99);
+      
+      // Past should NOT have grown during the transaction
+      expect(useDiagramStore.getState().past.length).toBe(pastLenBefore);
+
+      useDiagramStore.getState().commitTransaction();
+      // Only one entry added after commit
+      expect(useDiagramStore.getState().past.length).toBe(pastLenBefore + 1);
+    });
+
+    test('deleteNode/deleteEdge inside transaction do not create individual snapshots', () => {
+      const store = useDiagramStore.getState();
+      store.addNode('process', 0, 0); // n1
+      store.addNode('decision', 100, 0); // n2
+      store.addEdge('n1', 'n2'); // e1
+      const pastLenBefore = useDiagramStore.getState().past.length;
+
+      // Simulate grouped delete (as done in Canvas.tsx onNodesDelete)
+      useDiagramStore.getState().startTransaction();
+      useDiagramStore.getState().deleteNode('n1');
+      useDiagramStore.getState().deleteEdge('e1'); // edge may already be removed by cascade, but should not error
+      useDiagramStore.getState().commitTransaction();
+
+      // Exactly one undo step
+      expect(useDiagramStore.getState().past.length).toBe(pastLenBefore + 1);
+    });
+
+    test('resetDiagram is undoable', () => {
+      const store = useDiagramStore.getState();
+      store.addNode('process', 0, 0);
+      store.addNode('decision', 100, 0);
+      expect(useDiagramStore.getState().diagram.nodes).toHaveLength(2);
+
+      useDiagramStore.getState().resetDiagram();
+      expect(useDiagramStore.getState().diagram.nodes).toHaveLength(0);
+
+      useDiagramStore.getState().undo();
+      expect(useDiagramStore.getState().diagram.nodes).toHaveLength(2);
+    });
+
+    test('loadDiagram with resetHistory: true clears past, future, and checkpoint', () => {
+      const store = useDiagramStore.getState();
+      store.addNode('process', 0, 0);
+      store.addNode('decision', 100, 0);
+      expect(useDiagramStore.getState().past.length).toBeGreaterThan(0);
+
+      const newDiagram = {
+        schemaVersion: 1,
+        diagramType: 'flowchart' as const,
+        direction: 'LR' as const,
+        nodes: [{ id: 'n1', label: 'Imported', shape: 'process' as const, position: { x: 0, y: 0 } }],
+        edges: [],
+        textBoxes: [],
+      };
+
+      useDiagramStore.getState().loadDiagram(newDiagram, { resetHistory: true });
+      expect(useDiagramStore.getState().past).toHaveLength(0);
+      expect(useDiagramStore.getState().future).toHaveLength(0);
+      expect(useDiagramStore.getState().checkpoint).toBeNull();
+      expect(useDiagramStore.getState().diagram.nodes[0].label).toBe('Imported');
+    });
+
+    test('loadDiagram with resetHistory: false is undoable', () => {
+      const store = useDiagramStore.getState();
+      store.addNode('process', 0, 0);
+      const originalNodeCount = useDiagramStore.getState().diagram.nodes.length;
+
+      const newDiagram = {
+        schemaVersion: 1,
+        diagramType: 'flowchart' as const,
+        direction: 'LR' as const,
+        nodes: [
+          { id: 'n1', label: 'From Mermaid', shape: 'rounded' as const, position: { x: 0, y: 0 } },
+          { id: 'n2', label: 'Also Mermaid', shape: 'decision' as const, position: { x: 100, y: 0 } },
+        ],
+        edges: [],
+        textBoxes: [],
+      };
+
+      useDiagramStore.getState().loadDiagram(newDiagram, { resetHistory: false });
+      expect(useDiagramStore.getState().diagram.nodes).toHaveLength(2);
+      expect(useDiagramStore.getState().checkpoint).toBeNull();
+
+      useDiagramStore.getState().undo();
+      expect(useDiagramStore.getState().diagram.nodes).toHaveLength(originalNodeCount);
+    });
+
+    test('history depth is capped at 50 for takeSnapshot', () => {
+      const store = useDiagramStore.getState();
+      // Generate 55 distinct states
+      for (let i = 0; i < 55; i++) {
+        store.addNode('process', i * 100, i * 100);
+      }
+      expect(useDiagramStore.getState().past.length).toBeLessThanOrEqual(50);
+    });
+
+    test('commitTransaction also respects the 50-step history depth limit', () => {
+      // Fill past to near-capacity
+      for (let i = 0; i < 52; i++) {
+        useDiagramStore.getState().addNode('process', i * 100, i * 100);
+      }
+      const pastBefore = useDiagramStore.getState().past.length;
+      expect(pastBefore).toBeLessThanOrEqual(50);
+
+      // Transaction commit should also enforce limit
+      useDiagramStore.getState().startTransaction();
+      useDiagramStore.getState().updateNodeLabel('n1', 'Transaction Test');
+      useDiagramStore.getState().commitTransaction();
+
+      expect(useDiagramStore.getState().past.length).toBeLessThanOrEqual(50);
+    });
+
+    test('areDiagramsEqual returns true for structurally equal diagrams', () => {
+      const a = {
+        schemaVersion: 1,
+        diagramType: 'flowchart' as const,
+        direction: 'TD' as const,
+        nodes: [{ id: 'n1', label: 'A', shape: 'process' as const, position: { x: 0, y: 0 } }],
+        edges: [],
+        textBoxes: [],
+      };
+      const b = { ...a, nodes: [...a.nodes] };
+      expect(areDiagramsEqual(a, b)).toBe(true);
+    });
+
+    test('areDiagramsEqual returns false for different diagrams', () => {
+      const a = {
+        schemaVersion: 1,
+        diagramType: 'flowchart' as const,
+        direction: 'TD' as const,
+        nodes: [{ id: 'n1', label: 'A', shape: 'process' as const, position: { x: 0, y: 0 } }],
+        edges: [],
+        textBoxes: [],
+      };
+      const b = {
+        ...a,
+        nodes: [{ id: 'n1', label: 'B', shape: 'process' as const, position: { x: 0, y: 0 } }],
+      };
+      expect(areDiagramsEqual(a, b)).toBe(false);
+    });
   });
 });

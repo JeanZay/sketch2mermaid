@@ -35,6 +35,10 @@ function FlowInner() {
   const updateTextBoxPosition = useDiagramStore((state) => state.updateTextBoxPosition);
   const updateTextBoxSize = useDiagramStore((state) => state.updateTextBoxSize);
   const deleteTextBox = useDiagramStore((state) => state.deleteTextBox);
+  const undo = useDiagramStore((state) => state.undo);
+  const redo = useDiagramStore((state) => state.redo);
+  const startTransaction = useDiagramStore((state) => state.startTransaction);
+  const commitTransaction = useDiagramStore((state) => state.commitTransaction);
 
   const { screenToFlowPosition } = useReactFlow();
 
@@ -99,7 +103,7 @@ function FlowInner() {
   // Access React Flow's internal node list for keyboard nudging
   const nodes = useNodes();
 
-  // Handle keyboard nudging with safeguards
+  // Handle keyboard nudging and undo/redo shortcuts with safeguards
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const activeEl = document.activeElement;
@@ -114,6 +118,25 @@ function FlowInner() {
         ) {
           return;
         }
+      }
+
+      // Undo/Redo shortcuts
+      const isMod = event.metaKey || event.ctrlKey;
+      if (isMod && event.key.toLowerCase() === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        undo();
+        return;
+      }
+      if (isMod && event.key.toLowerCase() === 'y') {
+        event.preventDefault();
+        redo();
+        return;
+      }
+      // Cmd+Shift+Z (macOS redo)
+      if (isMod && event.key.toLowerCase() === 'z' && event.shiftKey) {
+        event.preventDefault();
+        redo();
+        return;
       }
 
       const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key);
@@ -140,7 +163,7 @@ function FlowInner() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [nodes, updateNodePosition]);
+  }, [nodes, updateNodePosition, undo, redo]);
 
   // Build a lookup for node types from the current rfNodes to route changes
   // by React Flow node type (refinement #1: avoid scattering ID prefix checks)
@@ -239,7 +262,10 @@ function FlowInner() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onPaneDoubleClick={onPaneDoubleClick}
+        onNodeDragStart={startTransaction}
+        onNodeDragStop={commitTransaction}
         onNodesDelete={(deletedNodes) => {
+          startTransaction();
           for (const n of deletedNodes) {
             const nType = nodeTypeById.get(n.id);
             if (nType === 'textBox') {
@@ -248,8 +274,13 @@ function FlowInner() {
               deleteNode(n.id);
             }
           }
+          commitTransaction();
         }}
-        onEdgesDelete={(edges) => edges.forEach((e) => deleteEdge(e.id))}
+        onEdgesDelete={(edges) => {
+          startTransaction();
+          edges.forEach((e) => deleteEdge(e.id));
+          commitTransaction();
+        }}
         deleteKeyCode={['Delete', 'Backspace']}
         nodeDragThreshold={2}
         defaultEdgeOptions={{ interactionWidth: 20 }}
@@ -277,5 +308,3 @@ export const Canvas = () => {
 };
 
 export default Canvas;
-
-

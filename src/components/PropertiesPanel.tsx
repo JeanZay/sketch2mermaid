@@ -26,6 +26,8 @@ export const PropertiesPanel = () => {
   const updateTextBoxStyle = useDiagramStore((state) => state.updateTextBoxStyle);
   const deleteTextBox = useDiagramStore((state) => state.deleteTextBox);
   const updateNodeStyle = useDiagramStore((state) => state.updateNodeStyle);
+  const startTransaction = useDiagramStore((state) => state.startTransaction);
+  const commitTransaction = useDiagramStore((state) => state.commitTransaction);
 
   const handleDeselect = () => {
     setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
@@ -89,6 +91,8 @@ export const PropertiesPanel = () => {
             <textarea
               value={textBoxData.text}
               onChange={(e) => updateTextBoxText(selectedNode.id, e.target.value)}
+              onFocus={startTransaction}
+              onBlur={commitTransaction}
               className="property-input property-textarea"
               rows={3}
             />
@@ -101,6 +105,8 @@ export const PropertiesPanel = () => {
                 type="color"
                 value={style.backgroundColor || '#ffffff'}
                 onChange={(e) => handleStyleChange({ backgroundColor: e.target.value.trim() || undefined })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
                 className="color-picker"
               />
               <input
@@ -108,6 +114,8 @@ export const PropertiesPanel = () => {
                 value={style.backgroundColor || ''}
                 placeholder="Transparent"
                 onChange={(e) => handleStyleChange({ backgroundColor: e.target.value.trim() || undefined })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
                 className="property-input color-text-input"
               />
               {style.backgroundColor && (
@@ -129,6 +137,8 @@ export const PropertiesPanel = () => {
                 type="color"
                 value={style.borderColor || '#c4c5d7'}
                 onChange={(e) => handleStyleChange({ borderColor: e.target.value.trim() || undefined })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
                 className="color-picker"
               />
               <input
@@ -136,6 +146,8 @@ export const PropertiesPanel = () => {
                 value={style.borderColor || ''}
                 placeholder="Transparent"
                 onChange={(e) => handleStyleChange({ borderColor: e.target.value.trim() || undefined })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
                 className="property-input color-text-input"
               />
               {style.borderColor && (
@@ -209,12 +221,16 @@ export const PropertiesPanel = () => {
                 type="color"
                 value={style.color}
                 onChange={(e) => handleStyleChange({ color: e.target.value })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
                 className="color-picker"
               />
               <input
                 type="text"
                 value={style.color}
                 onChange={(e) => handleStyleChange({ color: e.target.value })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
                 className="property-input color-text-input"
               />
             </div>
@@ -286,6 +302,8 @@ export const PropertiesPanel = () => {
               type="text"
               value={nodeData.label}
               onChange={(e) => updateNodeLabel(selectedNode.id, e.target.value)}
+              onFocus={startTransaction}
+              onBlur={commitTransaction}
               className="property-input"
             />
           </div>
@@ -297,6 +315,8 @@ export const PropertiesPanel = () => {
                 type="color"
                 value={nodeData.style?.backgroundColor || '#ffffff'}
                 onChange={(e) => handleNodeStyleChange({ backgroundColor: e.target.value })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
                 className="color-picker"
               />
               <input
@@ -304,6 +324,8 @@ export const PropertiesPanel = () => {
                 value={nodeData.style?.backgroundColor || ''}
                 placeholder="#ffffff"
                 onChange={(e) => handleNodeStyleChange({ backgroundColor: e.target.value })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
                 className="property-input color-text-input"
               />
             </div>
@@ -316,6 +338,8 @@ export const PropertiesPanel = () => {
                 type="color"
                 value={nodeData.style?.borderColor || '#c4c5d7'}
                 onChange={(e) => handleNodeStyleChange({ borderColor: e.target.value })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
                 className="color-picker"
               />
               <input
@@ -323,6 +347,8 @@ export const PropertiesPanel = () => {
                 value={nodeData.style?.borderColor || ''}
                 placeholder="#c4c5d7"
                 onChange={(e) => handleNodeStyleChange({ borderColor: e.target.value })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
                 className="property-input color-text-input"
               />
             </div>
@@ -390,12 +416,16 @@ export const PropertiesPanel = () => {
                 type="color"
                 value={style.color}
                 onChange={(e) => handleStyleChange({ color: e.target.value })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
                 className="color-picker"
               />
               <input
                 type="text"
                 value={style.color}
                 onChange={(e) => handleStyleChange({ color: e.target.value })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
                 className="property-input color-text-input"
               />
             </div>
@@ -485,6 +515,8 @@ export const PropertiesPanel = () => {
               type="text"
               value={edgeData.label || ''}
               onChange={(e) => updateEdgeLabel(selectedEdge.id, e.target.value)}
+              onFocus={startTransaction}
+              onBlur={commitTransaction}
               placeholder="Ex: Oui, Non, ..."
               className="property-input"
             />
@@ -572,12 +604,16 @@ export const PropertiesPanel = () => {
                     type="color"
                     value={style.color}
                     onChange={(e) => handleStyleChange({ color: e.target.value })}
+                    onFocus={startTransaction}
+                    onBlur={commitTransaction}
                     className="color-picker"
                   />
                   <input
                     type="text"
                     value={style.color}
                     onChange={(e) => handleStyleChange({ color: e.target.value })}
+                    onFocus={startTransaction}
+                    onBlur={commitTransaction}
                     className="property-input color-text-input"
                   />
                 </div>

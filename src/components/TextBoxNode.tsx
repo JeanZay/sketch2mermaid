@@ -20,6 +20,8 @@ export const TextBoxNode = ({ id, selected, data }: NodeProps) => {
   const updateTextBoxSize = data.updateTextBoxSize as ((id: string, w: number, h: number) => void) | undefined;
 
   const updateTextBoxText = useDiagramStore((state) => state.updateTextBoxText);
+  const startTransaction = useDiagramStore((state) => state.startTransaction);
+  const commitTransaction = useDiagramStore((state) => state.commitTransaction);
 
   const [isEditing, setIsEditing] = useState(false);
   const [tempText, setTempText] = useState(text);
@@ -84,7 +86,9 @@ export const TextBoxNode = ({ id, selected, data }: NodeProps) => {
         minWidth={MIN_TEXT_BOX_WIDTH}
         minHeight={MIN_TEXT_BOX_HEIGHT}
         keepAspectRatio={false}
+        onResizeStart={startTransaction}
         onResize={handleResize}
+        onResizeEnd={commitTransaction}
         lineClassName="node-resize-line"
         handleClassName="node-resize-handle"
       />

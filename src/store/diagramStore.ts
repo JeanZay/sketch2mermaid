@@ -158,6 +158,16 @@ export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
   };
 }
 
+/**
+ * Compares two CanonicalDiagram instances for structural equality.
+ * Normalizes both before comparing to handle optional fields with defaults.
+ */
+export function areDiagramsEqual(a: CanonicalDiagram, b: CanonicalDiagram): boolean {
+  return JSON.stringify(normalizeDiagram(a)) === JSON.stringify(normalizeDiagram(b));
+}
+
+const HISTORY_DEPTH_LIMIT = 50;
+
 export function loadInitialDiagram(): CanonicalDiagram {
   if (typeof window === 'undefined') return defaultDiagram;
   try {
@@ -190,6 +200,19 @@ export function loadInitialDiagram(): CanonicalDiagram {
 
 export interface DiagramState {
   diagram: CanonicalDiagram;
+
+  // History state (not part of CanonicalDiagram — not serialized to exports)
+  past: CanonicalDiagram[];
+  future: CanonicalDiagram[];
+  checkpoint: CanonicalDiagram | null;
+
+  // History actions
+  takeSnapshot: () => void;
+  undo: () => void;
+  redo: () => void;
+  startTransaction: () => void;
+  commitTransaction: () => void;
+
   setDirection: (direction: DiagramDirection) => void;
   addNode: (shape: NodeShape, x: number, y: number) => string;
   updateNodeLabel: (id: string, label: string) => void;
@@ -212,19 +235,85 @@ export interface DiagramState {
   updateTextBoxPosition: (id: string, x: number, y: number) => void;
   deleteTextBox: (id: string) => void;
   resetDiagram: () => void;
-  loadDiagram: (diagram: CanonicalDiagram) => void;
+  loadDiagram: (diagram: CanonicalDiagram, options: { resetHistory: boolean }) => void;
 }
 
 export const useDiagramStore = create<DiagramState>((set, get) => ({
   diagram: loadInitialDiagram(),
 
+  // History state
+  past: [],
+  future: [],
+  checkpoint: null,
+
+  // ---- History actions ----
+
+  takeSnapshot: () => {
+    const { checkpoint, past, diagram } = get();
+    // During an active transaction, snapshots are deferred to commitTransaction
+    if (checkpoint !== null) return;
+    // Avoid pushing a duplicate of the last snapshot
+    if (past.length > 0 && areDiagramsEqual(past[past.length - 1], diagram)) return;
+    set({ past: [...past, diagram].slice(-HISTORY_DEPTH_LIMIT), future: [] });
+  },
+
+  undo: () => {
+    const { past, diagram, future } = get();
+    if (past.length === 0) return;
+    const previous = past[past.length - 1];
+    set({
+      past: past.slice(0, -1),
+      future: [...future, diagram],
+      diagram: normalizeDiagram(previous),
+      checkpoint: null,
+    });
+  },
+
+  redo: () => {
+    const { past, diagram, future } = get();
+    if (future.length === 0) return;
+    const next = future[future.length - 1];
+    set({
+      past: [...past, diagram],
+      future: future.slice(0, -1),
+      diagram: normalizeDiagram(next),
+      checkpoint: null,
+    });
+  },
+
+  startTransaction: () => {
+    const { checkpoint, diagram } = get();
+    // Idempotent: do not overwrite an existing checkpoint
+    if (checkpoint !== null) return;
+    set({ checkpoint: diagram });
+  },
+
+  commitTransaction: () => {
+    const { checkpoint, diagram, past } = get();
+    if (checkpoint === null) return;
+    // Only create a history entry if something actually changed
+    if (!areDiagramsEqual(checkpoint, diagram)) {
+      set({
+        past: [...past, checkpoint].slice(-HISTORY_DEPTH_LIMIT),
+        future: [],
+        checkpoint: null,
+      });
+    } else {
+      set({ checkpoint: null });
+    }
+  },
+
+  // ---- Diagram mutation actions (each calls takeSnapshot at the start) ----
+
   setDirection: (direction) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: { ...state.diagram, direction },
     }));
   },
 
   addNode: (shape, x, y) => {
+    get().takeSnapshot();
     const newId = getNextNodeId(get().diagram.nodes);
     
     let targetX = Math.round(x);
@@ -255,6 +344,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   updateNodeLabel: (id, label) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -266,6 +356,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   updateNodeShape: (id, shape) => {
+    get().takeSnapshot();
     const sizeDefaults = NODE_SIZE_DEFAULTS[shape];
     set((state) => ({
       diagram: {
@@ -280,6 +371,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   updateNodePosition: (id, x, y) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -291,6 +383,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   updateNodeSize: (id, width, height) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -308,6 +401,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   updateNodeTextStyle: (id, stylePatch) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -327,6 +421,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   updateNodeStyle: (id, stylePatch) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -349,6 +444,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   deleteNode: (id) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -372,6 +468,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     );
     if (existing) return existing.id;
 
+    get().takeSnapshot();
     const newId = getNextEdgeId(get().diagram.edges);
     const newEdge: DiagramEdge = {
       id: newId,
@@ -393,6 +490,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   updateEdgeLabel: (id, label) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -404,6 +502,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   updateEdgeTextStyle: (id, style) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -415,6 +514,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   updateEdgeDirection: (id, direction) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -426,6 +526,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   toggleEdgeStyle: (id) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -439,6 +540,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   deleteEdge: (id) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -448,6 +550,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   addTextBox: (x, y) => {
+    get().takeSnapshot();
     const newId = getNextTextBoxId(get().diagram.textBoxes);
 
     let targetX = Math.round(x);
@@ -479,6 +582,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   updateTextBoxText: (id, text) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -490,6 +594,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   updateTextBoxStyle: (id, stylePatch) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -509,6 +614,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   updateTextBoxSize: (id, width, height) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -525,6 +631,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   updateTextBoxPosition: (id, x, y) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -536,6 +643,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   deleteTextBox: (id) => {
+    get().takeSnapshot();
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -545,11 +653,20 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   resetDiagram: () => {
+    get().takeSnapshot();
     set({ diagram: { ...defaultDiagram } });
   },
 
-  loadDiagram: (diagram) => {
-    set({ diagram: normalizeDiagram(diagram) });
+  loadDiagram: (diagram, options) => {
+    if (!options) throw new Error('loadDiagram requires an options argument with { resetHistory: boolean }');
+    const normalizedDiagram = normalizeDiagram(diagram);
+    // Clear checkpoint to prevent stale transactions
+    if (options.resetHistory) {
+      set({ diagram: normalizedDiagram, past: [], future: [], checkpoint: null });
+    } else {
+      get().takeSnapshot(); // Snapshot previous state BEFORE updating diagram
+      set({ diagram: normalizedDiagram, checkpoint: null });
+    }
   },
 }));
 

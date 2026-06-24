@@ -546,7 +546,7 @@ describe('store integration — export/import round-trip', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    store.getState().loadDiagram(result.diagram);
+    store.getState().loadDiagram(result.diagram, { resetHistory: true });
 
     // Verify equivalence
     const restoredDiagram = store.getState().diagram;

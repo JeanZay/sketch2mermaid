@@ -15,6 +15,8 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   const updateNodeSize = data.updateNodeSize as ((id: string, w: number, h: number) => void) | undefined;
   
   const updateNodeLabel = useDiagramStore((state) => state.updateNodeLabel);
+  const startTransaction = useDiagramStore((state) => state.startTransaction);
+  const commitTransaction = useDiagramStore((state) => state.commitTransaction);
   
   const [isEditing, setIsEditing] = useState(false);
   const [tempLabel, setTempLabel] = useState(label);
@@ -108,7 +110,9 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
       minWidth={sizeConfig.minWidth}
       minHeight={sizeConfig.minHeight}
       keepAspectRatio={shape === 'event' || shape === 'endEvent'}
+      onResizeStart={startTransaction}
       onResize={handleResize}
+      onResizeEnd={commitTransaction}
       lineClassName="node-resize-line"
       handleClassName="node-resize-handle"
     />
