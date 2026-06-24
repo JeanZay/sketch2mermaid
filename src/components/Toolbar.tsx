@@ -2,7 +2,8 @@ import React from 'react';
 import { useEdges, useReactFlow } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
 import type { NodeShape } from '../core/types';
-import { SHAPE_CONFIGS } from './shapeConfig';
+import { SHAPE_DEFINITIONS, type ShapeCategory } from '../core/shapeRegistry';
+import { SHAPE_ICONS } from './shapeIcons';
 
 export const Toolbar = () => {
   const addNode = useDiagramStore((state) => state.addNode);
@@ -46,30 +47,51 @@ export const Toolbar = () => {
     }
   };
 
-  // Shapes configuration
-  const shapes = SHAPE_CONFIGS;
+  const categories: { key: ShapeCategory; label: string }[] = [
+    { key: 'basic', label: 'Basic' },
+    { key: 'data', label: 'Data / Storage' },
+    { key: 'document', label: 'Documents' },
+    { key: 'event', label: 'Events / Control' },
+    { key: 'comment', label: 'Comments' },
+    { key: 'advanced', label: 'Advanced' },
+  ];
+
+  const getShapesByCategory = (catKey: ShapeCategory) => {
+    return SHAPE_DEFINITIONS.filter((def) => def.category === catKey);
+  };
 
   return (
     <aside className="sidebar-palette">
       <div className="sidebar-scrollable-content">
         <h3 className="sidebar-section-title">Shapes</h3>
-        <div className="shapes-list">
-          {shapes.map((s) => {
-            return (
-              <button
-                key={s.type}
-                onClick={() => handleShapeClick(s.type)}
-                title={`Ajouter un nœud ${s.label}`}
-                className="palette-shape-btn"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  {s.svg}
-                </svg>
-                <span className="palette-shape-btn-text">{s.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        {categories.map((cat) => {
+          const catShapes = getShapesByCategory(cat.key);
+          return (
+            <details key={cat.key} open className="sidebar-category-details">
+              <summary className="sidebar-category-summary">
+                {cat.label}
+              </summary>
+              <div className="shapes-list">
+                {catShapes.map((s) => {
+                  const icon = SHAPE_ICONS[s.iconKey];
+                  return (
+                    <button
+                      key={s.nodeShape}
+                      onClick={() => handleShapeClick(s.nodeShape)}
+                      title={`Ajouter un nœud ${s.uiLabel} (shape: ${s.mermaidShape})`}
+                      className="palette-shape-btn"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        {icon}
+                      </svg>
+                      <span className="palette-shape-btn-text">{s.uiLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </details>
+          );
+        })}
 
         <div className="sidebar-divider"></div>
 

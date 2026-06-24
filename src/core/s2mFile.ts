@@ -9,6 +9,7 @@ import type {
   NodeShape,
   DiagramEdgeEndpoint,
 } from './types';
+import { SHAPE_DEFINITIONS } from './shapeRegistry';
 import { normalizeDiagram } from '../store/diagramStore';
 
 // ---------------------------------------------------------------------------
@@ -22,24 +23,9 @@ export const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
 /** App version embedded in every exported .s2m file */
 export const APP_VERSION = '0.0.0';
 
-export const VALID_NODE_SHAPES: ReadonlySet<NodeShape> = new Set<NodeShape>([
-  'process',
-  'rounded',
-  'stadium',
-  'decision',
-  'event',
-  'endEvent',
-  'database',
-  'file',
-  'subroutine',
-  'hexagon',
-  'parallelogram',
-  'parallelogramAlt',
-  'trapezoid',
-  'trapezoidAlt',
-  'asymmetric',
-  'documents',
-]);
+export const VALID_NODE_SHAPES: ReadonlySet<NodeShape> = new Set<NodeShape>(
+  SHAPE_DEFINITIONS.map((d) => d.nodeShape)
+);
 
 const VALID_DIRECTIONS = new Set(['TD', 'LR', 'BT', 'RL']);
 

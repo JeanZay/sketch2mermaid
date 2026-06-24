@@ -104,9 +104,9 @@ describe('Mermaid Flowchart Import Tests', () => {
     expect(node?.label).toBe('Documents');
   });
 
-  // 10. unknown @{ shape: hourglass } imports as process with unsupportedShape
-  test('10. unknown @{ shape: hourglass } imports as process with unsupportedShape', () => {
-    const res = importMermaidFlowchart('graph TD\n  A@{ shape: hourglass }');
+  // 10. unknown @{ shape: nonexistent-shape } imports as process with unsupportedShape
+  test('10. unknown @{ shape: nonexistent-shape } imports as process with unsupportedShape', () => {
+    const res = importMermaidFlowchart('graph TD\n  A@{ shape: nonexistent-shape }');
     const node = res.diagram.nodes.find(n => n.id === 'A');
     expect(node?.shape).toBe('process');
     expect(res.warnings.some(w => w.type === 'unsupportedShape')).toBe(true);
@@ -657,6 +657,62 @@ describe('Mermaid Flowchart Import Tests', () => {
     // Aliases <-- and <-. must be canonicalized to <--- and <-.- respectively:
     expect(exported).toContain('M <---|Trimmed Label| N'.replace('Trimmed Label', '"Tolerant solid"'));
     expect(exported).toContain('O <-.-|Trimmed Label| P'.replace('Trimmed Label', '"Tolerant dotted"'));
+  });
+
+  test('Shape precedence rules', () => {
+    // 1. Metadata shape wins over classic syntax shape
+    const res1 = importMermaidFlowchart('graph TD\n  A[Classic]@{ shape: doc, label: "Meta" }');
+    const node1 = res1.diagram.nodes.find(n => n.id === 'A');
+    expect(node1?.shape).toBe('file');
+    expect(node1?.label).toBe('Meta');
+
+    // 2. Metadata label wins over classic syntax label
+    const res2 = importMermaidFlowchart('graph TD\n  A[Classic]@{ shape: doc, label: "Meta" }');
+    const node2 = res2.diagram.nodes.find(n => n.id === 'A');
+    expect(node2?.label).toBe('Meta');
+
+    // 3. Metadata shape without metadata label preserves the classic shorthand label
+    const res3 = importMermaidFlowchart('graph TD\n  A[Classic]@{ shape: doc }');
+    const node3 = res3.diagram.nodes.find(n => n.id === 'A');
+    expect(node3?.shape).toBe('file');
+    expect(node3?.label).toBe('Classic');
+
+    // 4. Fall back to node ID if no classic/metadata label is available
+    const res4 = importMermaidFlowchart('graph TD\n  A@{ shape: doc }');
+    const node4 = res4.diagram.nodes.find(n => n.id === 'A');
+    expect(node4?.label).toBe('A');
+  });
+
+  test('Alias resolution on import', () => {
+    const res = importMermaidFlowchart(`graph TD
+      A@{ shape: card }
+      B@{ shape: document }
+      C@{ shape: database }
+      D@{ shape: manual-input }
+      E@{ shape: sloped-rectangle }
+      F@{ shape: stacked-document }
+      G@{ shape: stacked-rectangle }
+      H@{ shape: processes }
+    `);
+    const nodes = res.diagram.nodes;
+    expect(nodes.find(n => n.id === 'A')?.shape).toBe('card');
+    expect(nodes.find(n => n.id === 'B')?.shape).toBe('file');
+    expect(nodes.find(n => n.id === 'C')?.shape).toBe('database');
+    expect(nodes.find(n => n.id === 'D')?.shape).toBe('manualInput');
+    expect(nodes.find(n => n.id === 'E')?.shape).toBe('manualInput');
+    expect(nodes.find(n => n.id === 'F')?.shape).toBe('documents');
+    expect(nodes.find(n => n.id === 'G')?.shape).toBe('multiProcess');
+    expect(nodes.find(n => n.id === 'H')?.shape).toBe('multiProcess');
+  });
+
+  test('Escaping and delimiters in metadata labels', () => {
+    const res = importMermaidFlowchart(`graph TD
+      A@{ shape: doc, label: "Apostrophe's and double \\"quotes\\", colons: , commas, brackets [] braces {}" }
+      B@{ shape: cloud, label: "Unicode: éàçü" }
+    `);
+    const nodes = res.diagram.nodes;
+    expect(nodes.find(n => n.id === 'A')?.label).toBe('Apostrophe\'s and double "quotes", colons: , commas, brackets [] braces {}');
+    expect(nodes.find(n => n.id === 'B')?.label).toBe('Unicode: éàçü');
   });
 });
 

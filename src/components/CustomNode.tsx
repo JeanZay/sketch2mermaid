@@ -4,6 +4,7 @@ import { useDiagramStore } from '../store/diagramStore';
 import type { NodeShape } from '../core/types';
 import { NODE_SIZE_DEFAULTS } from '../core/nodeSizeConfig';
 import { computeNodeFontSize } from '../core/nodeText';
+import { NodeShapeRenderer } from './nodeShapes/NodeShapeRenderer';
 
 export const CustomNode = ({ id, selected, data }: NodeProps) => {
   const label = (data.label as string) || '';
@@ -135,103 +136,51 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
     </>
   );
 
-  if (shape === 'decision') {
-    return (
-      <div className={`decision-wrapper s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
-        {renderResizer()}
-        <div className="decision-bg"></div>
-        <div className="decision-text">{renderInner()}</div>
-        {renderHandles()}
-      </div>
-    );
-  }
+  let wrapperClass = `${shape}-wrapper`;
+  if (shape === 'event') wrapperClass = 'event-circle';
+  if (shape === 'endEvent') wrapperClass = 'end-event-circle-outer';
+  if (shape === 'process') wrapperClass = 'custom-node shape-process';
+  if (shape === 'rounded') wrapperClass = 'custom-node shape-rounded';
+  if (shape === 'stadium') wrapperClass = 'custom-node shape-stadium';
 
-  if (shape === 'event') {
-    return (
-      <div className={`event-circle s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
-        {renderResizer()}
-        <div className="event-inner">{renderInner()}</div>
-        {renderHandles()}
-      </div>
-    );
-  }
+  const isLegacyShape = [
+    'process',
+    'rounded',
+    'stadium',
+    'decision',
+    'event',
+    'endEvent',
+    'database',
+    'file',
+    'subroutine',
+    'hexagon',
+    'parallelogram',
+    'parallelogramAlt',
+    'trapezoid',
+    'trapezoidAlt',
+    'asymmetric',
+    'documents',
+  ].includes(shape);
 
-  if (shape === 'endEvent') {
-    return (
-      <div className={`end-event-circle-outer s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
-        {renderResizer()}
-        <div className="end-event-circle-inner">
-          <div className="event-inner">{renderInner()}</div>
-        </div>
-        {renderHandles()}
-      </div>
-    );
+  if (!isLegacyShape) {
+    wrapperClass = `new-shape-node-wrapper shape-${shape}-node`;
   }
-
-  if (shape === 'database') {
-    return (
-      <div className={`database-wrapper s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
-        {renderResizer()}
-        <div className="database-text">{renderInner()}</div>
-        {renderHandles()}
-      </div>
-    );
-  }
-
-  if (shape === 'file') {
-    return (
-      <div className={`file-wrapper s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
-        {renderResizer()}
-        {renderInner()}
-        {renderHandles()}
-      </div>
-    );
-  }
-
-  if (shape === 'subroutine') {
-    return (
-      <div className={`subroutine-wrapper s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
-        {renderResizer()}
-        {renderInner()}
-        {renderHandles()}
-      </div>
-    );
-  }
-
-  if (['hexagon', 'parallelogram', 'parallelogramAlt', 'trapezoid', 'trapezoidAlt', 'asymmetric'].includes(shape)) {
-    return (
-      <div className={`${shape}-wrapper s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
-        {renderResizer()}
-        <div className={`${shape}-bg`}></div>
-        <div className={`${shape}-text`}>{renderInner()}</div>
-        {renderHandles()}
-      </div>
-    );
-  }
-
-  if (shape === 'documents') {
-    return (
-      <div className={`documents-wrapper s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
-        {renderResizer()}
-        <div className="documents-bg-back"></div>
-        <div className="documents-bg-middle"></div>
-        <div className="documents-front">
-          {renderInner()}
-        </div>
-        {renderHandles()}
-      </div>
-    );
-  }
-
-  // process, rounded, stadium
-  let shapeClass = 'shape-process';
-  if (shape === 'rounded') shapeClass = 'shape-rounded';
-  if (shape === 'stadium') shapeClass = 'shape-stadium';
 
   return (
-    <div className={`custom-node ${shapeClass} s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`} style={shapeStyle}>
+    <div
+      className={`${wrapperClass} s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`}
+      style={shapeStyle}
+    >
       {renderResizer()}
-      {renderInner()}
+      <NodeShapeRenderer
+        shape={shape}
+        width={width}
+        height={height}
+        selected={selected}
+        hovered={false}
+      >
+        {renderInner()}
+      </NodeShapeRenderer>
       {renderHandles()}
     </div>
   );

@@ -1,5 +1,6 @@
 import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, EdgeDirection, DiagramDirection, NodeStyle } from './types';
 import { NODE_SIZE_DEFAULTS } from './nodeSizeConfig';
+import { findDefinitionByMermaidName } from './shapeRegistry';
 import { layoutImportedDiagram } from './layout/mermaidLayout';
 
 export type MermaidImportWarningType =
@@ -741,10 +742,72 @@ const CLASSIC_BRACKETS: ClassicBracketConfig[] = [
   { open: '>', close: ']', shape: 'asymmetric' },
 ];
 
+function parseMetadataPayloadProperties(payload: string): { shape?: string; label?: string } {
+  let shape: string | undefined;
+  let label: string | undefined;
+
+  let idx = 0;
+  while (idx < payload.length) {
+    while (idx < payload.length && (/\s/.test(payload[idx]) || payload[idx] === ',')) {
+      idx++;
+    }
+    if (idx >= payload.length) break;
+
+    let key = '';
+    while (idx < payload.length && /[a-zA-Z0-9_-]/.test(payload[idx])) {
+      key += payload[idx];
+      idx++;
+    }
+
+    while (idx < payload.length && /\s/.test(payload[idx])) idx++;
+    if (payload[idx] !== ':') {
+      idx++;
+      continue;
+    }
+    idx++;
+    while (idx < payload.length && /\s/.test(payload[idx])) idx++;
+
+    if (idx < payload.length && payload[idx] === '"') {
+      idx++;
+      let val = '';
+      while (idx < payload.length && payload[idx] !== '"') {
+        if (payload[idx] === '\\') {
+          if (idx + 1 < payload.length) {
+            val += payload[idx + 1];
+            idx += 2;
+          } else {
+            val += '\\';
+            idx++;
+          }
+        } else {
+          val += payload[idx];
+          idx++;
+        }
+      }
+      if (idx < payload.length && payload[idx] === '"') {
+        idx++;
+      }
+      if (key === 'label') {
+        label = val;
+      }
+    } else {
+      let val = '';
+      while (idx < payload.length && /[a-zA-Z0-9_-]/.test(payload[idx])) {
+        val += payload[idx];
+        idx++;
+      }
+      if (key === 'shape') {
+        shape = val;
+      }
+    }
+  }
+
+  return { shape, label };
+}
+
 function scanNodeRef(s: string, start: number, lineIndex: number, warnings: MermaidImportWarning[]): { node: ParsedNode; nextIndex: number } | null {
   let idx = start;
   
-  // Consume ID: alphanumeric, underscore, hyphen, dot
   let id = '';
   while (idx < s.length && /[a-zA-Z0-9_.-]/.test(s[idx])) {
     id += s[idx];
@@ -753,82 +816,19 @@ function scanNodeRef(s: string, start: number, lineIndex: number, warnings: Merm
 
   if (!id) return null;
 
-  // Skip spacing
   while (idx < s.length && /\s/.test(s[idx])) idx++;
 
-  // Check 11.3+ shape syntax: @{ shape: hex, label: "Text" }
-  if (idx < s.length - 1 && s[idx] === '@' && s[idx + 1] === '{') {
-    idx += 2; // skip @{
-    let payload = '';
-    while (idx < s.length && s[idx] !== '}') {
-      payload += s[idx];
-      idx++;
-    }
-    if (idx < s.length && s[idx] === '}') {
-      idx++; // skip }
-    } else {
-      return null; // unclosed @{}
-    }
+  let classicShape: NodeShape | undefined;
+  let classicLabel: string | undefined;
 
-    // Parse shape: \w+
-    const shapeMatch = payload.match(/shape\s*:\s*([a-zA-Z0-9_-]+)/);
-    const labelMatch = payload.match(/label\s*:\s*"([^"]*)"/);
-
-    const mShape = shapeMatch ? shapeMatch[1] : 'rect';
-    const label = labelMatch ? labelMatch[1] : undefined;
-
-    // Map 11.3+ shape
-    let shape: NodeShape;
-    let isUnsupported = false;
-
-    switch (mShape) {
-      case 'rect': shape = 'process'; break;
-      case 'rounded': shape = 'rounded'; break;
-      case 'stadium': shape = 'stadium'; break;
-      case 'diamond': shape = 'decision'; break;
-      case 'circle': shape = 'event'; break;
-      case 'dbl-circ': shape = 'endEvent'; break;
-      case 'cyl': shape = 'database'; break;
-      case 'doc': shape = 'file'; break;
-      case 'docs': shape = 'documents'; break;
-      case 'subproc': shape = 'subroutine'; break;
-      case 'hex': shape = 'hexagon'; break;
-      case 'lean-r': shape = 'parallelogram'; break;
-      case 'lean-l': shape = 'parallelogramAlt'; break;
-      case 'trap-b': shape = 'trapezoid'; break;
-      case 'trap-t': shape = 'trapezoidAlt'; break;
-      default:
-        shape = 'process';
-        isUnsupported = true;
-        break;
-    }
-
-    if (isUnsupported) {
-      warnings.push({
-        type: 'unsupportedShape',
-        line: lineIndex,
-        message: `Forme non supportée "${mShape}" sur le nœud "${id}". Remplacée par "process".`,
-        raw: mShape,
-      });
-    }
-
-    return {
-      node: { id, shape, label, line: lineIndex },
-      nextIndex: idx
-    };
-  }
-
-  // Check classic shapes
   for (const config of CLASSIC_BRACKETS) {
     const openLen = config.open.length;
     if (s.substring(idx, idx + openLen) === config.open) {
       idx += openLen;
 
-      // Scan label content
       let label = '';
       let labelSanityCheckIndex = idx;
       
-      // If label starts with quote
       if (s[labelSanityCheckIndex] === '"') {
         labelSanityCheckIndex++;
         while (labelSanityCheckIndex < s.length && s[labelSanityCheckIndex] !== '"') {
@@ -845,12 +845,8 @@ function scanNodeRef(s: string, start: number, lineIndex: number, warnings: Merm
         }
         idx = labelSanityCheckIndex;
       } else {
-        // Unquoted: scan until closing bracket sequence
-        // We need to look ahead for the exact closing sequence
-        // For trapezoids, the closing sequences might differ
         let actualClose = config.close;
         if (config.open === '[/') {
-          // Check if ending with \] or /]
           const slashEnd = s.indexOf('/]', idx);
           const backslashEnd = s.indexOf('\\]', idx);
           if (slashEnd !== -1 && (backslashEnd === -1 || slashEnd < backslashEnd)) {
@@ -870,13 +866,12 @@ function scanNodeRef(s: string, start: number, lineIndex: number, warnings: Merm
 
         const closeIdx = s.indexOf(actualClose, idx);
         if (closeIdx === -1) {
-          return null; // unclosed bracket
+          return null;
         }
         label = s.substring(idx, closeIdx);
         idx = closeIdx;
       }
 
-      // Check closing bracket match
       let actualClose = config.close;
       let finalShape = config.shape;
 
@@ -899,24 +894,102 @@ function scanNodeRef(s: string, start: number, lineIndex: number, warnings: Merm
       }
 
       if (s.substring(idx, idx + actualClose.length) !== actualClose) {
-        return null; // mismatch
+        return null;
       }
 
       idx += actualClose.length;
+      classicShape = finalShape;
+      classicLabel = label;
+      break;
+    }
+  }
 
+  while (idx < s.length && /\s/.test(s[idx])) idx++;
+
+  let metadataShapeName: string | undefined;
+  let metadataLabel: string | undefined;
+  let hasMetadata = false;
+
+  if (idx < s.length - 1 && s[idx] === '@' && s[idx + 1] === '{') {
+    idx += 2;
+    hasMetadata = true;
+    let payload = '';
+    let inQuotes = false;
+    while (idx < s.length) {
+      const char = s[idx];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+        payload += char;
+        idx++;
+      } else if (char === '\\' && inQuotes) {
+        payload += char;
+        if (idx + 1 < s.length) {
+          payload += s[idx + 1];
+          idx += 2;
+        } else {
+          idx++;
+        }
+      } else if (char === '}' && !inQuotes) {
+        idx++;
+        break;
+      } else {
+        payload += char;
+        idx++;
+      }
+    }
+
+    const props = parseMetadataPayloadProperties(payload);
+    metadataShapeName = props.shape;
+    metadataLabel = props.label;
+  }
+
+  let finalShape: NodeShape;
+  let finalLabel: string | undefined;
+
+  if (hasMetadata) {
+    let resolvedShape: NodeShape;
+    if (metadataShapeName) {
+      const def = findDefinitionByMermaidName(metadataShapeName);
+      if (def) {
+        resolvedShape = def.nodeShape;
+      } else {
+        warnings.push({
+          type: 'unsupportedShape',
+          line: lineIndex,
+          message: `Forme non supportée "${metadataShapeName}" sur le nœud "${id}". Remplacée par "process".`,
+          raw: metadataShapeName,
+        });
+        resolvedShape = 'process';
+      }
+    } else {
+      resolvedShape = classicShape || 'process';
+    }
+    finalShape = resolvedShape;
+
+    if (metadataLabel !== undefined) {
+      finalLabel = metadataLabel;
+    } else {
+      finalLabel = classicLabel;
+    }
+  } else {
+    if (classicShape) {
+      finalShape = classicShape;
+      finalLabel = classicLabel;
+    } else {
       return {
-        node: { id, shape: finalShape, label, line: lineIndex },
+        node: { id, line: lineIndex },
         nextIndex: idx
       };
     }
   }
 
-  // Node reference without shape definition
   return {
-    node: { id, line: lineIndex },
+    node: { id, shape: finalShape, label: finalLabel, line: lineIndex },
     nextIndex: idx
   };
 }
+
+
 
 // Character-by-character scanner for edges
 function scanEdgeRef(s: string, start: number): { edge: ParsedEdge; nextIndex: number } | null {

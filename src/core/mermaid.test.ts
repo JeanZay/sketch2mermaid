@@ -580,4 +580,23 @@ describe('Mermaid Node Styling tests', () => {
     expect(output).toContain('n1 <-.- n2');
     expect(output).toContain('n1 <-.-|Trimmed Label| n2'.replace('Trimmed Label', '"Label"'));
   });
+
+  test('Export of all new generic shapes and label escaping', () => {
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        { id: 'n1', label: 'Bang label', shape: 'bang', position: { x: 0, y: 0 } },
+        { id: 'n2', label: 'Card : "quoted" & commas , colons :', shape: 'card', position: { x: 0, y: 100 } },
+        { id: 'n3', label: 'Cloud \\ slash / braces { }', shape: 'cloud', position: { x: 0, y: 200 } }
+      ],
+      edges: [],
+      textBoxes: []
+    };
+    const output = toMermaid(diagram);
+    expect(output).toContain('n1@{ shape: bang, label: "Bang label" }');
+    expect(output).toContain('n2@{ shape: notch-rect, label: "Card : #quot;quoted#quot; &amp; commas , colons :" }');
+    expect(output).toContain('n3@{ shape: cloud, label: "Cloud \\\\ slash / braces { }" }');
+  });
 });

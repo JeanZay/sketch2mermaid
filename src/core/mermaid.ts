@@ -1,5 +1,6 @@
 import type { CanonicalDiagram, MermaidExportFormat, DiagramNode, EdgeStyle, EdgeDirection, ConnectedEdgeEndpoint } from './types';
 import { isExportableEdge } from './types';
+import { findDefinitionByShape } from './shapeRegistry';
 
 /**
  * Helper to sort IDs numerically by their numeric suffix (e.g., n1, n2, n10).
@@ -119,43 +120,13 @@ export function toMermaid(diagram: CanonicalDiagram): string {
       finalLabel = `\`${markdownLabel}\``;
     }
 
-    if (node.shape === 'file' || node.shape === 'documents') {
-      const shapeName = node.shape === 'file' ? 'doc' : 'docs';
-      lines.push(`  ${node.id}@{ shape: ${shapeName}, label: "${finalLabel}" }`);
-    } else {
-      let open = '[';
-      let close = ']';
-      switch (node.shape) {
-        case 'process':
-          open = '['; close = ']'; break;
-        case 'rounded':
-          open = '('; close = ')'; break;
-        case 'stadium':
-          open = '(['; close = '])'; break;
-        case 'decision':
-          open = '{'; close = '}'; break;
-        case 'event':
-          open = '(('; close = '))'; break;
-        case 'endEvent':
-          open = '((('; close = ')))'; break;
-        case 'database':
-          open = '[('; close = ')]'; break;
-        case 'subroutine':
-          open = '[['; close = ']]'; break;
-        case 'hexagon':
-          open = '{{'; close = '}}'; break;
-        case 'parallelogram':
-          open = '[/'; close = '/]'; break;
-        case 'parallelogramAlt':
-          open = '[\\'; close = '\\' + ']'; break;
-        case 'trapezoid':
-          open = '[/'; close = '\\' + ']'; break;
-        case 'trapezoidAlt':
-          open = '[\\'; close = '/]'; break;
-        case 'asymmetric':
-          open = '>'; close = ']'; break;
-      }
+    const definition = findDefinitionByShape(node.shape);
+    if (definition?.legacySyntax) {
+      const { open, close } = definition.legacySyntax;
       lines.push(`  ${node.id}${open}"${finalLabel}"${close}`);
+    } else {
+      const shapeName = definition?.mermaidShape || 'rect';
+      lines.push(`  ${node.id}@{ shape: ${shapeName}, label: "${finalLabel}" }`);
     }
   }
 

@@ -20,7 +20,7 @@
  * A>Label]                            -> asymmetric
  * A@{ shape: docs, label: "Label" }     -> documents
  */
-export type NodeShape = 'process' | 'rounded' | 'stadium' | 'decision' | 'event' | 'endEvent' | 'database' | 'file' | 'subroutine' | 'hexagon' | 'parallelogram' | 'parallelogramAlt' | 'trapezoid' | 'trapezoidAlt' | 'asymmetric' | 'documents';
+export type NodeShape = 'process' | 'rounded' | 'stadium' | 'decision' | 'event' | 'endEvent' | 'database' | 'file' | 'subroutine' | 'hexagon' | 'parallelogram' | 'parallelogramAlt' | 'trapezoid' | 'trapezoidAlt' | 'asymmetric' | 'documents' | 'bang' | 'card' | 'cloud' | 'collate' | 'comLink' | 'comment' | 'commentRight' | 'commentBoth' | 'dataStore' | 'delay' | 'directAccessStorage' | 'diskStorage' | 'display' | 'dividedProcess' | 'extract' | 'forkJoin' | 'internalStorage' | 'junction' | 'linedDocument' | 'loopLimit' | 'manualFile' | 'manualInput' | 'multiProcess' | 'paperTape' | 'storedData' | 'summary' | 'taggedDocument' | 'taggedProcess' | 'textBlock' | 'odd';
 export type EdgeStyle = 'solid' | 'dotted';
 export type EdgeDirection = 'directed' | 'undirected' | 'bidirectional' | 'reverse';
 export type DiagramDirection = 'TD' | 'LR' | 'BT' | 'RL';

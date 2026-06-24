@@ -2,7 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { useNodes, useEdges, useReactFlow } from '@xyflow/react';
 import { useDiagramStore, DEFAULT_NODE_TEXT_STYLE, DEFAULT_EDGE_TEXT_STYLE, DEFAULT_TEXT_BOX_STYLE } from '../store/diagramStore';
 import type { TextStyle, TextBoxStyle } from '../core/types';
-import { SHAPE_CONFIGS } from './shapeConfig';
+import { SHAPE_DEFINITIONS } from '../core/shapeRegistry';
+import { SHAPE_ICONS } from './shapeIcons';
 import { FontSizeControl } from './properties/FontSizeControl';
 import { ConfirmModal } from './ConfirmModal';
 import { useVirtualEdgeAnchors } from '../hooks/useVirtualEdgeAnchors';
@@ -334,7 +335,6 @@ export const PropertiesPanel = () => {
       updateNodeStyle(selectedNode.id, updates);
     };
 
-    const shapes = SHAPE_CONFIGS;
 
     return (
       <>
@@ -497,20 +497,41 @@ export const PropertiesPanel = () => {
 
           <div className="property-group">
             <label className="property-label">Shape</label>
-            <div className="shape-grid">
-              {shapes.map((s) => (
-                <button
-                  key={s.type}
-                  className={`shape-select-btn ${nodeData.shape === s.type ? 'active' : ''}`}
-                  onClick={() => updateNodeShape(selectedNode.id, s.type)}
-                  title={s.label}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    {s.svg}
-                  </svg>
-                  <span className="shape-select-btn-text">{s.label}</span>
-                </button>
-              ))}
+            <div className="properties-shape-selector" style={{ maxHeight: '250px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '6px' }}>
+              {[
+                { key: 'basic', label: 'Basic' },
+                { key: 'data', label: 'Data / Storage' },
+                { key: 'document', label: 'Documents' },
+                { key: 'event', label: 'Events / Control' },
+                { key: 'comment', label: 'Comments' },
+                { key: 'advanced', label: 'Advanced' },
+              ].map((cat) => {
+                const catShapes = SHAPE_DEFINITIONS.filter((def) => def.category === cat.key);
+                return (
+                  <div key={cat.key} className="properties-shape-cat-section" style={{ marginBottom: '8px' }}>
+                    <div className="properties-shape-cat-header" style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                      {cat.label}
+                    </div>
+                    <div className="shape-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                      {catShapes.map((s) => {
+                        const icon = SHAPE_ICONS[s.iconKey];
+                        return (
+                          <button
+                            key={s.nodeShape}
+                            className={`shape-select-btn ${nodeData.shape === s.nodeShape ? 'active' : ''}`}
+                            onClick={() => updateNodeShape(selectedNode.id, s.nodeShape)}
+                            title={`${s.uiLabel} (shape: ${s.mermaidShape})`}
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              {icon}
+                            </svg>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

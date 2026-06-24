@@ -787,4 +787,33 @@ describe('store integration — export/import round-trip', () => {
       expect(res.diagram.edges[0].direction).toBe('directed');
     }
   });
+
+  it('preserves all new shapes on .s2m round-trip serialization', () => {
+    const raw = {
+      fileType: S2M_FILE_TYPE,
+      fileVersion: S2M_FILE_VERSION,
+      appVersion: APP_VERSION,
+      exportedAt: new Date().toISOString(),
+      diagram: {
+        schemaVersion: 1,
+        diagramType: 'flowchart',
+        direction: 'TD',
+        nodes: [
+          { id: 'n1', label: 'Bang', shape: 'bang', position: { x: 0, y: 0 } },
+          { id: 'n2', label: 'Card', shape: 'card', position: { x: 0, y: 100 } },
+          { id: 'n3', label: 'Cloud', shape: 'cloud', position: { x: 0, y: 200 } }
+        ],
+        edges: [],
+        textBoxes: []
+      }
+    };
+    const serialized = serializeSketch2MermaidFile(raw.diagram);
+    const parsed = parseSketch2MermaidFile(serialized);
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      expect(parsed.diagram.nodes.find(n => n.id === 'n1')?.shape).toBe('bang');
+      expect(parsed.diagram.nodes.find(n => n.id === 'n2')?.shape).toBe('card');
+      expect(parsed.diagram.nodes.find(n => n.id === 'n3')?.shape).toBe('cloud');
+    }
+  });
 });
