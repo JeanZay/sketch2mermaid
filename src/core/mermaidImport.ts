@@ -609,10 +609,6 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
       edge.sourceHandle = handlePair.sourceHandle;
       edge.targetHandle = handlePair.targetHandle;
     }
-    const labelPos = layoutResult.edgeLabelPositions?.get(edge.id);
-    if (labelPos) {
-      edge.labelPosition = labelPos;
-    }
   }
 
   // Deduplicate warnings by: type + line + raw + message
