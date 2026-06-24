@@ -155,4 +155,29 @@ describe('Mermaid empirical SVG rendering verification under strict security', (
     const errorNode = doc.querySelector('.error-icon, .error-text, #error-div');
     expect(errorNode).toBeNull();
   });
+
+  test('Compilation of solid/dotted reverse edges with/without labels', async () => {
+    const code = [
+      'flowchart TD',
+      '  A <--- B',
+      '  C <---|Label 1| D',
+      '  E <-.- F',
+      '  G <-.-|Label 2| H',
+    ].join('\n');
+    
+    const renderId = `reverse-edges-compile-test-${Math.floor(Math.random() * 100000)}`;
+    const { svg } = await mermaid.render(renderId, code);
+    
+    expect(svg).toBeDefined();
+    expect(svg.length).toBeGreaterThan(0);
+    
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svg, 'image/svg+xml');
+    
+    const errorNode = doc.querySelector('.error-icon, .error-text, #error-div');
+    expect(errorNode).toBeNull();
+  });
 });
+
+
+

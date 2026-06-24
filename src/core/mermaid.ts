@@ -83,10 +83,12 @@ export function getMermaidEdgeOperator(style: EdgeStyle, direction: EdgeDirectio
   if (style === 'dotted') {
     if (direction === 'undirected') return '-.-';
     if (direction === 'bidirectional') return '<-.->';
+    if (direction === 'reverse') return '<-.-';
     return '-.->';
   }
   if (direction === 'undirected') return '---';
   if (direction === 'bidirectional') return '<-->';
+  if (direction === 'reverse') return '<---';
   return '-->';
 }
 

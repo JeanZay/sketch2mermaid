@@ -998,14 +998,19 @@ function scanEdgeRef(s: string, start: number): { edge: ParsedEdge; nextIndex: n
   // 4. Simple Operators (with optional pipe labels)
   const simpleOperators: { op: string; style: EdgeStyle; direction: EdgeDirection; unsupported: boolean }[] = [
     { op: '<-.->', style: 'dotted', direction: 'bidirectional', unsupported: false },
-    { op: '-.->', style: 'dotted', direction: 'directed', unsupported: false },
-    { op: '-.-', style: 'dotted', direction: 'undirected', unsupported: false },
+    { op: '<-.-', style: 'dotted', direction: 'reverse', unsupported: false },
+    { op: '<---', style: 'solid', direction: 'reverse', unsupported: false },
     { op: '<-->', style: 'solid', direction: 'bidirectional', unsupported: false },
+    { op: '-.->', style: 'dotted', direction: 'directed', unsupported: false },
+    { op: '<-.', style: 'dotted', direction: 'reverse', unsupported: false }, // backup parser support
+    { op: '<--', style: 'solid', direction: 'reverse', unsupported: false },   // backup parser support
+    { op: '-.-', style: 'dotted', direction: 'undirected', unsupported: false },
     { op: '==>', style: 'solid', direction: 'directed', unsupported: true },
     { op: '===', style: 'solid', direction: 'directed', unsupported: true },
     { op: '-->', style: 'solid', direction: 'directed', unsupported: false },
     { op: '---', style: 'solid', direction: 'undirected', unsupported: false },
   ];
+
 
   for (const item of simpleOperators) {
     if (matchPrefix(item.op)) {

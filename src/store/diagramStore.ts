@@ -110,7 +110,7 @@ function normalizeDimension(value: unknown, fallback: number, min: number): numb
 }
 
 export const normalizeEdgeDirection = (direction: unknown): EdgeDirection =>
-  direction === 'undirected' || direction === 'bidirectional' || direction === 'directed'
+  direction === 'undirected' || direction === 'bidirectional' || direction === 'directed' || direction === 'reverse'
     ? direction
     : 'directed';
 

@@ -55,7 +55,20 @@ function makeTestDiagram(): CanonicalDiagram {
         sourceHandle: null,
         targetHandle: null,
       },
+      {
+        id: 'e2',
+        from: { kind: 'connected', nodeId: 'n1', handleId: null },
+        to: { kind: 'connected', nodeId: 'n2', handleId: null },
+        connectionStatus: 'connected',
+        exportMode: 'mermaid',
+        label: 'No',
+        style: 'dotted',
+        direction: 'reverse',
+        sourceHandle: null,
+        targetHandle: null,
+      },
     ],
+
     textBoxes: [
       {
         id: 'tb1',

@@ -549,7 +549,38 @@ describe('Mermaid Flowchart Import Tests', () => {
       expect(res.diagram.edges[0]).toMatchObject({ style: 'dotted', direction: 'bidirectional', label: '' });
     });
 
-    test('all 6 operators with pipe labels', () => {
+    test('reverse solid canonical: A <--- B', () => {
+      const res = importMermaidFlowchart('flowchart TD\n  A <--- B');
+      expect(res.diagram.edges).toHaveLength(1);
+      expect(res.diagram.edges[0]).toMatchObject({ style: 'solid', direction: 'reverse', label: '' });
+    });
+
+    test('reverse dotted canonical: A <-.- B', () => {
+      const res = importMermaidFlowchart('flowchart TD\n  A <-.- B');
+      expect(res.diagram.edges).toHaveLength(1);
+      expect(res.diagram.edges[0]).toMatchObject({ style: 'dotted', direction: 'reverse', label: '' });
+    });
+
+    test('reverse solid backup alias: A <-- B', () => {
+      const res = importMermaidFlowchart('flowchart TD\n  A <-- B');
+      expect(res.diagram.edges).toHaveLength(1);
+      expect(res.diagram.edges[0]).toMatchObject({ style: 'solid', direction: 'reverse', label: '' });
+    });
+
+    test('reverse dotted backup alias: A <-. B', () => {
+      const res = importMermaidFlowchart('flowchart TD\n  A <-. B');
+      expect(res.diagram.edges).toHaveLength(1);
+      expect(res.diagram.edges[0]).toMatchObject({ style: 'dotted', direction: 'reverse', label: '' });
+    });
+
+    test('precedence: bidirectional edges are not misparsed as reverse', () => {
+      const res = importMermaidFlowchart('flowchart TD\n  A <--> B\n  C <-.-> D');
+      expect(res.diagram.edges).toHaveLength(2);
+      expect(res.diagram.edges[0]).toMatchObject({ style: 'solid', direction: 'bidirectional' });
+      expect(res.diagram.edges[1]).toMatchObject({ style: 'dotted', direction: 'bidirectional' });
+    });
+
+    test('all 8 operators with pipe labels', () => {
       const res = importMermaidFlowchart([
         'flowchart TD',
         '  A1 -->|"L1"| B1',
@@ -558,14 +589,18 @@ describe('Mermaid Flowchart Import Tests', () => {
         '  A4 -.->|"L4"| B4',
         '  A5 -.-|"L5"| B5',
         '  A6 <-.->|"L6"| B6',
+        '  A7 <---|"L7"| B7',
+        '  A8 <-.-|"L8"| B8',
       ].join('\n'));
-      expect(res.diagram.edges).toHaveLength(6);
+      expect(res.diagram.edges).toHaveLength(8);
       expect(res.diagram.edges[0]).toMatchObject({ style: 'solid', direction: 'directed', label: 'L1' });
       expect(res.diagram.edges[1]).toMatchObject({ style: 'solid', direction: 'undirected', label: 'L2' });
       expect(res.diagram.edges[2]).toMatchObject({ style: 'solid', direction: 'bidirectional', label: 'L3' });
       expect(res.diagram.edges[3]).toMatchObject({ style: 'dotted', direction: 'directed', label: 'L4' });
       expect(res.diagram.edges[4]).toMatchObject({ style: 'dotted', direction: 'undirected', label: 'L5' });
       expect(res.diagram.edges[5]).toMatchObject({ style: 'dotted', direction: 'bidirectional', label: 'L6' });
+      expect(res.diagram.edges[6]).toMatchObject({ style: 'solid', direction: 'reverse', label: 'L7' });
+      expect(res.diagram.edges[7]).toMatchObject({ style: 'dotted', direction: 'reverse', label: 'L8' });
     });
 
     test('inline text labels preserve direction', () => {
@@ -588,6 +623,10 @@ describe('Mermaid Flowchart Import Tests', () => {
       '  C <--> D',
       '  E -.- F',
       '  G <-.-> H',
+      '  I <--- J',
+      '  K <-.- L',
+      '  M <--|"Tolerant solid"| N',
+      '  O <-.|"Tolerant dotted"| P',
     ].join('\n');
 
     const imported = importMermaidFlowchart(code);
@@ -597,17 +636,27 @@ describe('Mermaid Flowchart Import Tests', () => {
 
     // Verify direction survived normalization
     const edges = normalized.edges;
-    expect(edges).toHaveLength(4);
+    expect(edges).toHaveLength(8);
     expect(edges[0]).toMatchObject({ from: { kind: 'connected', nodeId: 'A' }, to: { kind: 'connected', nodeId: 'B' }, style: 'solid', direction: 'undirected' });
     expect(edges[1]).toMatchObject({ from: { kind: 'connected', nodeId: 'C' }, to: { kind: 'connected', nodeId: 'D' }, style: 'solid', direction: 'bidirectional' });
     expect(edges[2]).toMatchObject({ from: { kind: 'connected', nodeId: 'E' }, to: { kind: 'connected', nodeId: 'F' }, style: 'dotted', direction: 'undirected' });
     expect(edges[3]).toMatchObject({ from: { kind: 'connected', nodeId: 'G' }, to: { kind: 'connected', nodeId: 'H' }, style: 'dotted', direction: 'bidirectional' });
+    expect(edges[4]).toMatchObject({ from: { kind: 'connected', nodeId: 'I' }, to: { kind: 'connected', nodeId: 'J' }, style: 'solid', direction: 'reverse' });
+    expect(edges[5]).toMatchObject({ from: { kind: 'connected', nodeId: 'K' }, to: { kind: 'connected', nodeId: 'L' }, style: 'dotted', direction: 'reverse' });
+    expect(edges[6]).toMatchObject({ from: { kind: 'connected', nodeId: 'M' }, to: { kind: 'connected', nodeId: 'N' }, style: 'solid', direction: 'reverse', label: 'Tolerant solid' });
+    expect(edges[7]).toMatchObject({ from: { kind: 'connected', nodeId: 'O' }, to: { kind: 'connected', nodeId: 'P' }, style: 'dotted', direction: 'reverse', label: 'Tolerant dotted' });
 
-    // Verify export round-trip
+    // Verify export round-trip and backup alias canonicalization
     const exported = toMermaid(normalized);
     expect(exported).toContain('A --- B');
     expect(exported).toContain('C <--> D');
     expect(exported).toContain('E -.- F');
     expect(exported).toContain('G <-.-> H');
+    expect(exported).toContain('I <--- J');
+    expect(exported).toContain('K <-.- L');
+    // Aliases <-- and <-. must be canonicalized to <--- and <-.- respectively:
+    expect(exported).toContain('M <---|Trimmed Label| N'.replace('Trimmed Label', '"Tolerant solid"'));
+    expect(exported).toContain('O <-.-|Trimmed Label| P'.replace('Trimmed Label', '"Tolerant dotted"'));
   });
 });
+

@@ -554,7 +554,11 @@ describe('Mermaid Node Styling tests', () => {
         { id: 'e9', from: 'n1', to: 'n2', label: '', style: 'dotted', direction: 'undirected' },
         { id: 'e10', from: 'n1', to: 'n2', label: 'Label', style: 'dotted', direction: 'undirected' },
         { id: 'e11', from: 'n1', to: 'n2', label: '', style: 'dotted', direction: 'bidirectional' },
-        { id: 'e12', from: 'n1', to: 'n2', label: 'Label', style: 'dotted', direction: 'bidirectional' }
+        { id: 'e12', from: 'n1', to: 'n2', label: 'Label', style: 'dotted', direction: 'bidirectional' },
+        { id: 'e13', from: 'n1', to: 'n2', label: '', style: 'solid', direction: 'reverse' },
+        { id: 'e14', from: 'n1', to: 'n2', label: 'Label', style: 'solid', direction: 'reverse' },
+        { id: 'e15', from: 'n1', to: 'n2', label: '', style: 'dotted', direction: 'reverse' },
+        { id: 'e16', from: 'n1', to: 'n2', label: 'Label', style: 'dotted', direction: 'reverse' }
       ],
       textBoxes: []
     };
@@ -571,5 +575,9 @@ describe('Mermaid Node Styling tests', () => {
     expect(output).toContain('n1 -.-|"Label"| n2');
     expect(output).toContain('n1 <-.-> n2');
     expect(output).toContain('n1 <-.->|"Label"| n2');
+    expect(output).toContain('n1 <--- n2');
+    expect(output).toContain('n1 <---|Trimmed Label| n2'.replace('Trimmed Label', '"Label"'));
+    expect(output).toContain('n1 <-.- n2');
+    expect(output).toContain('n1 <-.-|Trimmed Label| n2'.replace('Trimmed Label', '"Label"'));
   });
 });

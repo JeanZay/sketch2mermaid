@@ -684,7 +684,15 @@ export const PropertiesPanel = () => {
               >
                 A ↔ B
               </button>
+              <button
+                className={`segment-btn ${edgeData.direction === 'reverse' ? 'active' : ''}`}
+                onClick={() => updateEdgeDirection(selectedEdge.id, 'reverse')}
+                title="Inverse"
+              >
+                A ← B
+              </button>
             </div>
+
           </div>
 
           {edgeData.label && edgeData.label.trim().length > 0 && (

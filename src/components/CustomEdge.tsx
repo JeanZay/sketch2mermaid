@@ -110,8 +110,8 @@ export const CustomEdge = ({
   const markerEndId = `${reactId}-end`;
   const markerStartId = `${reactId}-start`;
 
-  const hasMarkerEnd = direction !== 'undirected';
-  const hasMarkerStart = direction === 'bidirectional';
+  const hasMarkerEnd = direction === 'directed' || direction === 'bidirectional';
+  const hasMarkerStart = direction === 'reverse' || direction === 'bidirectional';
 
   const textStyleObj = storeEdge ? { ...DEFAULT_EDGE_TEXT_STYLE, ...storeEdge.textStyle } : DEFAULT_EDGE_TEXT_STYLE;
   const edgeTextStyle: React.CSSProperties = {

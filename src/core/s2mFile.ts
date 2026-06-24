@@ -279,7 +279,7 @@ export function parseSketch2MermaidFile(raw: string): ParseResult {
       }
     }
 
-    if (edge.direction !== undefined && edge.direction !== 'directed' && edge.direction !== 'undirected' && edge.direction !== 'bidirectional') {
+    if (edge.direction !== undefined && edge.direction !== 'directed' && edge.direction !== 'undirected' && edge.direction !== 'bidirectional' && edge.direction !== 'reverse') {
       return { ok: false, error: `Edge "${edge.id as string}" has an invalid direction "${String(edge.direction)}".` };
     }
   }

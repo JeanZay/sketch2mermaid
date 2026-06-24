@@ -510,6 +510,9 @@ describe('Zustand diagram store tests', () => {
     
     store.updateEdgeDirection(edgeId, 'bidirectional');
     expect(useDiagramStore.getState().diagram.edges[0].direction).toBe('bidirectional');
+
+    store.updateEdgeDirection(edgeId, 'reverse');
+    expect(useDiagramStore.getState().diagram.edges[0].direction).toBe('reverse');
   });
 
   test('normalizeDiagram edge direction defensive fallback', () => {
@@ -526,7 +529,9 @@ describe('Zustand diagram store tests', () => {
         // @ts-expect-error - testing bad direction value
         { id: 'e1', from: 'n1', to: 'n2', label: '', style: 'solid', direction: 'banana' },
         // @ts-expect-error - testing missing direction field
-        { id: 'e2', from: 'n1', to: 'n2', label: '', style: 'dotted' }
+        { id: 'e2', from: 'n1', to: 'n2', label: '', style: 'dotted' },
+        // Testing that reverse is preserved correctly
+        { id: 'e3', from: 'n1', to: 'n2', label: '', style: 'solid', direction: 'reverse' }
       ],
       textBoxes: []
     };
@@ -535,7 +540,9 @@ describe('Zustand diagram store tests', () => {
     const edges = useDiagramStore.getState().diagram.edges;
     expect(edges[0].direction).toBe('directed');
     expect(edges[1].direction).toBe('directed');
+    expect(edges[2].direction).toBe('reverse');
   });
+
 
   test('normalizeDiagram is idempotent and preserves detached edges', () => {
     const raw = {
