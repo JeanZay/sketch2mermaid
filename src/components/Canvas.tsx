@@ -401,11 +401,25 @@ function FlowInner() {
     }
   }, [selectedEdgeIds]);
 
+  // Helper to normalize the handle ID to the correct type for the endpoint
+  const normalizeHandle = useCallback((endpoint: 'from' | 'to', handleId: string | null) => {
+    if (!handleId) return null;
+    const side = handleId.split('-')[0]; // 't', 'b', 'l', 'r'
+    if (endpoint === 'from') return `${side}-source`;
+    if (endpoint === 'to') return `${side}-target`;
+    return handleId;
+  }, []);
+
   // Handle edge connections and reconnection
   const onConnect = useCallback((connection: Connection) => {
     if (connection.source && connection.target) {
       const isSourceGhost = connection.source.startsWith('ghostAnchor__');
       const isTargetGhost = connection.target.startsWith('ghostAnchor__');
+
+      if (isSourceGhost && isTargetGhost) {
+        // Ghost-to-ghost connection is not supported; ignore to prevent phantom edges
+        return;
+      }
 
       if (isSourceGhost || isTargetGhost) {
         if (isSourceGhost && !isTargetGhost) {
@@ -416,7 +430,7 @@ function FlowInner() {
             edgeId,
             endpoint,
             nodeId: connection.target,
-            handleId: connection.targetHandle ?? null,
+            handleId: normalizeHandle(endpoint, connection.targetHandle ?? null),
           });
         } else if (!isSourceGhost && isTargetGhost) {
           const parts = connection.target.split('__');
@@ -426,7 +440,7 @@ function FlowInner() {
             edgeId,
             endpoint,
             nodeId: connection.source,
-            handleId: connection.sourceHandle ?? null,
+            handleId: normalizeHandle(endpoint, connection.sourceHandle ?? null),
           });
         }
       } else {
@@ -439,7 +453,7 @@ function FlowInner() {
         );
       }
     }
-  }, [addEdge, reconnectDetachedEdgeEndpoint]);
+  }, [addEdge, reconnectDetachedEdgeEndpoint, normalizeHandle]);
 
   // Double-clicking the background pane creates a new process node
   const onPaneDoubleClick = useCallback((event: React.MouseEvent) => {
