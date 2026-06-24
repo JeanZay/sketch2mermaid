@@ -14,6 +14,8 @@ import { useDiagramStore } from '../store/diagramStore';
 import CustomNode from './CustomNode';
 import CustomEdge from './CustomEdge';
 import TextBoxNode from './TextBoxNode';
+import { useVirtualEdgeAnchors } from '../hooks/useVirtualEdgeAnchors';
+import { VirtualAnchorsContext } from './VirtualAnchorsContext';
 
 const nodeTypes = {
   customNode: CustomNode,
@@ -41,6 +43,9 @@ function FlowInner() {
   const commitTransaction = useDiagramStore((state) => state.commitTransaction);
 
   const { screenToFlowPosition } = useReactFlow();
+
+  // Compute virtual anchor positions for edge distribution
+  const virtualAnchors = useVirtualEdgeAnchors();
 
   // Selection state — updated only from event handler callbacks (not effects)
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
@@ -252,54 +257,56 @@ function FlowInner() {
   }, [addNode, screenToFlowPosition]);
 
   return (
-    <div className="canvas-container" style={{ width: '100%', height: '100%' }}>
-      <ReactFlow
-        nodes={rfNodes}
-        edges={rfEdges}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onPaneDoubleClick={onPaneDoubleClick}
-        onNodeDragStart={startTransaction}
-        onNodeDragStop={commitTransaction}
-        onNodesDelete={(deletedNodes) => {
-          startTransaction();
-          for (const n of deletedNodes) {
-            const nType = nodeTypeById.get(n.id);
-            if (nType === 'textBox') {
-              deleteTextBox(n.id);
-            } else {
-              deleteNode(n.id);
+    <VirtualAnchorsContext.Provider value={virtualAnchors}>
+      <div className="canvas-container" style={{ width: '100%', height: '100%' }}>
+        <ReactFlow
+          nodes={rfNodes}
+          edges={rfEdges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onPaneDoubleClick={onPaneDoubleClick}
+          onNodeDragStart={startTransaction}
+          onNodeDragStop={commitTransaction}
+          onNodesDelete={(deletedNodes) => {
+            startTransaction();
+            for (const n of deletedNodes) {
+              const nType = nodeTypeById.get(n.id);
+              if (nType === 'textBox') {
+                deleteTextBox(n.id);
+              } else {
+                deleteNode(n.id);
+              }
             }
-          }
-          commitTransaction();
-        }}
-        onEdgesDelete={(edges) => {
-          startTransaction();
-          edges.forEach((e) => deleteEdge(e.id));
-          commitTransaction();
-        }}
-        deleteKeyCode={['Delete', 'Backspace']}
-        nodeDragThreshold={2}
-        defaultEdgeOptions={{ interactionWidth: 20 }}
-        connectionLineOptions={{
-          style: { stroke: '#4b5563', strokeWidth: 2 },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            width: 20,
-            height: 20,
-            color: '#4b5563',
-          },
-        }}
-        fitView
-      >
-        <Background color="#374151" gap={16} />
-        <Controls showInteractive={false} className="rf-controls" />
+            commitTransaction();
+          }}
+          onEdgesDelete={(edges) => {
+            startTransaction();
+            edges.forEach((e) => deleteEdge(e.id));
+            commitTransaction();
+          }}
+          deleteKeyCode={['Delete', 'Backspace']}
+          nodeDragThreshold={2}
+          defaultEdgeOptions={{ interactionWidth: 20 }}
+          connectionLineOptions={{
+            style: { stroke: '#4b5563', strokeWidth: 2 },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 20,
+              height: 20,
+              color: '#4b5563',
+            },
+          }}
+          fitView
+        >
+          <Background color="#374151" gap={16} />
+          <Controls showInteractive={false} className="rf-controls" />
 
-      </ReactFlow>
-    </div>
+        </ReactFlow>
+      </div>
+    </VirtualAnchorsContext.Provider>
   );
 }
 

@@ -1,6 +1,7 @@
 import React, { useState, useId } from 'react';
 import { EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
 import { useDiagramStore, DEFAULT_EDGE_TEXT_STYLE } from '../store/diagramStore';
+import { useVirtualAnchors } from './VirtualAnchorsContext';
 
 /**
  * Inline SVG arrow marker for edges.
@@ -42,11 +43,21 @@ export const CustomEdge = ({
   label,
   selected,
 }: EdgeProps) => {
+  // Virtual anchor coordinates for edge distribution
+  const virtualAnchors = useVirtualAnchors();
+  const anchor = virtualAnchors[id];
+
+  // Use virtual anchor coordinates when available, fall back to React Flow defaults
+  const startX = anchor?.sourceX ?? sourceX;
+  const startY = anchor?.sourceY ?? sourceY;
+  const endX = anchor?.targetX ?? targetX;
+  const endY = anchor?.targetY ?? targetY;
+
   const bezier = getBezierPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
+    sourceX: startX,
+    sourceY: startY,
+    targetX: endX,
+    targetY: endY,
     sourcePosition,
     targetPosition,
   });
