@@ -531,8 +531,9 @@ export const NodeShapeRenderer = ({
     case 'multiProcess':
       svgContent = (
         <>
-          <rect x="15" y="2" width="80" height="75" rx="4" fill="var(--node-bg-color, #ffffff)" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
-          <rect x="2" y="20" width="80" height="75" rx="4" fill="var(--node-bg-color, #ffffff)" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
+          <rect x="20" y="2" width="78" height="72" rx="4" fill="var(--node-bg-color, #ffffff)" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
+          <rect x="11" y="14" width="78" height="72" rx="4" fill="var(--node-bg-color, #ffffff)" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
+          <rect x="2" y="26" width="78" height="72" rx="4" fill="var(--node-bg-color, #ffffff)" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
         </>
       );
       break;
@@ -678,11 +679,11 @@ export const NodeShapeRenderer = ({
       <div
         className={`new-shape-label-wrapper`}
         style={{
-          position: ['documents', 'manualFile', 'forkJoin', 'asymmetric', 'odd', 'dividedProcess'].includes(shape) ? 'absolute' : 'relative',
-          left: shape === 'documents' ? '2%' : (shape === 'manualFile' ? '10%' : (shape === 'forkJoin' ? '50%' : (['asymmetric', 'odd'].includes(shape) ? '18%' : (shape === 'dividedProcess' ? '2%' : undefined)))),
-          top: shape === 'documents' ? '14%' : (shape === 'manualFile' ? '10%' : (shape === 'forkJoin' ? '50%' : (['asymmetric', 'odd'].includes(shape) ? '15%' : (shape === 'dividedProcess' ? '26.6%' : undefined)))),
-          width: shape === 'documents' ? '78%' : (shape === 'manualFile' ? '80%' : (shape === 'forkJoin' ? '150px' : (['asymmetric', 'odd'].includes(shape) ? '80%' : (shape === 'dividedProcess' ? '96%' : '100%')))),
-          height: shape === 'documents' ? '72%' : (shape === 'manualFile' ? '35%' : (shape === 'forkJoin' ? '40px' : (['asymmetric', 'odd'].includes(shape) ? '70%' : (shape === 'dividedProcess' ? '58.4%' : '100%')))),
+          position: ['documents', 'manualFile', 'forkJoin', 'asymmetric', 'odd', 'dividedProcess', 'multiProcess'].includes(shape) ? 'absolute' : 'relative',
+          left: shape === 'documents' ? '2%' : (shape === 'manualFile' ? '10%' : (shape === 'forkJoin' ? '50%' : (['asymmetric', 'odd'].includes(shape) ? '18%' : (shape === 'dividedProcess' ? '2%' : (shape === 'multiProcess' ? '2%' : undefined))))),
+          top: shape === 'documents' ? '14%' : (shape === 'manualFile' ? '10%' : (shape === 'forkJoin' ? '50%' : (['asymmetric', 'odd'].includes(shape) ? '15%' : (shape === 'dividedProcess' ? '26.6%' : (shape === 'multiProcess' ? '26%' : undefined))))),
+          width: shape === 'documents' ? '78%' : (shape === 'manualFile' ? '80%' : (shape === 'forkJoin' ? '150px' : (['asymmetric', 'odd'].includes(shape) ? '80%' : (shape === 'dividedProcess' ? '96%' : (shape === 'multiProcess' ? '78%' : '100%'))))),
+          height: shape === 'documents' ? '72%' : (shape === 'manualFile' ? '35%' : (shape === 'forkJoin' ? '40px' : (['asymmetric', 'odd'].includes(shape) ? '70%' : (shape === 'dividedProcess' ? '58.4%' : (shape === 'multiProcess' ? '72%' : '100%'))))),
           transform: shape === 'forkJoin' ? 'translate(-50%, -50%)' : undefined,
           zIndex: 1,
           padding: '4px 8px',
