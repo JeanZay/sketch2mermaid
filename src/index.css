@@ -1010,19 +1010,19 @@ body {
 
 /* Custom Edge styling */
 .edge-label-container {
-  background-color: #ffffff;
+  background-color: #eaeaea;
   padding: 3px 8px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  border: 1px solid transparent;
   cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, background-color 0.15s;
 }
 
-.edge-label-container:hover {
-  border-color: var(--accent-color);
+.edge-label-container:hover,
+.edge-label-container.selected {
+  border-color: #8b5cf6;
 }
 
 .edge-label-input {

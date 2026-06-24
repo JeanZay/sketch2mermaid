@@ -71,11 +71,11 @@ export const DEFAULT_NODE_TEXT_STYLE: import('../core/types').TextStyle = {
 };
 
 export const DEFAULT_EDGE_TEXT_STYLE: import('../core/types').TextStyle = {
-  fontSize: 14,
+  fontSize: 11,
   bold: false,
   italic: false,
   textAlign: 'center',
-  color: '#4b5563',
+  color: '#1a1b23',
 };
 
 export const DEFAULT_TEXT_BOX_STYLE: TextBoxStyle = {

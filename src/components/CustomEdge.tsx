@@ -135,7 +135,7 @@ export const CustomEdge = ({
       />
       <EdgeLabelRenderer>
         <div
-          className="edge-label-container"
+          className={`edge-label-container ${selected ? 'selected' : ''}`}
           style={{
             position: 'absolute',
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
