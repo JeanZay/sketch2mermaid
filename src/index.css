@@ -2160,6 +2160,17 @@ body {
   color: #e2e8f0;
 }
 
+.modal-btn--middle {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.modal-btn--middle:hover {
+  background: rgba(99, 102, 241, 0.25);
+  color: #c7d2fe;
+}
+
 .modal-btn--confirm {
   background: linear-gradient(135deg, #4f46e5, #6366f1);
   color: #fff;
@@ -2312,4 +2323,77 @@ body {
  * fix is a safety net, not a layout crutch. */
 .react-flow__edgelabel-renderer {
   z-index: 1001;
+}
+
+.status-info-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 4px;
+}
+
+.status-info-box--detached {
+  border-color: rgba(245, 158, 11, 0.2);
+  background: rgba(245, 158, 11, 0.02);
+}
+
+.status-info-box--canvas-only {
+  border-color: rgba(99, 102, 241, 0.2);
+  background: rgba(99, 102, 241, 0.02);
+}
+
+.status-info-box--connected {
+  border-color: rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.02);
+}
+
+.status-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.status-badge--detached {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.status-badge--canvas-only {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+}
+
+.status-badge--connected {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.status-desc {
+  font-size: 12px;
+  color: #e2e8f0;
+  margin: 4px 0;
+}
+
+.status-help {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 4px 0 0 0;
+  line-height: 1.4;
+}
+
+/* Ghost anchor node style */
+.ghost-anchor-node {
+  transition: transform 0.15s ease;
+}
+
+.ghost-anchor-node:hover {
+  transform: scale(1.2);
+}
+
+.ghost-anchor-selected .ghost-anchor-handle {
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.4) !important;
 }

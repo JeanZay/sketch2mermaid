@@ -44,12 +44,33 @@ export interface DiagramNode {
   style?: NodeStyle;
 }
 
+export interface ConnectedEdgeEndpoint {
+  kind: 'connected';
+  nodeId: string;
+  handleId?: string | null;
+}
+
+export interface DetachedEdgeEndpoint {
+  kind: 'detached';
+  point: {
+    x: number;
+    y: number;
+  };
+}
+
+export type DiagramEdgeEndpoint =
+  | ConnectedEdgeEndpoint
+  | DetachedEdgeEndpoint;
+
+export type EdgeConnectionStatus = 'connected' | 'detached';
+export type EdgeExportMode = 'mermaid' | 'canvasOnly';
+
 export interface DiagramEdge {
   id: string;
-  from: string; // references a node.id
-  to: string;   // references a node.id
-  sourceHandle?: string;
-  targetHandle?: string;
+  from: DiagramEdgeEndpoint;
+  to: DiagramEdgeEndpoint;
+  connectionStatus: EdgeConnectionStatus;
+  exportMode: EdgeExportMode;
   label: string; // "" means no label
   style: EdgeStyle;
   direction?: EdgeDirection;
@@ -59,6 +80,10 @@ export interface DiagramEdge {
    * Not exported to Mermaid.
    */
   textStyle?: TextStyle;
+
+  // Backward compatibility
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
 }
 
 export interface TextStyle {
@@ -115,5 +140,27 @@ export interface Sketch2MermaidFile {
   exportedAt: string; // ISO 8601
   diagram: CanonicalDiagram;
   viewport?: S2mViewport;
+}
+
+export function isConnectedEndpoint(endpoint: DiagramEdgeEndpoint): endpoint is ConnectedEdgeEndpoint {
+  return endpoint && (typeof endpoint === 'string' || endpoint.kind === 'connected');
+}
+
+export function isDetachedEndpoint(endpoint: DiagramEdgeEndpoint): endpoint is DetachedEdgeEndpoint {
+  return endpoint && typeof endpoint !== 'string' && endpoint.kind === 'detached';
+}
+
+export function isStructurallyConnectedEdge(edge: DiagramEdge): boolean {
+  const fromKind = typeof edge.from === 'string' ? 'connected' : edge.from?.kind;
+  const toKind = typeof edge.to === 'string' ? 'connected' : edge.to?.kind;
+  return fromKind === 'connected' && toKind === 'connected';
+}
+
+export function isStructurallyDetachedEdge(edge: DiagramEdge): boolean {
+  return !isStructurallyConnectedEdge(edge);
+}
+
+export function isExportableEdge(edge: DiagramEdge): boolean {
+  return isStructurallyConnectedEdge(edge) && edge.exportMode !== 'canvasOnly';
 }
 

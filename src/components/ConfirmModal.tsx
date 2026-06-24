@@ -5,8 +5,10 @@ interface ConfirmModalProps {
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  middleLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
+  onMiddle?: () => void;
   variant?: 'danger' | 'default';
 }
 
@@ -15,8 +17,10 @@ export function ConfirmModal({
   message,
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
+  middleLabel,
   onConfirm,
   onCancel,
+  onMiddle,
   variant = 'default',
 }: ConfirmModalProps) {
   const handleKeyDown = useCallback(
@@ -48,6 +52,11 @@ export function ConfirmModal({
           <button className="modal-btn modal-btn--cancel" onClick={onCancel}>
             {cancelLabel}
           </button>
+          {middleLabel && onMiddle && (
+            <button className="modal-btn modal-btn--middle" onClick={onMiddle}>
+              {middleLabel}
+            </button>
+          )}
           <button
             className={`modal-btn modal-btn--confirm ${variant === 'danger' ? 'modal-btn--danger' : ''}`}
             onClick={onConfirm}

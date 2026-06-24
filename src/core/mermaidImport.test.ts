@@ -2,6 +2,14 @@ import { describe, test, expect } from 'vitest';
 import { importMermaidFlowchart } from './mermaidImport';
 import { toMermaid } from './mermaid';
 import { normalizeDiagram } from '../store/diagramStore';
+import type { DiagramEdge, ConnectedEdgeEndpoint } from './types';
+
+const hasEdge = (edges: DiagramEdge[], from: string, to: string) =>
+  edges.some(
+    (e) =>
+      (typeof e.from === 'string' ? e.from : e.from.nodeId) === from &&
+      (typeof e.to === 'string' ? e.to : e.to.nodeId) === to
+  );
 
 describe('Mermaid Flowchart Import Tests', () => {
   // 1. graph TD parses with direction TD
@@ -189,18 +197,18 @@ describe('Mermaid Flowchart Import Tests', () => {
   test('21. chained edge A --> B --> C creates two edges', () => {
     const res = importMermaidFlowchart('graph TD\n  A --> B --> C');
     expect(res.diagram.edges.length).toBe(2);
-    expect(res.diagram.edges[0].from).toBe('A');
-    expect(res.diagram.edges[0].to).toBe('B');
-    expect(res.diagram.edges[1].from).toBe('B');
-    expect(res.diagram.edges[1].to).toBe('C');
+    expect((res.diagram.edges[0].from as ConnectedEdgeEndpoint).nodeId).toBe('A');
+    expect((res.diagram.edges[0].to as ConnectedEdgeEndpoint).nodeId).toBe('B');
+    expect((res.diagram.edges[1].from as ConnectedEdgeEndpoint).nodeId).toBe('B');
+    expect((res.diagram.edges[1].to as ConnectedEdgeEndpoint).nodeId).toBe('C');
   });
 
   // 22. ampersand syntax parses and expands edges
   test('22. ampersand syntax parses and expands edges', () => {
     const res = importMermaidFlowchart('graph TD\n  A --> B & C');
     expect(res.diagram.edges.length).toBe(2);
-    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'B')).toBe(true);
-    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'A', 'B')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'A', 'C')).toBe(true);
     expect(res.warnings.some(w => w.type === 'ampersandSkipped')).toBe(false);
   });
 
@@ -208,18 +216,18 @@ describe('Mermaid Flowchart Import Tests', () => {
   test('22a. ampersand syntax with multiple sources', () => {
     const res = importMermaidFlowchart('graph TD\n  A & B --> C');
     expect(res.diagram.edges.length).toBe(2);
-    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
-    expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'C')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'A', 'C')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'B', 'C')).toBe(true);
   });
 
   // 22b. ampersand syntax with multiple sources and targets
   test('22b. ampersand syntax with multiple sources and targets', () => {
     const res = importMermaidFlowchart('graph TD\n  A & B --> C & D');
     expect(res.diagram.edges.length).toBe(4);
-    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
-    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'D')).toBe(true);
-    expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'C')).toBe(true);
-    expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'D')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'A', 'C')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'A', 'D')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'B', 'C')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'B', 'D')).toBe(true);
   });
 
   // 22c. inline node definitions in groups
@@ -257,8 +265,8 @@ describe('Mermaid Flowchart Import Tests', () => {
     const nodeB = res.diagram.nodes.find(n => n.id === 'B');
     expect(nodeA?.label).toBe('Research & Development');
     expect(nodeB?.label).toBe('Sales & Marketing');
-    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
-    expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'C')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'A', 'C')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'B', 'C')).toBe(true);
   });
 
   // 22f. labelled pipe edge with multiple targets
@@ -354,10 +362,10 @@ describe('Mermaid Flowchart Import Tests', () => {
   test('22o. chained ampersand edges', () => {
     const res = importMermaidFlowchart('graph TD\n  A --> B & C --> D');
     expect(res.diagram.edges.length).toBe(4);
-    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'B')).toBe(true);
-    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
-    expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'D')).toBe(true);
-    expect(res.diagram.edges.some(e => e.from === 'C' && e.to === 'D')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'A', 'B')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'A', 'C')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'B', 'D')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'C', 'D')).toBe(true);
   });
 
   // 23. comments are ignored
@@ -432,10 +440,10 @@ describe('Mermaid Flowchart Import Tests', () => {
     expect(res.warnings.length).toBe(0);
     expect(res.diagram.nodes.length).toBe(4);
     expect(res.diagram.edges.length).toBe(4);
-    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'B')).toBe(true);
-    expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
-    expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'D')).toBe(true);
-    expect(res.diagram.edges.some(e => e.from === 'C' && e.to === 'D')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'A', 'B')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'A', 'C')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'B', 'D')).toBe(true);
+    expect(hasEdge(res.diagram.edges, 'C', 'D')).toBe(true);
   });
 
   // 32. imports direction-specific operators correctly
@@ -590,10 +598,10 @@ describe('Mermaid Flowchart Import Tests', () => {
     // Verify direction survived normalization
     const edges = normalized.edges;
     expect(edges).toHaveLength(4);
-    expect(edges[0]).toMatchObject({ from: 'A', to: 'B', style: 'solid', direction: 'undirected' });
-    expect(edges[1]).toMatchObject({ from: 'C', to: 'D', style: 'solid', direction: 'bidirectional' });
-    expect(edges[2]).toMatchObject({ from: 'E', to: 'F', style: 'dotted', direction: 'undirected' });
-    expect(edges[3]).toMatchObject({ from: 'G', to: 'H', style: 'dotted', direction: 'bidirectional' });
+    expect(edges[0]).toMatchObject({ from: { kind: 'connected', nodeId: 'A' }, to: { kind: 'connected', nodeId: 'B' }, style: 'solid', direction: 'undirected' });
+    expect(edges[1]).toMatchObject({ from: { kind: 'connected', nodeId: 'C' }, to: { kind: 'connected', nodeId: 'D' }, style: 'solid', direction: 'bidirectional' });
+    expect(edges[2]).toMatchObject({ from: { kind: 'connected', nodeId: 'E' }, to: { kind: 'connected', nodeId: 'F' }, style: 'dotted', direction: 'undirected' });
+    expect(edges[3]).toMatchObject({ from: { kind: 'connected', nodeId: 'G' }, to: { kind: 'connected', nodeId: 'H' }, style: 'dotted', direction: 'bidirectional' });
 
     // Verify export round-trip
     const exported = toMermaid(normalized);

@@ -1,4 +1,5 @@
-import type { CanonicalDiagram, MermaidExportFormat, DiagramNode, EdgeStyle, EdgeDirection } from './types';
+import type { CanonicalDiagram, MermaidExportFormat, DiagramNode, EdgeStyle, EdgeDirection, ConnectedEdgeEndpoint } from './types';
+import { isExportableEdge } from './types';
 
 /**
  * Helper to sort IDs numerically by their numeric suffix (e.g., n1, n2, n10).
@@ -157,15 +158,19 @@ export function toMermaid(diagram: CanonicalDiagram): string {
   }
 
   // Sort edges by ID ascending (numerically on the numeric suffix)
-  const sortedEdges = [...diagram.edges].sort((a, b) => sortById(a.id, b.id));
+  const sortedEdges = [...diagram.edges]
+    .filter(isExportableEdge)
+    .sort((a, b) => sortById(a.id, b.id));
 
   for (const edge of sortedEdges) {
     const connector = getMermaidEdgeOperator(edge.style, edge.direction || 'directed');
+    const fromId = typeof edge.from === 'string' ? edge.from : (edge.from as ConnectedEdgeEndpoint).nodeId;
+    const toId = typeof edge.to === 'string' ? edge.to : (edge.to as ConnectedEdgeEndpoint).nodeId;
     if (edge.label) {
       const escaped = escapeLabel(edge.label);
-      lines.push(`  ${edge.from} ${connector}|"${escaped}"| ${edge.to}`);
+      lines.push(`  ${fromId} ${connector}|"${escaped}"| ${toId}`);
     } else {
-      lines.push(`  ${edge.from} ${connector} ${edge.to}`);
+      lines.push(`  ${fromId} ${connector} ${toId}`);
     }
   }
 

@@ -55,13 +55,19 @@ export function useVirtualEdgeAnchors(): Record<string, VirtualEdgeAnchor> {
     }
 
     // Build EdgeInfo array from canonical edges
-    const edgeInfos: EdgeInfo[] = canonicalEdges.map((e) => ({
-      id: e.id,
-      source: e.from,
-      target: e.to,
-      sourceHandle: e.sourceHandle,
-      targetHandle: e.targetHandle,
-    }));
+    const edgeInfos: EdgeInfo[] = canonicalEdges.map((e) => {
+      const sourceId = e.from.kind === 'connected' ? e.from.nodeId : `ghostAnchor__${e.id}__from`;
+      const targetId = e.to.kind === 'connected' ? e.to.nodeId : `ghostAnchor__${e.id}__to`;
+      const sourceHandle = e.from.kind === 'connected' ? (e.from.handleId ?? undefined) : undefined;
+      const targetHandle = e.to.kind === 'connected' ? (e.to.handleId ?? undefined) : undefined;
+      return {
+        id: e.id,
+        source: sourceId,
+        target: targetId,
+        sourceHandle,
+        targetHandle,
+      };
+    });
 
     return computeVirtualAnchors(nodeRects, edgeInfos);
   }, [rfNodes, canonicalEdges]);

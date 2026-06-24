@@ -1,5 +1,18 @@
 import { create } from 'zustand';
-import type { CanonicalDiagram, DiagramNode, DiagramEdge, TextBox, TextBoxStyle, NodeShape, EdgeStyle, EdgeDirection, DiagramDirection, NodeStyle } from '../core/types';
+import type {
+  CanonicalDiagram,
+  DiagramNode,
+  DiagramEdge,
+  TextBox,
+  TextBoxStyle,
+  NodeShape,
+  EdgeStyle,
+  EdgeDirection,
+  DiagramDirection,
+  NodeStyle,
+  DiagramEdgeEndpoint,
+  TextStyle
+} from '../core/types';
 import { NODE_SIZE_DEFAULTS } from '../core/nodeSizeConfig';
 
 const SCHEMA_VERSION = 1;
@@ -143,13 +156,136 @@ export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
         return node;
       })
     : [];
+
+  const nodeSet = new Set(nodes.map((n) => n.id));
+
+  interface LegacyDiagramEdge {
+    id: string;
+    from: string | DiagramEdgeEndpoint;
+    to: string | DiagramEdgeEndpoint;
+    exportMode?: string;
+    sourceHandle?: string | null;
+    targetHandle?: string | null;
+    label?: string;
+    style?: string;
+    direction?: string;
+    textStyle?: TextStyle;
+  }
+
   const edges = Array.isArray(raw.edges)
-    ? raw.edges.map((edge) => ({
-        ...edge,
-        style: normalizeEdgeStyle(edge.style),
-        direction: normalizeEdgeDirection(edge.direction),
-      }))
+    ? raw.edges.map((rawEdge: unknown) => {
+        const edge = rawEdge as LegacyDiagramEdge;
+        let fromEndpoint: DiagramEdgeEndpoint;
+        if (typeof edge.from === 'string') {
+          if (nodeSet.has(edge.from)) {
+            fromEndpoint = {
+              kind: 'connected',
+              nodeId: edge.from,
+              handleId: edge.sourceHandle || null,
+            };
+          } else {
+            fromEndpoint = {
+              kind: 'detached',
+              point: { x: 100, y: 100 },
+            };
+          }
+        } else if (edge.from && typeof edge.from === 'object') {
+          if (edge.from.kind === 'connected') {
+            if (nodeSet.has(edge.from.nodeId)) {
+              fromEndpoint = {
+                kind: 'connected',
+                nodeId: edge.from.nodeId,
+                handleId: edge.from.handleId || null,
+              };
+            } else {
+              fromEndpoint = {
+                kind: 'detached',
+                point: edge.from.point || { x: 100, y: 100 },
+              };
+            }
+          } else {
+            const pt = edge.from.point || { x: 100, y: 100 };
+            const x = typeof pt.x === 'number' && Number.isFinite(pt.x) ? pt.x : 100;
+            const y = typeof pt.y === 'number' && Number.isFinite(pt.y) ? pt.y : 100;
+            fromEndpoint = {
+              kind: 'detached',
+              point: { x, y },
+            };
+          }
+        } else {
+          fromEndpoint = {
+            kind: 'detached',
+            point: { x: 100, y: 100 },
+          };
+        }
+
+        let toEndpoint: DiagramEdgeEndpoint;
+        if (typeof edge.to === 'string') {
+          if (nodeSet.has(edge.to)) {
+            toEndpoint = {
+              kind: 'connected',
+              nodeId: edge.to,
+              handleId: edge.targetHandle || null,
+            };
+          } else {
+            toEndpoint = {
+              kind: 'detached',
+              point: { x: 200, y: 200 },
+            };
+          }
+        } else if (edge.to && typeof edge.to === 'object') {
+          if (edge.to.kind === 'connected') {
+            if (nodeSet.has(edge.to.nodeId)) {
+              toEndpoint = {
+                kind: 'connected',
+                nodeId: edge.to.nodeId,
+                handleId: edge.to.handleId || null,
+              };
+            } else {
+              toEndpoint = {
+                kind: 'detached',
+                point: edge.to.point || { x: 200, y: 200 },
+              };
+            }
+          } else {
+            const pt = edge.to.point || { x: 200, y: 200 };
+            const x = typeof pt.x === 'number' && Number.isFinite(pt.x) ? pt.x : 200;
+            const y = typeof pt.y === 'number' && Number.isFinite(pt.y) ? pt.y : 200;
+            toEndpoint = {
+              kind: 'detached',
+              point: { x, y },
+            };
+          }
+        } else {
+          toEndpoint = {
+            kind: 'detached',
+            point: { x: 200, y: 200 },
+          };
+        }
+
+        const connectionStatus =
+          fromEndpoint.kind === 'connected' && toEndpoint.kind === 'connected'
+            ? 'connected'
+            : 'detached';
+
+        const exportMode = edge.exportMode === 'canvasOnly' ? 'canvasOnly' : 'mermaid';
+
+        return {
+          id: edge.id,
+          from: fromEndpoint,
+          to: toEndpoint,
+          connectionStatus,
+          exportMode,
+          sourceHandle: fromEndpoint.kind === 'connected' ? fromEndpoint.handleId : null,
+          targetHandle: toEndpoint.kind === 'connected' ? toEndpoint.handleId : null,
+          label: edge.label || '',
+          style: normalizeEdgeStyle(edge.style),
+          direction: normalizeEdgeDirection(edge.direction),
+          textStyle: edge.textStyle,
+        };
+      })
     : [];
+
   return {
     ...raw,
     nodes,
@@ -222,7 +358,34 @@ export interface DiagramState {
   updateNodeTextStyle: (id: string, style: Partial<TextStyle>) => void;
   updateNodeStyle: (id: string, style: Partial<NodeStyle>) => void;
   deleteNode: (id: string) => void;
-  addEdge: (from: string, to: string, style?: EdgeStyle, sourceHandle?: string, targetHandle?: string) => string;
+  addEdge: (
+    from: string | DiagramEdgeEndpoint,
+    to: string | DiagramEdgeEndpoint,
+    style?: EdgeStyle,
+    sourceHandle?: string,
+    targetHandle?: string
+  ) => string;
+  deleteSelectedElements: (params: {
+    nodeIds: string[];
+    edgeIds: string[];
+    textBoxIds: string[];
+    connectedEdgeBehavior: 'delete' | 'detach';
+    endpointPositions?: Record<string, {
+      from?: { x: number; y: number };
+      to?: { x: number; y: number };
+    }>;
+  }) => void;
+  moveDetachedEdgeEndpoint: (params: {
+    edgeId: string;
+    endpoint: 'from' | 'to';
+    point: { x: number; y: number };
+  }) => void;
+  reconnectDetachedEdgeEndpoint: (params: {
+    edgeId: string;
+    endpoint: 'from' | 'to';
+    nodeId: string;
+    handleId?: string | null;
+  }) => void;
   updateEdgeLabel: (id: string, label: string) => void;
   updateEdgeTextStyle: (id: string, style: Partial<import('../core/types').TextStyle>) => void;
   updateEdgeDirection: (id: string, direction: EdgeDirection) => void;
@@ -449,22 +612,35 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       diagram: {
         ...state.diagram,
         nodes: state.diagram.nodes.filter((node) => node.id !== id),
-        // AC13: Remove incident edges
         edges: state.diagram.edges.filter(
-          (edge) => edge.from !== id && edge.to !== id
+          (edge) => {
+            const fromId = edge.from.kind === 'connected' ? edge.from.nodeId : null;
+            const toId = edge.to.kind === 'connected' ? edge.to.nodeId : null;
+            return fromId !== id && toId !== id;
+          }
         ),
       },
     }));
   },
 
   addEdge: (from, to, style = 'solid', sourceHandle, targetHandle) => {
-    // Prevent duplicate edges considering nodes and handles
+    const fromEp = typeof from === 'string' ? { kind: 'connected' as const, nodeId: from, handleId: sourceHandle || null } : from;
+    const toEp = typeof to === 'string' ? { kind: 'connected' as const, nodeId: to, handleId: targetHandle || null } : to;
+
     const existing = get().diagram.edges.find(
-      (e) =>
-        e.from === from &&
-        e.to === to &&
-        e.sourceHandle === sourceHandle &&
-        e.targetHandle === targetHandle
+      (e) => {
+        const eFromNode = e.from.kind === 'connected' ? e.from.nodeId : null;
+        const eFromHandle = e.from.kind === 'connected' ? e.from.handleId : null;
+        const eToNode = e.to.kind === 'connected' ? e.to.nodeId : null;
+        const eToHandle = e.to.kind === 'connected' ? e.to.handleId : null;
+
+        const fNode = fromEp.kind === 'connected' ? fromEp.nodeId : null;
+        const fHandle = fromEp.kind === 'connected' ? fromEp.handleId : null;
+        const tNode = toEp.kind === 'connected' ? toEp.nodeId : null;
+        const tHandle = toEp.kind === 'connected' ? toEp.handleId : null;
+
+        return eFromNode === fNode && eFromHandle === fHandle && eToNode === tNode && eToHandle === tHandle;
+      }
     );
     if (existing) return existing.id;
 
@@ -472,10 +648,12 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     const newId = getNextEdgeId(get().diagram.edges);
     const newEdge: DiagramEdge = {
       id: newId,
-      from,
-      to,
-      sourceHandle,
-      targetHandle,
+      from: fromEp,
+      to: toEp,
+      sourceHandle: fromEp.kind === 'connected' ? fromEp.handleId : null,
+      targetHandle: toEp.kind === 'connected' ? toEp.handleId : null,
+      connectionStatus: fromEp.kind === 'connected' && toEp.kind === 'connected' ? 'connected' : 'detached',
+      exportMode: 'mermaid',
       label: '',
       style,
       direction: 'directed',
@@ -487,6 +665,164 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       },
     }));
     return newId;
+  },
+
+  deleteSelectedElements: ({ nodeIds, edgeIds, textBoxIds, connectedEdgeBehavior, endpointPositions }) => {
+    get().takeSnapshot();
+    const nodeIdSet = new Set(nodeIds);
+    const edgeIdSet = new Set(edgeIds);
+    const textBoxIdSet = new Set(textBoxIds);
+
+    set((state) => {
+      const nextNodes = state.diagram.nodes.filter((node) => !nodeIdSet.has(node.id));
+      const nextTextBoxes = state.diagram.textBoxes.filter((tb) => !textBoxIdSet.has(tb.id));
+
+      let nextEdges: DiagramEdge[];
+      
+      if (connectedEdgeBehavior === 'delete') {
+        nextEdges = state.diagram.edges.filter((edge) => {
+          if (edgeIdSet.has(edge.id)) return false;
+          const fromNodeId = edge.from.kind === 'connected' ? edge.from.nodeId : null;
+          const toNodeId = edge.to.kind === 'connected' ? edge.to.nodeId : null;
+          if (fromNodeId && nodeIdSet.has(fromNodeId)) return false;
+          if (toNodeId && nodeIdSet.has(toNodeId)) return false;
+          return true;
+        });
+      } else {
+        nextEdges = state.diagram.edges.map((edge) => {
+          if (edgeIdSet.has(edge.id)) return null;
+
+          const fromNodeId = edge.from.kind === 'connected' ? edge.from.nodeId : null;
+          const toNodeId = edge.to.kind === 'connected' ? edge.to.nodeId : null;
+
+          const isFromDeleted = fromNodeId && nodeIdSet.has(fromNodeId);
+          const isToDeleted = toNodeId && nodeIdSet.has(toNodeId);
+
+          if (!isFromDeleted && !isToDeleted) {
+            return edge;
+          }
+
+          let newFrom = { ...edge.from };
+          let newTo = { ...edge.to };
+
+          if (isFromDeleted) {
+            const capturedPos = endpointPositions?.[edge.id]?.from || { x: 100, y: 100 };
+            newFrom = {
+              kind: 'detached',
+              point: capturedPos,
+            };
+          }
+
+          if (isToDeleted) {
+            const capturedPos = endpointPositions?.[edge.id]?.to || { x: 200, y: 200 };
+            newTo = {
+              kind: 'detached',
+              point: capturedPos,
+            };
+          }
+
+          return {
+            ...edge,
+            from: newFrom,
+            to: newTo,
+            sourceHandle: newFrom.kind === 'connected' ? newFrom.handleId : null,
+            targetHandle: newTo.kind === 'connected' ? newTo.handleId : null,
+            connectionStatus: 'detached' as const,
+          };
+        }).filter((e): e is DiagramEdge => e !== null);
+      }
+
+      return {
+        diagram: {
+          ...state.diagram,
+          nodes: nextNodes,
+          textBoxes: nextTextBoxes,
+          edges: nextEdges,
+        },
+      };
+    });
+  },
+
+  moveDetachedEdgeEndpoint: ({ edgeId, endpoint, point }) => {
+    set((state) => {
+      const nextEdges = state.diagram.edges.map((edge) => {
+        if (edge.id !== edgeId) return edge;
+        if (endpoint === 'from') {
+          return {
+            ...edge,
+            from: {
+              kind: 'detached' as const,
+              point,
+            },
+            sourceHandle: null,
+            connectionStatus: 'detached' as const,
+          };
+        } else {
+          return {
+            ...edge,
+            to: {
+              kind: 'detached' as const,
+              point,
+            },
+            targetHandle: null,
+            connectionStatus: 'detached' as const,
+          };
+        }
+      });
+      return {
+        diagram: {
+          ...state.diagram,
+          edges: nextEdges,
+        },
+      };
+    });
+  },
+
+  reconnectDetachedEdgeEndpoint: ({ edgeId, endpoint, nodeId, handleId }) => {
+    get().takeSnapshot();
+    set((state) => {
+      const nextEdges = state.diagram.edges.map((edge) => {
+        if (edge.id !== edgeId) return edge;
+
+        let newFrom = { ...edge.from };
+        let newTo = { ...edge.to };
+
+        if (endpoint === 'from') {
+          newFrom = {
+            kind: 'connected' as const,
+            nodeId,
+            handleId: handleId || null,
+          };
+        } else {
+          newTo = {
+            kind: 'connected' as const,
+            nodeId,
+            handleId: handleId || null,
+          };
+        }
+
+        const connectionStatus =
+          newFrom.kind === 'connected' && newTo.kind === 'connected'
+            ? ('connected' as const)
+            : ('detached' as const);
+
+        return {
+          ...edge,
+          from: newFrom,
+          to: newTo,
+          sourceHandle: newFrom.kind === 'connected' ? newFrom.handleId : null,
+          targetHandle: newTo.kind === 'connected' ? newTo.handleId : null,
+          connectionStatus,
+        };
+      });
+
+      return {
+        diagram: {
+          ...state.diagram,
+          edges: nextEdges,
+        },
+      };
+    });
   },
 
   updateEdgeLabel: (id, label) => {

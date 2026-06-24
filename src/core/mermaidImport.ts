@@ -582,8 +582,18 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
 
     finalEdges.push({
       id: `e${edgeCounter++}`,
-      from: edge.from,
-      to: edge.to,
+      from: {
+        kind: 'connected',
+        nodeId: edge.from,
+        handleId: null,
+      },
+      to: {
+        kind: 'connected',
+        nodeId: edge.to,
+        handleId: null,
+      },
+      connectionStatus: 'connected',
+      exportMode: 'mermaid',
       label: finalEdgeLabel,
       style: edge.style,
       direction: edge.direction || 'directed',

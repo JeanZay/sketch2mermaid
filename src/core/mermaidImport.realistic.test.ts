@@ -3,6 +3,7 @@ import { describe, test, expect } from 'vitest';
 import mermaid from 'mermaid';
 import { importMermaidFlowchart } from './mermaidImport';
 import { toMermaid } from './mermaid';
+import type { DiagramEdge } from './types';
 
 // Mock SVG getBBox for JSDOM
 if (typeof window !== 'undefined' && !window.SVGElement.prototype.getBBox) {
@@ -40,6 +41,8 @@ async function assertMermaidCompiles(code: string, id: string) {
 }
 
 describe('Mermaid Import Realistic & Hardening Tests', () => {
+  const getEdgeFrom = (e: DiagramEdge) => typeof e.from === 'string' ? e.from : e.from.nodeId;
+  const getEdgeTo = (e: DiagramEdge) => typeof e.to === 'string' ? e.to : e.to.nodeId;
 
   // 1. Ampersand detection rules
   describe('Ampersand Detection hardening', () => {
@@ -71,8 +74,8 @@ describe('Mermaid Import Realistic & Hardening Tests', () => {
       const code = 'flowchart TD\n  A --> B & C';
       const res = importMermaidFlowchart(code);
       expect(res.diagram.edges.length).toBe(2);
-      expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'B')).toBe(true);
-      expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
+      expect(res.diagram.edges.some(e => getEdgeFrom(e) === 'A' && getEdgeTo(e) === 'B')).toBe(true);
+      expect(res.diagram.edges.some(e => getEdgeFrom(e) === 'A' && getEdgeTo(e) === 'C')).toBe(true);
       expect(res.warnings.some(w => w.type === 'ampersandSkipped')).toBe(false);
     });
 
@@ -80,8 +83,8 @@ describe('Mermaid Import Realistic & Hardening Tests', () => {
       const code = 'flowchart TD\n  A & B --> C';
       const res = importMermaidFlowchart(code);
       expect(res.diagram.edges.length).toBe(2);
-      expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
-      expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'C')).toBe(true);
+      expect(res.diagram.edges.some(e => getEdgeFrom(e) === 'A' && getEdgeTo(e) === 'C')).toBe(true);
+      expect(res.diagram.edges.some(e => getEdgeFrom(e) === 'B' && getEdgeTo(e) === 'C')).toBe(true);
       expect(res.warnings.some(w => w.type === 'ampersandSkipped')).toBe(false);
     });
   });
@@ -109,7 +112,7 @@ describe('Mermaid Import Realistic & Hardening Tests', () => {
 
       // Edges & cycles
       expect(res.diagram.edges.length).toBe(6);
-      const cycleEdge = res.diagram.edges.find(e => e.from === 'E' && e.to === 'B');
+      const cycleEdge = res.diagram.edges.find(e => getEdgeFrom(e) === 'E' && getEdgeTo(e) === 'B');
       expect(cycleEdge).toBeDefined();
 
       // Export & render validation
@@ -135,7 +138,7 @@ describe('Mermaid Import Realistic & Hardening Tests', () => {
       const nodeE = res.diagram.nodes.find(n => n.id === 'E');
       expect(nodeE?.label).toBe('Notify manager & support lead');
 
-      const edgeP1P2 = res.diagram.edges.find(e => e.from === 'B' && e.to === 'C');
+      const edgeP1P2 = res.diagram.edges.find(e => getEdgeFrom(e) === 'B' && getEdgeTo(e) === 'C');
       expect(edgeP1P2?.label).toBe('P1/P2');
 
       expect(res.warnings.some(w => w.type === 'ampersandSkipped')).toBe(false);
@@ -169,12 +172,12 @@ describe('Mermaid Import Realistic & Hardening Tests', () => {
 
       // Chained edges decomposition
       // A -> B -> D
-      expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'B')).toBe(true);
-      expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'D')).toBe(true);
+      expect(res.diagram.edges.some(e => getEdgeFrom(e) === 'A' && getEdgeTo(e) === 'B')).toBe(true);
+      expect(res.diagram.edges.some(e => getEdgeFrom(e) === 'B' && getEdgeTo(e) === 'D')).toBe(true);
       // D -> E -> C
-      const de = res.diagram.edges.find(e => e.from === 'D' && e.to === 'E');
+      const de = res.diagram.edges.find(e => getEdgeFrom(e) === 'D' && getEdgeTo(e) === 'E');
       expect(de?.label).toBe('Yes');
-      expect(res.diagram.edges.some(e => e.from === 'E' && e.to === 'C')).toBe(true);
+      expect(res.diagram.edges.some(e => getEdgeFrom(e) === 'E' && getEdgeTo(e) === 'C')).toBe(true);
 
       // Export & render validation
       const exported = toMermaid(res.diagram);
@@ -198,7 +201,7 @@ describe('Mermaid Import Realistic & Hardening Tests', () => {
       expect(res.diagram.direction).toBe('LR');
       expect(res.diagram.nodes.find(n => n.id === 'D')?.shape).toBe('hexagon');
       
-      const loopEdge = res.diagram.edges.find(e => e.from === 'D' && e.to === 'C');
+      const loopEdge = res.diagram.edges.find(e => getEdgeFrom(e) === 'D' && getEdgeTo(e) === 'C');
       expect(loopEdge?.label).toBe('KO: data quality issue');
 
       // Export & render validation
@@ -286,8 +289,8 @@ flowchart TD
 
       // Edge validation
       expect(res.diagram.edges.length).toBe(1);
-      expect(res.diagram.edges[0].from).toBe('A');
-      expect(res.diagram.edges[0].to).toBe('B');
+      expect(getEdgeFrom(res.diagram.edges[0])).toBe('A');
+      expect(getEdgeTo(res.diagram.edges[0])).toBe('B');
 
       // Export & render validation
       const exported = toMermaid(res.diagram);
@@ -315,10 +318,10 @@ flowchart TD
 
       // Recovered/expanded edges (4 total: A->B, A->C, B->D, C->D)
       expect(res.diagram.edges.length).toBe(4);
-      expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'B')).toBe(true);
-      expect(res.diagram.edges.some(e => e.from === 'A' && e.to === 'C')).toBe(true);
-      expect(res.diagram.edges.some(e => e.from === 'B' && e.to === 'D')).toBe(true);
-      expect(res.diagram.edges.some(e => e.from === 'C' && e.to === 'D')).toBe(true);
+      expect(res.diagram.edges.some(e => getEdgeFrom(e) === 'A' && getEdgeTo(e) === 'B')).toBe(true);
+      expect(res.diagram.edges.some(e => getEdgeFrom(e) === 'A' && getEdgeTo(e) === 'C')).toBe(true);
+      expect(res.diagram.edges.some(e => getEdgeFrom(e) === 'B' && getEdgeTo(e) === 'D')).toBe(true);
+      expect(res.diagram.edges.some(e => getEdgeFrom(e) === 'C' && getEdgeTo(e) === 'D')).toBe(true);
 
       // Export & render validation
       const exported = toMermaid(res.diagram);

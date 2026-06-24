@@ -7,6 +7,7 @@ import type {
   Sketch2MermaidFile,
   S2mViewport,
   NodeShape,
+  DiagramEdgeEndpoint,
 } from './types';
 import { normalizeDiagram } from '../store/diagramStore';
 
@@ -235,12 +236,49 @@ export function parseSketch2MermaidFile(raw: string): ParseResult {
     }
     edgeIds.add(edge.id as string);
 
-    if (!isNonEmptyString(edge.from) || !nodeIds.has(edge.from as string)) {
-      return { ok: false, error: `Edge "${edge.id as string}" references a missing source node "${String(edge.from)}".` };
+    const validateEndpoint = (ep: unknown): boolean => {
+      if (typeof ep === 'string') {
+        return ep.length > 0;
+      }
+      if (ep != null && typeof ep === 'object' && !Array.isArray(ep)) {
+        const obj = ep as Record<string, unknown>;
+        if (obj.kind === 'connected') {
+          return typeof obj.nodeId === 'string' && obj.nodeId.length > 0;
+        }
+        if (obj.kind === 'detached') {
+          const pt = obj.point as Record<string, unknown>;
+          return pt != null && typeof pt === 'object' && typeof pt.x === 'number' && Number.isFinite(pt.x) && typeof pt.y === 'number' && Number.isFinite(pt.y);
+        }
+      }
+      return false;
+    };
+
+    if (!validateEndpoint(edge.from)) {
+      return { ok: false, error: `Edge "${edge.id as string}" has an invalid or missing source endpoint.` };
     }
-    if (!isNonEmptyString(edge.to) || !nodeIds.has(edge.to as string)) {
-      return { ok: false, error: `Edge "${edge.id as string}" references a missing target node "${String(edge.to)}".` };
+    if (!validateEndpoint(edge.to)) {
+      return { ok: false, error: `Edge "${edge.id as string}" has an invalid or missing target endpoint.` };
     }
+
+    // Strict node presence validation for connected endpoints during file parse
+    const getFromNodeId = (ep: unknown) => typeof ep === 'string' ? ep : (ep as DiagramEdgeEndpoint & { nodeId: string }).nodeId;
+    const isFromConnected = typeof edge.from === 'string' || (edge.from && (edge.from as DiagramEdgeEndpoint).kind === 'connected');
+    if (isFromConnected) {
+      const fromNodeId = getFromNodeId(edge.from);
+      if (!nodeIds.has(fromNodeId)) {
+        return { ok: false, error: `Edge "${edge.id as string}" references a missing source node "${String(fromNodeId)}".` };
+      }
+    }
+
+    const getToNodeId = (ep: unknown) => typeof ep === 'string' ? ep : (ep as DiagramEdgeEndpoint & { nodeId: string }).nodeId;
+    const isToConnected = typeof edge.to === 'string' || (edge.to && (edge.to as DiagramEdgeEndpoint).kind === 'connected');
+    if (isToConnected) {
+      const toNodeId = getToNodeId(edge.to);
+      if (!nodeIds.has(toNodeId)) {
+        return { ok: false, error: `Edge "${edge.id as string}" references a missing target node "${String(toNodeId)}".` };
+      }
+    }
+
     if (edge.direction !== undefined && edge.direction !== 'directed' && edge.direction !== 'undirected' && edge.direction !== 'bidirectional') {
       return { ok: false, error: `Edge "${edge.id as string}" has an invalid direction "${String(edge.direction)}".` };
     }

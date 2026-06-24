@@ -45,11 +45,15 @@ function makeTestDiagram(): CanonicalDiagram {
     edges: [
       {
         id: 'e1',
-        from: 'n1',
-        to: 'n2',
+        from: { kind: 'connected', nodeId: 'n1', handleId: null },
+        to: { kind: 'connected', nodeId: 'n2', handleId: null },
+        connectionStatus: 'connected',
+        exportMode: 'mermaid',
         label: 'Yes',
         style: 'solid',
         direction: 'directed',
+        sourceHandle: null,
+        targetHandle: null,
       },
     ],
     textBoxes: [
@@ -573,7 +577,19 @@ describe('store integration — export/import round-trip', () => {
         { id: 'n8', label: 'Documents Node', shape: 'documents', position: { x: 700, y: 720 }, width: 225, height: 64 }
       ],
       edges: [
-        { id: 'e1', from: 'n1', to: 'n2', label: 'Link', style: 'solid', direction: 'directed' }
+        {
+          id: 'e1',
+          from: { kind: 'connected', nodeId: 'n1', handleId: null },
+          to: { kind: 'connected', nodeId: 'n2', handleId: null },
+          connectionStatus: 'connected',
+          exportMode: 'mermaid',
+          sourceHandle: null,
+          targetHandle: null,
+          label: 'Link',
+          style: 'solid',
+          direction: 'directed',
+          textStyle: undefined,
+        }
       ],
       textBoxes: []
     };

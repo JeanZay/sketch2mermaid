@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNodes, useEdges, useReactFlow } from '@xyflow/react';
 import { useDiagramStore, DEFAULT_NODE_TEXT_STYLE, DEFAULT_EDGE_TEXT_STYLE, DEFAULT_TEXT_BOX_STYLE } from '../store/diagramStore';
 import type { TextStyle, TextBoxStyle } from '../core/types';
 import { SHAPE_CONFIGS } from './shapeConfig';
 import { FontSizeControl } from './properties/FontSizeControl';
 import { ConfirmModal } from './ConfirmModal';
+import { useVirtualEdgeAnchors } from '../hooks/useVirtualEdgeAnchors';
 
 export const PropertiesPanel = () => {
   const nodes = useNodes();
@@ -17,7 +18,6 @@ export const PropertiesPanel = () => {
   const diagram = useDiagramStore((state) => state.diagram);
   const updateNodeLabel = useDiagramStore((state) => state.updateNodeLabel);
   const updateNodeShape = useDiagramStore((state) => state.updateNodeShape);
-  const deleteNode = useDiagramStore((state) => state.deleteNode);
   const updateEdgeLabel = useDiagramStore((state) => state.updateEdgeLabel);
   const toggleEdgeStyle = useDiagramStore((state) => state.toggleEdgeStyle);
   const deleteEdge = useDiagramStore((state) => state.deleteEdge);
@@ -29,11 +29,53 @@ export const PropertiesPanel = () => {
   const updateNodeStyle = useDiagramStore((state) => state.updateNodeStyle);
   const startTransaction = useDiagramStore((state) => state.startTransaction);
   const commitTransaction = useDiagramStore((state) => state.commitTransaction);
+  const deleteSelectedElements = useDiagramStore((state) => state.deleteSelectedElements);
+
+  const virtualAnchors = useVirtualEdgeAnchors();
 
   const handleDeselect = () => {
     setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
     setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
   };
+
+  const getEdgeEndpointPosition = useCallback((edgeId: string, endpoint: 'from' | 'to') => {
+    const anchor = virtualAnchors[edgeId];
+    if (anchor) {
+      return endpoint === 'from'
+        ? { x: anchor.sourceX, y: anchor.sourceY }
+        : { x: anchor.targetX, y: anchor.targetY };
+    }
+
+    const edge = diagram.edges.find((e) => e.id === edgeId);
+    if (!edge) return { x: 0, y: 0 };
+
+    const ep = endpoint === 'from' ? edge.from : edge.to;
+    if (ep.kind !== 'connected') {
+      return ep.point;
+    }
+
+    const node = diagram.nodes.find((n) => n.id === ep.nodeId);
+    if (!node) return { x: 0, y: 0 };
+
+    const width = node.width ?? 100;
+    const height = node.height ?? 40;
+    const handleId = ep.handleId;
+
+    let side: 'top' | 'bottom' | 'left' | 'right' = 'bottom';
+    if (handleId) {
+      if (handleId.startsWith('t-')) side = 'top';
+      else if (handleId.startsWith('b-')) side = 'bottom';
+      else if (handleId.startsWith('l-')) side = 'left';
+      else if (handleId.startsWith('r-')) side = 'right';
+    }
+
+    switch (side) {
+      case 'top': return { x: node.position.x + width / 2, y: node.position.y };
+      case 'bottom': return { x: node.position.x + width / 2, y: node.position.y + height };
+      case 'left': return { x: node.position.x, y: node.position.y + height / 2 };
+      case 'right': return { x: node.position.x + width, y: node.position.y + height / 2 };
+    }
+  }, [virtualAnchors, diagram]);
 
   // Pending delete confirmation state for node with connected edges
   const [pendingDeleteNode, setPendingDeleteNode] = useState<{
@@ -43,11 +85,19 @@ export const PropertiesPanel = () => {
 
   const handleDeleteNode = () => {
     if (!selectedNode) return;
-    const edgeCount = diagram.edges.filter(
-      (e) => e.from === selectedNode.id || e.to === selectedNode.id
-    ).length;
+    const edgeCount = diagram.edges.filter((e) => {
+      const fromId = e.from.kind === 'connected' ? e.from.nodeId : null;
+      const toId = e.to.kind === 'connected' ? e.to.nodeId : null;
+      return fromId === selectedNode.id || toId === selectedNode.id;
+    }).length;
+
     if (edgeCount === 0) {
-      deleteNode(selectedNode.id);
+      deleteSelectedElements({
+        nodeIds: [selectedNode.id],
+        edgeIds: [],
+        textBoxIds: [],
+        connectedEdgeBehavior: 'delete',
+      });
     } else {
       setPendingDeleteNode({ nodeId: selectedNode.id, edgeCount });
     }
@@ -484,11 +534,51 @@ export const PropertiesPanel = () => {
         <ConfirmModal
           title="Supprimer le nœud"
           message={`Ce nœud est connecté à ${pendingDeleteNode.edgeCount} liaison(s). Supprimer ce nœud supprimera aussi ces liaisons.`}
-          confirmLabel="Supprimer tout"
+          confirmLabel="Supprimer aussi les flèches"
           cancelLabel="Annuler"
+          middleLabel="Conserver les flèches sur le canvas"
           variant="danger"
           onConfirm={() => {
-            deleteNode(pendingDeleteNode.nodeId);
+            deleteSelectedElements({
+              nodeIds: [pendingDeleteNode.nodeId],
+              edgeIds: [],
+              textBoxIds: [],
+              connectedEdgeBehavior: 'delete',
+            });
+            setPendingDeleteNode(null);
+          }}
+          onMiddle={() => {
+            const endpointPositions: Record<string, {
+              from?: { x: number; y: number };
+              to?: { x: number; y: number };
+            }> = {};
+            
+            const connectedEdges = diagram.edges.filter((e) => {
+              const fromId = e.from.kind === 'connected' ? e.from.nodeId : null;
+              const toId = e.to.kind === 'connected' ? e.to.nodeId : null;
+              return fromId === pendingDeleteNode.nodeId || toId === pendingDeleteNode.nodeId;
+            });
+
+            for (const edge of connectedEdges) {
+              const fromId = edge.from.kind === 'connected' ? edge.from.nodeId : null;
+              const toId = edge.to.kind === 'connected' ? edge.to.nodeId : null;
+              
+              endpointPositions[edge.id] = {};
+              if (fromId === pendingDeleteNode.nodeId) {
+                endpointPositions[edge.id].from = getEdgeEndpointPosition(edge.id, 'from');
+              }
+              if (toId === pendingDeleteNode.nodeId) {
+                endpointPositions[edge.id].to = getEdgeEndpointPosition(edge.id, 'to');
+              }
+            }
+
+            deleteSelectedElements({
+              nodeIds: [pendingDeleteNode.nodeId],
+              edgeIds: [],
+              textBoxIds: [],
+              connectedEdgeBehavior: 'detach',
+              endpointPositions,
+            });
             setPendingDeleteNode(null);
           }}
           onCancel={() => setPendingDeleteNode(null)}
@@ -503,10 +593,10 @@ export const PropertiesPanel = () => {
     const edgeData = diagram.edges.find((e) => e.id === selectedEdge.id);
     if (!edgeData) return null;
 
-    const sourceNode = diagram.nodes.find((n) => n.id === edgeData.from);
-    const targetNode = diagram.nodes.find((n) => n.id === edgeData.to);
-    const sourceLabel = sourceNode ? sourceNode.label : edgeData.from;
-    const targetLabel = targetNode ? targetNode.label : edgeData.to;
+    const sourceNode = edgeData.from.kind === 'connected' ? diagram.nodes.find((n) => n.id === edgeData.from.nodeId) : null;
+    const targetNode = edgeData.to.kind === 'connected' ? diagram.nodes.find((n) => n.id === edgeData.to.nodeId) : null;
+    const sourceLabel = sourceNode ? sourceNode.label : (edgeData.from.kind === 'connected' ? edgeData.from.nodeId : 'Point détaché');
+    const targetLabel = targetNode ? targetNode.label : (edgeData.to.kind === 'connected' ? edgeData.to.nodeId : 'Point détaché');
 
     const isDotted = edgeData.style === 'dotted';
     
@@ -650,6 +740,39 @@ export const PropertiesPanel = () => {
               </div>
             </>
           )}
+
+          <div className="property-group">
+            <label className="property-label">Statut</label>
+            <div className="connection-status-info">
+              {edgeData.connectionStatus === 'detached' ? (
+                <div className="status-info-box status-info-box--detached">
+                  <span className="status-badge status-badge--detached">Liaison détachée (Canvas uniquement)</span>
+                  <p className="status-desc">
+                    {edgeData.from.kind === 'detached' && edgeData.to.kind === 'detached'
+                      ? 'Les deux extrémités sont détachées.'
+                      : 'Une extrémité est détachée.'}
+                  </p>
+                  <p className="status-help">
+                    Cette liaison ne sera pas exportée dans le code Mermaid tant qu’elle ne sera pas reconnectée à deux nœuds.
+                  </p>
+                </div>
+              ) : edgeData.exportMode === 'canvasOnly' ? (
+                <div className="status-info-box status-info-box--canvas-only">
+                  <span className="status-badge status-badge--canvas-only">Liaison canvas uniquement</span>
+                  <p className="status-help">
+                    Cette liaison est connectée mais intentionnellement exclue de l’export Mermaid.
+                  </p>
+                </div>
+              ) : (
+                <div className="status-info-box status-info-box--connected">
+                  <span className="status-badge status-badge--connected">Liaison Mermaid connectée</span>
+                  <p className="status-help">
+                    Cette liaison sera exportée dans le code Mermaid.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
 
           <div className="property-group">
             <label className="property-label">Connections</label>

@@ -9,7 +9,8 @@ import {
   type Connection,
   type NodeChange,
   type EdgeChange,
-  MarkerType
+  MarkerType,
+  type Node
 } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
 import CustomNode from './CustomNode';
@@ -18,9 +19,12 @@ import TextBoxNode from './TextBoxNode';
 import { useVirtualEdgeAnchors } from '../hooks/useVirtualEdgeAnchors';
 import { VirtualAnchorsContext } from './VirtualAnchorsContext';
 
+import GhostAnchorNode from './GhostAnchorNode';
+
 const nodeTypes = {
   customNode: CustomNode,
   textBox: TextBoxNode,
+  ghostAnchor: GhostAnchorNode,
 };
 
 const edgeTypes = {
@@ -32,16 +36,16 @@ function FlowInner() {
   const addNode = useDiagramStore((state) => state.addNode);
   const updateNodePosition = useDiagramStore((state) => state.updateNodePosition);
   const updateNodeSize = useDiagramStore((state) => state.updateNodeSize);
-  const deleteNode = useDiagramStore((state) => state.deleteNode);
   const addEdge = useDiagramStore((state) => state.addEdge);
-  const deleteEdge = useDiagramStore((state) => state.deleteEdge);
   const updateTextBoxPosition = useDiagramStore((state) => state.updateTextBoxPosition);
   const updateTextBoxSize = useDiagramStore((state) => state.updateTextBoxSize);
-  const deleteTextBox = useDiagramStore((state) => state.deleteTextBox);
   const undo = useDiagramStore((state) => state.undo);
   const redo = useDiagramStore((state) => state.redo);
   const startTransaction = useDiagramStore((state) => state.startTransaction);
   const commitTransaction = useDiagramStore((state) => state.commitTransaction);
+  const deleteSelectedElements = useDiagramStore((state) => state.deleteSelectedElements);
+  const moveDetachedEdgeEndpoint = useDiagramStore((state) => state.moveDetachedEdgeEndpoint);
+  const reconnectDetachedEdgeEndpoint = useDiagramStore((state) => state.reconnectDetachedEdgeEndpoint);
 
   const { screenToFlowPosition } = useReactFlow();
 
@@ -92,8 +96,36 @@ function FlowInner() {
       connectable: false,
     }));
 
-    return [...diagramNodes, ...textBoxNodes];
-  }, [diagram.nodes, diagram.textBoxes, selectedNodeIds, updateNodeSize, updateTextBoxSize]);
+    const ghostNodes: Node[] = [];
+    for (const edge of diagram.edges) {
+      if (edge.from.kind === 'detached') {
+        ghostNodes.push({
+          id: `ghostAnchor__${edge.id}__from`,
+          type: 'ghostAnchor' as const,
+          position: edge.from.point,
+          data: {
+            endpointType: 'from' as const,
+            edgeId: edge.id,
+          },
+          selected: selectedNodeIds.has(`ghostAnchor__${edge.id}__from`),
+        });
+      }
+      if (edge.to.kind === 'detached') {
+        ghostNodes.push({
+          id: `ghostAnchor__${edge.id}__to`,
+          type: 'ghostAnchor' as const,
+          position: edge.to.point,
+          data: {
+            endpointType: 'to' as const,
+            edgeId: edge.id,
+          },
+          selected: selectedNodeIds.has(`ghostAnchor__${edge.id}__to`),
+        });
+      }
+    }
+
+    return [...diagramNodes, ...textBoxNodes, ...ghostNodes];
+  }, [diagram.nodes, diagram.textBoxes, diagram.edges, selectedNodeIds, updateNodeSize, updateTextBoxSize]);
 
   // Derive React Flow edges from diagram store + selection state
   // Note: markers are rendered by CustomEdge directly from the Zustand store,
@@ -101,12 +133,17 @@ function FlowInner() {
   const rfEdges = useMemo(() => {
     return diagram.edges.map((edge) => {
       const isSelected = selectedEdgeIds.has(edge.id);
+      const source = edge.from.kind === 'connected' ? edge.from.nodeId : `ghostAnchor__${edge.id}__from`;
+      const target = edge.to.kind === 'connected' ? edge.to.nodeId : `ghostAnchor__${edge.id}__to`;
+      const sourceHandle = edge.from.kind === 'connected' ? edge.from.handleId : undefined;
+      const targetHandle = edge.to.kind === 'connected' ? edge.to.handleId : undefined;
+
       return {
         id: edge.id,
-        source: edge.from,
-        target: edge.to,
-        sourceHandle: edge.sourceHandle,
-        targetHandle: edge.targetHandle,
+        source,
+        target,
+        sourceHandle: sourceHandle ?? undefined,
+        targetHandle: targetHandle ?? undefined,
         label: edge.label,
         type: 'customEdge',
         selected: isSelected,
@@ -126,6 +163,46 @@ function FlowInner() {
     }
     return map;
   }, [rfNodes]);
+
+  // Helper to capture actual rendered endpoint positions before deletion
+  const getEdgeEndpointPosition = useCallback((edgeId: string, endpoint: 'from' | 'to') => {
+    const anchor = virtualAnchors[edgeId];
+    if (anchor) {
+      return endpoint === 'from'
+        ? { x: anchor.sourceX, y: anchor.sourceY }
+        : { x: anchor.targetX, y: anchor.targetY };
+    }
+
+    const edge = diagram.edges.find((e) => e.id === edgeId);
+    if (!edge) return { x: 0, y: 0 };
+
+    const ep = endpoint === 'from' ? edge.from : edge.to;
+    if (ep.kind !== 'connected') {
+      return ep.point;
+    }
+
+    const node = diagram.nodes.find((n) => n.id === ep.nodeId);
+    if (!node) return { x: 0, y: 0 };
+
+    const width = node.width ?? 100;
+    const height = node.height ?? 40;
+    const handleId = ep.handleId;
+
+    let side: 'top' | 'bottom' | 'left' | 'right' = 'bottom';
+    if (handleId) {
+      if (handleId.startsWith('t-')) side = 'top';
+      else if (handleId.startsWith('b-')) side = 'bottom';
+      else if (handleId.startsWith('l-')) side = 'left';
+      else if (handleId.startsWith('r-')) side = 'right';
+    }
+
+    switch (side) {
+      case 'top': return { x: node.position.x + width / 2, y: node.position.y };
+      case 'bottom': return { x: node.position.x + width / 2, y: node.position.y + height };
+      case 'left': return { x: node.position.x, y: node.position.y + height / 2 };
+      case 'right': return { x: node.position.x + width, y: node.position.y + height / 2 };
+    }
+  }, [virtualAnchors, diagram]);
 
   // Centralized delete handler: collects all selected elements, checks for
   // connected edges on selected nodes, and either deletes directly or shows
@@ -150,17 +227,23 @@ function FlowInner() {
     // Count edges connected to the selected nodes (unique, excluding already-selected edges)
     const selNodeIdSet = new Set(selNodeIds);
     const selEdgeIdSet = new Set(selEdgeIds);
-    const cascadeEdges = diagram.edges.filter(
-      (e) => (selNodeIdSet.has(e.from) || selNodeIdSet.has(e.to)) && !selEdgeIdSet.has(e.id)
-    );
+    const cascadeEdges = diagram.edges.filter((e) => {
+      const fromId = e.from.kind === 'connected' ? e.from.nodeId : null;
+      const toId = e.to.kind === 'connected' ? e.to.nodeId : null;
+      return (
+        ((fromId && selNodeIdSet.has(fromId)) || (toId && selNodeIdSet.has(toId))) &&
+        !selEdgeIdSet.has(e.id)
+      );
+    });
 
     if (cascadeEdges.length === 0) {
       // No cascade edges — delete everything directly
-      startTransaction();
-      for (const id of selEdgeIds) deleteEdge(id);
-      for (const id of selTextBoxIds) deleteTextBox(id);
-      for (const id of selNodeIds) deleteNode(id);
-      commitTransaction();
+      deleteSelectedElements({
+        nodeIds: selNodeIds,
+        edgeIds: selEdgeIds,
+        textBoxIds: selTextBoxIds,
+        connectedEdgeBehavior: 'delete',
+      });
     } else {
       // At least one selected node has connected edges — ask for confirmation
       setPendingDelete({
@@ -170,7 +253,7 @@ function FlowInner() {
         cascadeEdgeCount: cascadeEdges.length,
       });
     }
-  }, [selectedNodeIds, selectedEdgeIds, nodeTypeById, diagram.edges, startTransaction, commitTransaction, deleteNode, deleteEdge, deleteTextBox]);
+  }, [selectedNodeIds, selectedEdgeIds, nodeTypeById, diagram.edges, deleteSelectedElements]);
 
   // Handle keyboard nudging and undo/redo shortcuts with safeguards
   useEffect(() => {
@@ -246,8 +329,25 @@ function FlowInner() {
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     let selectionChanged = false;
     let nextSelected: Set<string> | null = null;
+    let edgeSelectionChanged = false;
+    let nextEdgeSelected: Set<string> | null = null;
+
     for (const change of changes) {
       if (change.type === 'select') {
+        const nType = nodeTypeById.get(change.id);
+        if (nType === 'ghostAnchor') {
+          if (change.selected) {
+            const parts = change.id.split('__');
+            const edgeId = parts[1];
+            if (!nextEdgeSelected) {
+              nextEdgeSelected = new Set(selectedEdgeIds);
+            }
+            nextEdgeSelected.add(edgeId);
+            edgeSelectionChanged = true;
+          }
+          continue;
+        }
+
         if (!nextSelected) {
           nextSelected = new Set(selectedNodeIds);
         }
@@ -261,6 +361,11 @@ function FlowInner() {
         const nType = nodeTypeById.get(change.id);
         if (nType === 'textBox') {
           updateTextBoxPosition(change.id, change.position.x, change.position.y);
+        } else if (nType === 'ghostAnchor') {
+          const parts = change.id.split('__');
+          const edgeId = parts[1];
+          const endpoint = parts[2] as 'from' | 'to';
+          moveDetachedEdgeEndpoint({ edgeId, endpoint, point: change.position });
         } else {
           updateNodePosition(change.id, change.position.x, change.position.y);
         }
@@ -269,7 +374,10 @@ function FlowInner() {
     if (selectionChanged && nextSelected) {
       setSelectedNodeIds(nextSelected);
     }
-  }, [selectedNodeIds, updateNodePosition, updateTextBoxPosition, nodeTypeById]);
+    if (edgeSelectionChanged && nextEdgeSelected) {
+      setSelectedEdgeIds(nextEdgeSelected);
+    }
+  }, [selectedNodeIds, selectedEdgeIds, updateNodePosition, updateTextBoxPosition, moveDetachedEdgeEndpoint, nodeTypeById]);
 
   // Handle ALL edge changes — selection tracked in state
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
@@ -293,18 +401,45 @@ function FlowInner() {
     }
   }, [selectedEdgeIds]);
 
-  // Handle edge connections
+  // Handle edge connections and reconnection
   const onConnect = useCallback((connection: Connection) => {
     if (connection.source && connection.target) {
-      addEdge(
-        connection.source,
-        connection.target,
-        'solid',
-        connection.sourceHandle ?? undefined,
-        connection.targetHandle ?? undefined
-      );
+      const isSourceGhost = connection.source.startsWith('ghostAnchor__');
+      const isTargetGhost = connection.target.startsWith('ghostAnchor__');
+
+      if (isSourceGhost || isTargetGhost) {
+        if (isSourceGhost && !isTargetGhost) {
+          const parts = connection.source.split('__');
+          const edgeId = parts[1];
+          const endpoint = parts[2] as 'from' | 'to';
+          reconnectDetachedEdgeEndpoint({
+            edgeId,
+            endpoint,
+            nodeId: connection.target,
+            handleId: connection.targetHandle ?? null,
+          });
+        } else if (!isSourceGhost && isTargetGhost) {
+          const parts = connection.target.split('__');
+          const edgeId = parts[1];
+          const endpoint = parts[2] as 'from' | 'to';
+          reconnectDetachedEdgeEndpoint({
+            edgeId,
+            endpoint,
+            nodeId: connection.source,
+            handleId: connection.sourceHandle ?? null,
+          });
+        }
+      } else {
+        addEdge(
+          connection.source,
+          connection.target,
+          'solid',
+          connection.sourceHandle ?? undefined,
+          connection.targetHandle ?? undefined
+        );
+      }
     }
-  }, [addEdge]);
+  }, [addEdge, reconnectDetachedEdgeEndpoint]);
 
   // Double-clicking the background pane creates a new process node
   const onPaneDoubleClick = useCallback((event: React.MouseEvent) => {
@@ -369,15 +504,56 @@ function FlowInner() {
           <ConfirmModal
             title="Supprimer"
             message={pendingDeleteMessage}
-            confirmLabel="Supprimer tout"
+            confirmLabel="Supprimer aussi les flèches"
             cancelLabel="Annuler"
+            middleLabel="Conserver les flèches sur le canvas"
             variant="danger"
             onConfirm={() => {
-              startTransaction();
-              for (const id of pendingDelete.edgeIds) deleteEdge(id);
-              for (const id of pendingDelete.textBoxIds) deleteTextBox(id);
-              for (const id of pendingDelete.nodeIds) deleteNode(id);
-              commitTransaction();
+              deleteSelectedElements({
+                nodeIds: pendingDelete.nodeIds,
+                edgeIds: pendingDelete.edgeIds,
+                textBoxIds: pendingDelete.textBoxIds,
+                connectedEdgeBehavior: 'delete',
+              });
+              setPendingDelete(null);
+            }}
+            onMiddle={() => {
+              const endpointPositions: Record<string, {
+                from?: { x: number; y: number };
+                to?: { x: number; y: number };
+              }> = {};
+              
+              const selNodeIdSet = new Set(pendingDelete.nodeIds);
+              const selEdgeIdSet = new Set(pendingDelete.edgeIds);
+              const connectedEdges = diagram.edges.filter((e) => {
+                const fromId = e.from.kind === 'connected' ? e.from.nodeId : null;
+                const toId = e.to.kind === 'connected' ? e.to.nodeId : null;
+                return (
+                  ((fromId && selNodeIdSet.has(fromId)) || (toId && selNodeIdSet.has(toId))) &&
+                  !selEdgeIdSet.has(e.id)
+                );
+              });
+
+              for (const edge of connectedEdges) {
+                const fromId = edge.from.kind === 'connected' ? edge.from.nodeId : null;
+                const toId = edge.to.kind === 'connected' ? edge.to.nodeId : null;
+                
+                endpointPositions[edge.id] = {};
+                if (fromId && selNodeIdSet.has(fromId)) {
+                  endpointPositions[edge.id].from = getEdgeEndpointPosition(edge.id, 'from');
+                }
+                if (toId && selNodeIdSet.has(toId)) {
+                  endpointPositions[edge.id].to = getEdgeEndpointPosition(edge.id, 'to');
+                }
+              }
+
+              deleteSelectedElements({
+                nodeIds: pendingDelete.nodeIds,
+                edgeIds: pendingDelete.edgeIds,
+                textBoxIds: pendingDelete.textBoxIds,
+                connectedEdgeBehavior: 'detach',
+                endpointPositions,
+              });
               setPendingDelete(null);
             }}
             onCancel={() => setPendingDelete(null)}

@@ -10,7 +10,8 @@
  * implementation without touching the rest of the codebase.
  */
 import { Graph, layout } from '@dagrejs/dagre';
-import type { DiagramNode, DiagramEdge, DiagramDirection } from '../types';
+import type { DiagramNode, DiagramEdge, DiagramDirection, ConnectedEdgeEndpoint, DiagramEdgeEndpoint } from '../types';
+import { isStructurallyConnectedEdge } from '../types';
 import { NODE_SIZE_DEFAULTS } from '../nodeSizeConfig';
 
 // ---------------------------------------------------------------------------
@@ -198,13 +199,15 @@ function gridFallback(
 
   const defaultHandles = defaultHandlesForDirection(direction);
   for (const edge of edges) {
-    const sc = centerLookup.get(edge.from);
-    const tc = centerLookup.get(edge.to);
-    if (sc && tc) {
-      handles.set(edge.id, selectHandlesGeometrically(sc, tc));
-    } else {
-      handles.set(edge.id, { ...defaultHandles });
+    if (edge.from.kind === 'connected' && edge.to.kind === 'connected') {
+      const sc = centerLookup.get(edge.from.nodeId);
+      const tc = centerLookup.get(edge.to.nodeId);
+      if (sc && tc) {
+        handles.set(edge.id, selectHandlesGeometrically(sc, tc));
+        continue;
+      }
     }
+    handles.set(edge.id, { ...defaultHandles });
   }
 
   return { positions, handles };
@@ -226,21 +229,48 @@ function gridFallback(
  * @param orderOfAppearance - Node IDs in the order they appeared in the source
  * @returns Positions and handle pairs for all nodes and edges
  */
+function normalizeLayoutEdges(edges: DiagramEdge[]): DiagramEdge[] {
+  return edges.map((edge) => {
+    let fromEndpoint: DiagramEdgeEndpoint;
+    if (typeof edge.from === 'string') {
+      fromEndpoint = { kind: 'connected', nodeId: edge.from, handleId: edge.sourceHandle || null };
+    } else {
+      fromEndpoint = edge.from;
+    }
+
+    let toEndpoint: DiagramEdgeEndpoint;
+    if (typeof edge.to === 'string') {
+      toEndpoint = { kind: 'connected', nodeId: edge.to, handleId: edge.targetHandle || null };
+    } else {
+      toEndpoint = edge.to;
+    }
+
+    return {
+      ...edge,
+      from: fromEndpoint,
+      to: toEndpoint,
+      connectionStatus: fromEndpoint.kind === 'connected' && toEndpoint.kind === 'connected' ? 'connected' : 'detached',
+      exportMode: edge.exportMode || 'mermaid',
+    };
+  });
+}
+
 export function layoutImportedDiagram(
   nodes: DiagramNode[],
   edges: DiagramEdge[],
   direction: DiagramDirection,
   orderOfAppearance: string[],
 ): LayoutResult {
+  const normalizedEdges = normalizeLayoutEdges(edges);
   if (nodes.length === 0) {
     return { positions: new Map(), handles: new Map(), edgeLabelPositions: new Map() };
   }
 
   try {
-    return dagreLayout(nodes, edges, direction, orderOfAppearance);
+    return dagreLayout(nodes, normalizedEdges, direction, orderOfAppearance);
   } catch (err) {
     console.error('[mermaidLayout] Dagre layout failed, falling back to grid:', err);
-    return gridFallback(nodes, edges, direction);
+    return gridFallback(nodes, normalizedEdges, direction);
   }
 }
 
@@ -282,11 +312,14 @@ function dagreLayout(
   }
 
   // 3. Insert edges in stable order
-  const sortedEdges = [...edges].sort(stableEdgeOrder);
+  const sortedEdges = [...edges].filter(isStructurallyConnectedEdge).sort(stableEdgeOrder);
   for (const edge of sortedEdges) {
     const label = edge.label || '';
     const w = label ? label.length * LABEL_CHAR_WIDTH + LABEL_PADDING_X : 0;
     const h = label ? LABEL_LINE_HEIGHT : 0;
+
+    const fromId = (edge.from as ConnectedEdgeEndpoint).nodeId;
+    const toId = (edge.to as ConnectedEdgeEndpoint).nodeId;
 
     // All edge types (directed, undirected, bidirectional) are given to Dagre
     // to influence rank and proximity. For undirected/bidirectional edges,
@@ -295,12 +328,12 @@ function dagreLayout(
     const dir = edge.direction ?? 'directed';
     if (dir === 'undirected' || dir === 'bidirectional') {
       // Deterministic orientation for layout: lower id → higher id
-      const [from, to] = edge.from <= edge.to
-        ? [edge.from, edge.to]
-        : [edge.to, edge.from];
+      const [from, to] = fromId <= toId
+        ? [fromId, toId]
+        : [toId, fromId];
       g.setEdge(from, to, { width: w, height: h, labelpos: 'c' }, edge.id);
     } else {
-      g.setEdge(edge.from, edge.to, { width: w, height: h, labelpos: 'c' }, edge.id);
+      g.setEdge(fromId, toId, { width: w, height: h, labelpos: 'c' }, edge.id);
     }
   }
 
@@ -334,12 +367,14 @@ function dagreLayout(
   const defaultHandles = defaultHandlesForDirection(direction);
 
   for (const edge of sortedEdges) {
-    const sourceCenter = centerPositions.get(edge.from);
-    const targetCenter = centerPositions.get(edge.to);
+    const fromId = (edge.from as ConnectedEdgeEndpoint).nodeId;
+    const toId = (edge.to as ConnectedEdgeEndpoint).nodeId;
+    const sourceCenter = centerPositions.get(fromId);
+    const targetCenter = centerPositions.get(toId);
 
     if (sourceCenter && targetCenter) {
       // Self-loops: use default directional handles
-      if (edge.from === edge.to) {
+      if (fromId === toId) {
         handles.set(edge.id, { ...defaultHandles });
       } else {
         handles.set(edge.id, selectHandlesGeometrically(sourceCenter, targetCenter));
@@ -356,15 +391,15 @@ function dagreLayout(
     
     // Dagre requires querying the edge using the exact from/to direction
     // that was passed to g.setEdge. We used 'directed' behavior.
-    let from = edge.from;
-    let to = edge.to;
+    let from = (edge.from as ConnectedEdgeEndpoint).nodeId;
+    let to = (edge.to as ConnectedEdgeEndpoint).nodeId;
     
     // For undirected/bidirectional edges we sorted from/to alphabetically in setEdge
     const dir = edge.direction ?? 'directed';
     if (dir === 'undirected' || dir === 'bidirectional') {
-      if (edge.from > edge.to) {
-        from = edge.to;
-        to = edge.from;
+      if (from > to) {
+        from = (edge.to as ConnectedEdgeEndpoint).nodeId;
+        to = (edge.from as ConnectedEdgeEndpoint).nodeId;
       }
     }
     
