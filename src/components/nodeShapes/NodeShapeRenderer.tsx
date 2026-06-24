@@ -356,14 +356,13 @@ export const NodeShapeRenderer = ({
       svgContent = (
         <>
           <path
-            d="M15,15 A35,10 0 0,1 85,15 L85,85 A35,10 0 0,1 15,85 Z"
+            d="M15,15 L85,15 L85,85 A35,10 0 0,1 15,85 Z"
             fill="var(--node-bg-color, #ffffff)"
             stroke="var(--node-border-color, var(--border-color))"
             strokeWidth="2"
           />
           <ellipse cx="50" cy="15" rx="35" ry="10" fill="var(--node-bg-color, #ffffff)" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
-          <path d="M15,38 A35,10 0 0,0 85,38" fill="none" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
-          <path d="M15,62 A35,10 0 0,0 85,62" fill="none" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
+          <path d="M15,22 A35,10 0 0,0 85,22" fill="none" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
         </>
       );
       break;

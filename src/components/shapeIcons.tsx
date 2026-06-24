@@ -96,8 +96,7 @@ export const SHAPE_ICONS: Record<ShapeIconKey, React.ReactNode> = {
     <>
       <ellipse cx="12" cy="6" rx="7" ry="2.5" />
       <path d="M5 6v12c0 1.5 3.13 2.5 7 2.5s7-1 7-2.5V6" />
-      <path d="M5 10c0 1.5 3.13 2.5 7 2.5s7-1 7-2.5" />
-      <path d="M5 14c0 1.5 3.13 2.5 7 2.5s7-1 7-2.5" />
+      <path d="M5 8c0 1.5 3.13 2.5 7 2.5s7-1 7-2.5" />
     </>
   ),
   display: (
