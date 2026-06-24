@@ -537,6 +537,64 @@ describe('Zustand diagram store tests', () => {
     expect(edges[1].direction).toBe('directed');
   });
 
+  test('normalizeDiagram is idempotent and preserves detached edges', () => {
+    const raw = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        { id: 'n1', label: 'A', shape: 'process', position: { x: 0, y: 0 } }
+      ],
+      edges: [
+        // legacy string endpoint to real node:
+        { id: 'e1', from: 'n1', to: 'n2', label: 'E1', style: 'solid', direction: 'directed' }, // n2 is missing, becomes detached
+        // detached endpoint:
+        {
+          id: 'e2',
+          from: { kind: 'detached', point: { x: 45, y: 90 } },
+          to: { kind: 'connected', nodeId: 'n1', handleId: 'right' },
+          label: 'E2',
+          style: 'dotted',
+          direction: 'bidirectional',
+          exportMode: 'canvasOnly'
+        }
+      ],
+      textBoxes: [
+        {
+          id: 'tb1',
+          text: 'hello',
+          position: { x: 10, y: 20 },
+          width: 100,
+          height: 50,
+          style: { backgroundColor: '#ff0000', borderColor: '#00ff00' }
+        }
+      ]
+    };
+
+    const firstPass = normalizeDiagram(raw as unknown as CanonicalDiagram);
+    const secondPass = normalizeDiagram(firstPass);
+
+    // Verify first pass preserved/normalized everything:
+    expect(firstPass.edges).toHaveLength(2);
+    expect(firstPass.edges[0].from.kind).toBe('connected');
+    expect(firstPass.edges[0].to.kind).toBe('detached'); // n2 was not in nodes
+    
+    const to0 = firstPass.edges[0].to;
+    if (to0.kind !== 'detached') throw new Error('Expected detached');
+    expect(to0.point).toEqual({ x: 200, y: 200 }); // default fallback for toEndpoint
+
+    expect(firstPass.edges[1].from.kind).toBe('detached');
+    const from1 = firstPass.edges[1].from;
+    if (from1.kind !== 'detached') throw new Error('Expected detached');
+    expect(from1.point).toEqual({ x: 45, y: 90 });
+    expect(firstPass.edges[1].exportMode).toBe('canvasOnly');
+
+    // Verify idempotence:
+    expect(secondPass).toEqual(firstPass);
+  });
+
+
+
   test('loadDiagram preserves undirected and bidirectional directions', () => {
     const store = useDiagramStore.getState();
     const diagram = {

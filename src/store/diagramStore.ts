@@ -744,8 +744,10 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   moveDetachedEdgeEndpoint: ({ edgeId, endpoint, point }) => {
+    get().takeSnapshot();
     set((state) => {
       const nextEdges = state.diagram.edges.map((edge) => {
+
         if (edge.id !== edgeId) return edge;
         if (endpoint === 'from') {
           return {

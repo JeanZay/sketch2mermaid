@@ -41,8 +41,21 @@ async function assertMermaidCompiles(code: string, id: string) {
 }
 
 describe('Mermaid Import Realistic & Hardening Tests', () => {
-  const getEdgeFrom = (e: DiagramEdge) => typeof e.from === 'string' ? e.from : e.from.nodeId;
-  const getEdgeTo = (e: DiagramEdge) => typeof e.to === 'string' ? e.to : e.to.nodeId;
+  const getEdgeFrom = (e: DiagramEdge) => {
+    if (typeof e.from === 'string') return e.from;
+    if (e.from.kind !== 'connected') {
+      throw new Error(`Edge ${e.id} from endpoint is detached: ${JSON.stringify(e.from)}`);
+    }
+    return e.from.nodeId;
+  };
+  const getEdgeTo = (e: DiagramEdge) => {
+    if (typeof e.to === 'string') return e.to;
+    if (e.to.kind !== 'connected') {
+      throw new Error(`Edge ${e.id} to endpoint is detached: ${JSON.stringify(e.to)}`);
+    }
+    return e.to.nodeId;
+  };
+
 
   // 1. Ampersand detection rules
   describe('Ampersand Detection hardening', () => {

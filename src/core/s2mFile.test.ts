@@ -162,7 +162,112 @@ describe('parseSketch2MermaidFile — valid files', () => {
     if (!result.ok) return;
     expect(result.diagram.textBoxes).toEqual([]);
   });
+
+  it('round-trip: verifies .s2m schema round-trip for connected Mermaid, detached (1 and 2 endpoints), and connected canvasOnly edges', () => {
+    const complexDiagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'LR',
+      nodes: [
+        { id: 'n1', label: 'Node 1', shape: 'rounded', position: { x: 50, y: 50 } },
+        { id: 'n2', label: 'Node 2', shape: 'process', position: { x: 250, y: 50 } }
+      ],
+      edges: [
+        // 1. One fully connected Mermaid edge
+        {
+          id: 'e1',
+          from: { kind: 'connected', nodeId: 'n1', handleId: 'r-1' },
+          to: { kind: 'connected', nodeId: 'n2', handleId: 'l-1' },
+          connectionStatus: 'connected',
+          exportMode: 'mermaid',
+          label: 'Mermaid Connected',
+          style: 'solid',
+          direction: 'directed',
+          sourceHandle: 'r-1',
+          targetHandle: 'l-1'
+        },
+        // 2. One detached edge with one detached endpoint
+        {
+          id: 'e2',
+          from: { kind: 'connected', nodeId: 'n1', handleId: 'b-1' },
+          to: { kind: 'detached', point: { x: 100, y: 300 } },
+          connectionStatus: 'detached',
+          exportMode: 'mermaid',
+          label: 'One End Detached',
+          style: 'dotted',
+          direction: 'undirected',
+          sourceHandle: 'b-1',
+          targetHandle: null
+        },
+        // 3. One detached edge with two detached endpoints
+        {
+          id: 'e3',
+          from: { kind: 'detached', point: { x: 200, y: 400 } },
+          to: { kind: 'detached', point: { x: 300, y: 500 } },
+          connectionStatus: 'detached',
+          exportMode: 'mermaid',
+          label: 'Both Ends Detached',
+          style: 'solid',
+          direction: 'directed',
+          sourceHandle: null,
+          targetHandle: null
+        },
+        // 4. One fully connected canvasOnly edge
+        {
+          id: 'e4',
+          from: { kind: 'connected', nodeId: 'n1', handleId: 't-1' },
+          to: { kind: 'connected', nodeId: 'n2', handleId: 't-2' },
+          connectionStatus: 'connected',
+          exportMode: 'canvasOnly',
+          label: 'Canvas Only Connected',
+          style: 'dotted',
+          direction: 'bidirectional',
+          sourceHandle: 't-1',
+          targetHandle: 't-2'
+        }
+      ],
+      textBoxes: []
+    };
+
+    const json = serializeSketch2MermaidFile(complexDiagram, testViewport);
+    const result = parseSketch2MermaidFile(json);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // Check all edge structures are preserved
+    expect(result.diagram.edges).toHaveLength(4);
+    
+    // Check edge 1
+    const e1 = result.diagram.edges[0];
+    expect(e1.from).toEqual({ kind: 'connected', nodeId: 'n1', handleId: 'r-1' });
+    expect(e1.to).toEqual({ kind: 'connected', nodeId: 'n2', handleId: 'l-1' });
+    expect(e1.connectionStatus).toBe('connected');
+    expect(e1.exportMode).toBe('mermaid');
+
+    // Check edge 2
+    const e2 = result.diagram.edges[1];
+    expect(e2.from).toEqual({ kind: 'connected', nodeId: 'n1', handleId: 'b-1' });
+    expect(e2.to).toEqual({ kind: 'detached', point: { x: 100, y: 300 } });
+    expect(e2.connectionStatus).toBe('detached');
+    expect(e2.exportMode).toBe('mermaid');
+
+    // Check edge 3
+    const e3 = result.diagram.edges[2];
+    expect(e3.from).toEqual({ kind: 'detached', point: { x: 200, y: 400 } });
+    expect(e3.to).toEqual({ kind: 'detached', point: { x: 300, y: 500 } });
+    expect(e3.connectionStatus).toBe('detached');
+    expect(e3.exportMode).toBe('mermaid');
+
+    // Check edge 4
+    const e4 = result.diagram.edges[3];
+    expect(e4.from).toEqual({ kind: 'connected', nodeId: 'n1', handleId: 't-1' });
+    expect(e4.to).toEqual({ kind: 'connected', nodeId: 'n2', handleId: 't-2' });
+    expect(e4.connectionStatus).toBe('connected');
+    expect(e4.exportMode).toBe('canvasOnly');
+  });
 });
+
 
 // ---------------------------------------------------------------------------
 // parseSketch2MermaidFile — invalid files
