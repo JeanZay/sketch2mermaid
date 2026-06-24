@@ -13,7 +13,7 @@ export const NodeShapeRenderer = ({
   className = '',
   children,
 }: NodeShapeRendererProps) => {
-  const isLegacyShape = LEGACY_NODE_SHAPES.has(shape);
+  const isLegacyShape = LEGACY_NODE_SHAPES.has(shape) && shape !== 'asymmetric';
 
   if (shape === 'comment') {
     return (
@@ -241,7 +241,6 @@ export const NodeShapeRenderer = ({
       'parallelogramAlt',
       'trapezoid',
       'trapezoidAlt',
-      'asymmetric',
     ].includes(shape)) {
       return (
         <>
@@ -412,7 +411,7 @@ export const NodeShapeRenderer = ({
       svgContent = (
         <>
           <rect x="2" y="15" width="96" height="70" rx="4" fill="var(--node-bg-color, #ffffff)" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
-          <line x1="2" y1="35" x2="98" y2="35" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
+          <line x1="2" y1="26.6" x2="98" y2="26.6" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
         </>
       );
       break;
@@ -618,6 +617,7 @@ export const NodeShapeRenderer = ({
       );
       break;
 
+    case 'asymmetric':
     case 'odd':
       svgContent = (
         <polygon
@@ -678,17 +678,17 @@ export const NodeShapeRenderer = ({
       <div
         className={`new-shape-label-wrapper`}
         style={{
-          position: ['documents', 'manualFile', 'forkJoin'].includes(shape) ? 'absolute' : 'relative',
-          left: shape === 'documents' ? '2%' : (shape === 'manualFile' ? '10%' : (shape === 'forkJoin' ? '50%' : undefined)),
-          top: shape === 'documents' ? '14%' : (shape === 'manualFile' ? '10%' : (shape === 'forkJoin' ? '50%' : undefined)),
-          width: shape === 'documents' ? '78%' : (shape === 'manualFile' ? '80%' : (shape === 'forkJoin' ? '150px' : '100%')),
-          height: shape === 'documents' ? '72%' : (shape === 'manualFile' ? '35%' : (shape === 'forkJoin' ? '40px' : '100%')),
+          position: ['documents', 'manualFile', 'forkJoin', 'asymmetric', 'odd', 'dividedProcess'].includes(shape) ? 'absolute' : 'relative',
+          left: shape === 'documents' ? '2%' : (shape === 'manualFile' ? '10%' : (shape === 'forkJoin' ? '50%' : (['asymmetric', 'odd'].includes(shape) ? '18%' : (shape === 'dividedProcess' ? '2%' : undefined)))),
+          top: shape === 'documents' ? '14%' : (shape === 'manualFile' ? '10%' : (shape === 'forkJoin' ? '50%' : (['asymmetric', 'odd'].includes(shape) ? '15%' : (shape === 'dividedProcess' ? '26.6%' : undefined)))),
+          width: shape === 'documents' ? '78%' : (shape === 'manualFile' ? '80%' : (shape === 'forkJoin' ? '150px' : (['asymmetric', 'odd'].includes(shape) ? '80%' : (shape === 'dividedProcess' ? '96%' : '100%')))),
+          height: shape === 'documents' ? '72%' : (shape === 'manualFile' ? '35%' : (shape === 'forkJoin' ? '40px' : (['asymmetric', 'odd'].includes(shape) ? '70%' : (shape === 'dividedProcess' ? '58.4%' : '100%')))),
           transform: shape === 'forkJoin' ? 'translate(-50%, -50%)' : undefined,
           zIndex: 1,
           padding: '4px 8px',
           boxSizing: 'border-box',
           display: 'flex',
-          alignItems: 'center',
+          alignItems: shape === 'dividedProcess' ? 'flex-end' : 'center',
           justifyContent: 'center',
           pointerEvents: 'none',
         }}

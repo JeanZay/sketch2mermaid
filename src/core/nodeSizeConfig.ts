@@ -27,7 +27,7 @@ export const NODE_SIZE_DEFAULTS: Record<NodeShape, NodeSizeConfig> = {
   parallelogramAlt: { width: 160, height: 56, minWidth: 110, minHeight: 44 },
   trapezoid:        { width: 160, height: 56, minWidth: 110, minHeight: 44 },
   trapezoidAlt:     { width: 160, height: 56, minWidth: 110, minHeight: 44 },
-  asymmetric:       { width: 150, height: 56, minWidth: 100, minHeight: 44 },
+  asymmetric:       { width: 140, height: 56, minWidth: 90, minHeight: 44 },
   documents:        { width: 150, height: 76, minWidth: 110, minHeight: 64 },
 
   // New shapes:
@@ -44,7 +44,7 @@ export const NODE_SIZE_DEFAULTS: Record<NodeShape, NodeSizeConfig> = {
   directAccessStorage:  { width: 150, height: 76, minWidth: 110, minHeight: 64 },
   diskStorage:          { width: 150, height: 76, minWidth: 110, minHeight: 64 },
   display:              { width: 150, height: 112, minWidth: 100, minHeight: 88 },
-  dividedProcess:       { width: 140, height: 56, minWidth: 90, minHeight: 44 },
+  dividedProcess:       { width: 180, height: 56, minWidth: 90, minHeight: 44 },
   extract:              { width: 120, height: 90, minWidth: 90, minHeight: 70 },
   forkJoin:             { width: 16, height: 96, minWidth: 8, minHeight: 44 },
   internalStorage:      { width: 150, height: 56, minWidth: 100, minHeight: 44 },

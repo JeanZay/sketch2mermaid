@@ -144,7 +144,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   if (shape === 'rounded') wrapperClass = 'custom-node shape-rounded';
   if (shape === 'stadium') wrapperClass = 'custom-node shape-stadium';
 
-  const isLegacy = LEGACY_NODE_SHAPES.has(shape);
+  const isLegacy = LEGACY_NODE_SHAPES.has(shape) && shape !== 'asymmetric';
 
   if (!isLegacy) {
     wrapperClass = `new-shape-node-wrapper shape-${shape}-node`;
