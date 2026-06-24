@@ -112,4 +112,33 @@ describe('Centralized Shape Registry', () => {
       expect(shapes.length).toBeGreaterThan(0);
     }
   });
+
+  it('should map comment shapes and their aliases correctly', () => {
+    // Comment / Left Brace
+    const braceDef = findDefinitionByMermaidName('brace');
+    const commentDef = findDefinitionByMermaidName('comment');
+    const braceLDef = findDefinitionByMermaidName('brace-l');
+    
+    expect(braceDef?.nodeShape).toBe('comment');
+    expect(commentDef?.nodeShape).toBe('comment');
+    expect(braceLDef?.nodeShape).toBe('comment');
+
+    // Comment Right / Right Brace
+    const braceRDef = findDefinitionByMermaidName('brace-r');
+    const commentRightDef = findDefinitionByMermaidName('comment right');
+    const commentRightHyphenDef = findDefinitionByMermaidName('comment-right');
+    
+    expect(braceRDef?.nodeShape).toBe('commentRight');
+    expect(commentRightDef?.nodeShape).toBe('commentRight');
+    expect(commentRightHyphenDef?.nodeShape).toBe('commentRight');
+
+    // Comment Both / Braces
+    const bracesDef = findDefinitionByMermaidName('braces');
+    const commentBothDef = findDefinitionByMermaidName('comment both');
+    const commentBothHyphenDef = findDefinitionByMermaidName('comment-both');
+
+    expect(bracesDef?.nodeShape).toBe('commentBoth');
+    expect(commentBothDef?.nodeShape).toBe('commentBoth');
+    expect(commentBothHyphenDef?.nodeShape).toBe('commentBoth');
+  });
 });

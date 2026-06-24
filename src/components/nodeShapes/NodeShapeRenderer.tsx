@@ -15,6 +15,197 @@ export const NodeShapeRenderer = ({
 }: NodeShapeRendererProps) => {
   const isLegacyShape = LEGACY_NODE_SHAPES.has(shape);
 
+  if (shape === 'comment') {
+    return (
+      <div
+        className={`new-shape-container shape-comment-container ${className}`}
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          boxSizing: 'border-box',
+          padding: '4px 8px 4px 18px',
+        }}
+      >
+        <svg
+          viewBox="0 0 10 80"
+          style={{
+            position: 'absolute',
+            left: '6px',
+            top: '10%',
+            height: '80%',
+            width: '10px',
+            pointerEvents: 'none',
+            overflow: 'visible',
+          }}
+        >
+          <path
+            d="M 8,2 Q 2,2 2,12 L 2,34 Q 2,40 0,40 Q 2,40 2,46 L 2,68 Q 2,78 8,78"
+            fill="none"
+            stroke="var(--node-border-color, var(--border-color))"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+        <div
+          className="new-shape-label-wrapper"
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div style={{ pointerEvents: 'auto', width: '100%' }}>
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (shape === 'commentRight') {
+    return (
+      <div
+        className={`new-shape-container shape-commentRight-container ${className}`}
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          boxSizing: 'border-box',
+          padding: '4px 18px 4px 8px',
+        }}
+      >
+        <div
+          className="new-shape-label-wrapper"
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div style={{ pointerEvents: 'auto', width: '100%' }}>
+            {children}
+          </div>
+        </div>
+        <svg
+          viewBox="0 0 10 80"
+          style={{
+            position: 'absolute',
+            right: '6px',
+            top: '10%',
+            height: '80%',
+            width: '10px',
+            pointerEvents: 'none',
+            overflow: 'visible',
+          }}
+        >
+          <path
+            d="M 2,2 Q 8,2 8,12 L 8,34 Q 8,40 10,40 Q 8,40 8,46 L 8,68 Q 8,78 2,78"
+            fill="none"
+            stroke="var(--node-border-color, var(--border-color))"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+      </div>
+    );
+  }
+
+  if (shape === 'commentBoth') {
+    return (
+      <div
+        className={`new-shape-container shape-commentBoth-container ${className}`}
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          boxSizing: 'border-box',
+          padding: '4px 18px 4px 18px',
+        }}
+      >
+        <svg
+          viewBox="0 0 10 80"
+          style={{
+            position: 'absolute',
+            left: '6px',
+            top: '10%',
+            height: '80%',
+            width: '10px',
+            pointerEvents: 'none',
+            overflow: 'visible',
+          }}
+        >
+          <path
+            d="M 8,2 Q 2,2 2,12 L 2,34 Q 2,40 0,40 Q 2,40 2,46 L 2,68 Q 2,78 8,78"
+            fill="none"
+            stroke="var(--node-border-color, var(--border-color))"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+        <div
+          className="new-shape-label-wrapper"
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div style={{ pointerEvents: 'auto', width: '100%' }}>
+            {children}
+          </div>
+        </div>
+        <svg
+          viewBox="0 0 10 80"
+          style={{
+            position: 'absolute',
+            right: '6px',
+            top: '10%',
+            height: '80%',
+            width: '10px',
+            pointerEvents: 'none',
+            overflow: 'visible',
+          }}
+        >
+          <path
+            d="M 2,2 Q 8,2 8,12 L 8,34 Q 8,40 10,40 Q 8,40 8,46 L 8,68 Q 8,78 2,78"
+            fill="none"
+            stroke="var(--node-border-color, var(--border-color))"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+      </div>
+    );
+  }
+
   if (isLegacyShape) {
     // Return legacy HTML/CSS wrapper structure to guarantee zero regressions for original shapes
     if (shape === 'decision') {
@@ -131,38 +322,7 @@ export const NodeShapeRenderer = ({
       );
       break;
 
-    case 'comment':
-      svgContent = (
-        <path
-          d="M80,5 C40,5 30,10 30,50 C30,90 40,95 80,95 M30,50 L5,50"
-          fill="none"
-          stroke="var(--node-border-color, var(--border-color))"
-          strokeWidth="2"
-        />
-      );
-      break;
 
-    case 'commentRight':
-      svgContent = (
-        <path
-          d="M20,5 C60,5 70,10 70,50 C70,90 60,95 20,95 M70,50 L95,50"
-          fill="none"
-          stroke="var(--node-border-color, var(--border-color))"
-          strokeWidth="2"
-        />
-      );
-      break;
-
-    case 'commentBoth':
-      svgContent = (
-        <path
-          d="M30,5 C10,5 5,10 5,50 C5,90 10,95 30,95 M70,5 C90,5 95,10 95,50 C95,90 90,95 70,95"
-          fill="none"
-          stroke="var(--node-border-color, var(--border-color))"
-          strokeWidth="2"
-        />
-      );
-      break;
 
     case 'dataStore':
       svgContent = (
