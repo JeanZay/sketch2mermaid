@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNodes, useEdges, useReactFlow } from '@xyflow/react';
 import { useDiagramStore, DEFAULT_NODE_TEXT_STYLE, DEFAULT_EDGE_TEXT_STYLE, DEFAULT_TEXT_BOX_STYLE } from '../store/diagramStore';
 import type { TextStyle, TextBoxStyle } from '../core/types';
 import { SHAPE_CONFIGS } from './shapeConfig';
 import { FontSizeControl } from './properties/FontSizeControl';
+import { ConfirmModal } from './ConfirmModal';
 
 export const PropertiesPanel = () => {
   const nodes = useNodes();
@@ -34,9 +35,21 @@ export const PropertiesPanel = () => {
     setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
   };
 
+  // Pending delete confirmation state for node with connected edges
+  const [pendingDeleteNode, setPendingDeleteNode] = useState<{
+    nodeId: string;
+    edgeCount: number;
+  } | null>(null);
+
   const handleDeleteNode = () => {
-    if (selectedNode) {
+    if (!selectedNode) return;
+    const edgeCount = diagram.edges.filter(
+      (e) => e.from === selectedNode.id || e.to === selectedNode.id
+    ).length;
+    if (edgeCount === 0) {
       deleteNode(selectedNode.id);
+    } else {
+      setPendingDeleteNode({ nodeId: selectedNode.id, edgeCount });
     }
   };
 
@@ -274,6 +287,7 @@ export const PropertiesPanel = () => {
     const shapes = SHAPE_CONFIGS;
 
     return (
+      <>
       <div className="properties-panel-content">
         <div className="properties-header">
           <div className="properties-header-title">
@@ -465,6 +479,22 @@ export const PropertiesPanel = () => {
           </div>
         </div>
       </div>
+
+      {pendingDeleteNode && (
+        <ConfirmModal
+          title="Supprimer le nœud"
+          message={`Ce nœud est connecté à ${pendingDeleteNode.edgeCount} liaison(s). Supprimer ce nœud supprimera aussi ces liaisons.`}
+          confirmLabel="Supprimer tout"
+          cancelLabel="Annuler"
+          variant="danger"
+          onConfirm={() => {
+            deleteNode(pendingDeleteNode.nodeId);
+            setPendingDeleteNode(null);
+          }}
+          onCancel={() => setPendingDeleteNode(null)}
+        />
+      )}
+    </>
     );
   }
 

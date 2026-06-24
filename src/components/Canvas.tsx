@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useEffect, useState } from 'react';
+import { ConfirmModal } from './ConfirmModal';
 import { 
   ReactFlow, 
   Background, 
@@ -50,6 +51,14 @@ function FlowInner() {
   // Selection state — updated only from event handler callbacks (not effects)
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<Set<string>>(new Set());
+
+  // Pending delete confirmation state for nodes with connected edges
+  const [pendingDelete, setPendingDelete] = useState<{
+    nodeIds: string[];
+    textBoxIds: string[];
+    edgeIds: string[];       // edges explicitly selected by the user
+    cascadeEdgeCount: number; // additional edges connected to selected nodes
+  } | null>(null);
 
   // Derive React Flow nodes from diagram store + selection state
   const rfNodes = useMemo(() => {
@@ -108,6 +117,61 @@ function FlowInner() {
   // Access React Flow's internal node list for keyboard nudging
   const nodes = useNodes();
 
+  // Build a lookup for node types from the current rfNodes to route changes
+  // by React Flow node type (refinement #1: avoid scattering ID prefix checks)
+  const nodeTypeById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const n of rfNodes) {
+      map.set(n.id, n.type);
+    }
+    return map;
+  }, [rfNodes]);
+
+  // Centralized delete handler: collects all selected elements, checks for
+  // connected edges on selected nodes, and either deletes directly or shows
+  // a confirmation dialog. Handles mixed selection atomically.
+  const handleDeleteSelected = useCallback(() => {
+    // Partition selected nodes into diagram nodes vs text boxes
+    const selNodeIds: string[] = [];
+    const selTextBoxIds: string[] = [];
+    for (const id of selectedNodeIds) {
+      const nType = nodeTypeById.get(id);
+      if (nType === 'textBox') {
+        selTextBoxIds.push(id);
+      } else if (nType === 'customNode') {
+        selNodeIds.push(id);
+      }
+    }
+    const selEdgeIds = Array.from(selectedEdgeIds);
+
+    // Nothing selected — bail
+    if (selNodeIds.length === 0 && selTextBoxIds.length === 0 && selEdgeIds.length === 0) return;
+
+    // Count edges connected to the selected nodes (unique, excluding already-selected edges)
+    const selNodeIdSet = new Set(selNodeIds);
+    const selEdgeIdSet = new Set(selEdgeIds);
+    const cascadeEdges = diagram.edges.filter(
+      (e) => (selNodeIdSet.has(e.from) || selNodeIdSet.has(e.to)) && !selEdgeIdSet.has(e.id)
+    );
+
+    if (cascadeEdges.length === 0) {
+      // No cascade edges — delete everything directly
+      startTransaction();
+      for (const id of selEdgeIds) deleteEdge(id);
+      for (const id of selTextBoxIds) deleteTextBox(id);
+      for (const id of selNodeIds) deleteNode(id);
+      commitTransaction();
+    } else {
+      // At least one selected node has connected edges — ask for confirmation
+      setPendingDelete({
+        nodeIds: selNodeIds,
+        textBoxIds: selTextBoxIds,
+        edgeIds: selEdgeIds,
+        cascadeEdgeCount: cascadeEdges.length,
+      });
+    }
+  }, [selectedNodeIds, selectedEdgeIds, nodeTypeById, diagram.edges, startTransaction, commitTransaction, deleteNode, deleteEdge, deleteTextBox]);
+
   // Handle keyboard nudging and undo/redo shortcuts with safeguards
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -144,6 +208,13 @@ function FlowInner() {
         return;
       }
 
+      // Delete/Backspace — custom handling to intercept before React Flow
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault();
+        handleDeleteSelected();
+        return;
+      }
+
       const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key);
       if (!isArrowKey) return;
 
@@ -168,17 +239,8 @@ function FlowInner() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [nodes, updateNodePosition, undo, redo]);
+  }, [nodes, updateNodePosition, undo, redo, handleDeleteSelected]);
 
-  // Build a lookup for node types from the current rfNodes to route changes
-  // by React Flow node type (refinement #1: avoid scattering ID prefix checks)
-  const nodeTypeById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const n of rfNodes) {
-      map.set(n.id, n.type);
-    }
-    return map;
-  }, [rfNodes]);
 
   // Handle ALL node changes — selection tracked in state, position updated continuously
   const onNodesChange = useCallback((changes: NodeChange[]) => {
@@ -256,6 +318,16 @@ function FlowInner() {
     }
   }, [addNode, screenToFlowPosition]);
 
+  // Build the confirmation message based on the pending delete state
+  const pendingDeleteMessage = useMemo(() => {
+    if (!pendingDelete) return '';
+    const { nodeIds, cascadeEdgeCount } = pendingDelete;
+    if (nodeIds.length === 1) {
+      return `Ce nœud est connecté à ${cascadeEdgeCount} liaison(s). Supprimer ce nœud supprimera aussi ces liaisons.`;
+    }
+    return `Ces ${nodeIds.length} nœuds sont connectés à ${cascadeEdgeCount} liaison(s) au total. Supprimer ces nœuds supprimera aussi ces liaisons.`;
+  }, [pendingDelete]);
+
   return (
     <VirtualAnchorsContext.Provider value={virtualAnchors}>
       <div className="canvas-container" style={{ width: '100%', height: '100%' }}>
@@ -270,24 +342,11 @@ function FlowInner() {
           onPaneDoubleClick={onPaneDoubleClick}
           onNodeDragStart={startTransaction}
           onNodeDragStop={commitTransaction}
-          onNodesDelete={(deletedNodes) => {
-            startTransaction();
-            for (const n of deletedNodes) {
-              const nType = nodeTypeById.get(n.id);
-              if (nType === 'textBox') {
-                deleteTextBox(n.id);
-              } else {
-                deleteNode(n.id);
-              }
-            }
-            commitTransaction();
-          }}
-          onEdgesDelete={(edges) => {
-            startTransaction();
-            edges.forEach((e) => deleteEdge(e.id));
-            commitTransaction();
-          }}
-          deleteKeyCode={['Delete', 'Backspace']}
+          // Neutralized: all deletion is handled by our custom keydown handler
+          // to enforce the confirmation dialog for nodes with connected edges.
+          onNodesDelete={() => {}}
+          onEdgesDelete={() => {}}
+          deleteKeyCode={null}
           nodeDragThreshold={2}
           defaultEdgeOptions={{ interactionWidth: 20 }}
           connectionLineOptions={{
@@ -305,6 +364,25 @@ function FlowInner() {
           <Controls showInteractive={false} className="rf-controls" />
 
         </ReactFlow>
+
+        {pendingDelete && (
+          <ConfirmModal
+            title="Supprimer"
+            message={pendingDeleteMessage}
+            confirmLabel="Supprimer tout"
+            cancelLabel="Annuler"
+            variant="danger"
+            onConfirm={() => {
+              startTransaction();
+              for (const id of pendingDelete.edgeIds) deleteEdge(id);
+              for (const id of pendingDelete.textBoxIds) deleteTextBox(id);
+              for (const id of pendingDelete.nodeIds) deleteNode(id);
+              commitTransaction();
+              setPendingDelete(null);
+            }}
+            onCancel={() => setPendingDelete(null)}
+          />
+        )}
       </div>
     </VirtualAnchorsContext.Provider>
   );
