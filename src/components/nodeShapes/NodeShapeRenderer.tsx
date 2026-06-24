@@ -233,15 +233,7 @@ export const NodeShapeRenderer = ({
       return <div className="database-text">{children}</div>;
     }
 
-    if (shape === 'documents') {
-      return (
-        <>
-          <div className="documents-bg-back"></div>
-          <div className="documents-bg-middle"></div>
-          <div className="documents-front">{children}</div>
-        </>
-      );
-    }
+
 
     if ([
       'hexagon',
@@ -269,8 +261,8 @@ export const NodeShapeRenderer = ({
   switch (shape) {
     case 'bang':
       svgContent = (
-        <polygon
-          points="50,2 62,35 95,25 78,55 98,75 66,75 50,98 34,75 2,75 22,55 5,25 38,35"
+        <path
+          d="M8,20 a11.5,11.5 1 0,0 19.1,-5.9 a11.5,11.5 1 0,0 19.1,0 a11.5,11.5 1 0,0 19.1,0 a11.5,11.5 1 0,0 19.1,5.9 a11.5,11.5 1 0,0 11.5,19.4 a9.2,9.2 1 0,0 0,20.0 a11.5,11.5 1 0,0 -11.5,19.4 a11.5,11.5 1 0,0 -19.1,8.8 a11.5,11.5 1 0,0 -19.1,0 a11.5,11.5 1 0,0 -19.1,0 a11.5,11.5 1 0,0 -19.1,-8.8 a11.5,11.5 1 0,0 -7.6,-19.4 a9.2,9.2 1 0,0 0,-20.0 a11.5,11.5 1 0,0 7.6,-19.4 Z"
           fill="var(--node-bg-color, #ffffff)"
           stroke="var(--node-border-color, var(--border-color))"
           strokeWidth="2"
@@ -281,7 +273,7 @@ export const NodeShapeRenderer = ({
     case 'card':
       svgContent = (
         <path
-          d="M2,2 L80,2 L98,20 L98,98 L2,98 Z"
+          d="M98,2 L20,2 L2,20 L2,98 L98,98 Z"
           fill="var(--node-bg-color, #ffffff)"
           stroke="var(--node-border-color, var(--border-color))"
           strokeWidth="2"
@@ -380,11 +372,39 @@ export const NodeShapeRenderer = ({
     case 'display':
       svgContent = (
         <path
-          d="M2,50 C15,15 30,15 50,15 L98,15 L80,50 L98,85 L50,85 C30,85 15,85 2,50 Z"
+          d="M20,15 L10,50 L20,85 L75,85 C88,85 98,70 98,50 C98,30 88,15 75,15 Z"
           fill="var(--node-bg-color, #ffffff)"
           stroke="var(--node-border-color, var(--border-color))"
           strokeWidth="2"
         />
+      );
+      break;
+
+    case 'documents':
+      svgContent = (
+        <>
+          {/* Back Sheet */}
+          <path
+            d="M18,2 L96,2 L96,70 C76,62 38,78 18,70 Z"
+            fill="var(--node-bg-color, #ffffff)"
+            stroke="var(--node-border-color, var(--border-color))"
+            strokeWidth="2"
+          />
+          {/* Middle Sheet */}
+          <path
+            d="M10,8 L88,8 L88,78 C68,70 30,86 10,78 Z"
+            fill="var(--node-bg-color, #ffffff)"
+            stroke="var(--node-border-color, var(--border-color))"
+            strokeWidth="2"
+          />
+          {/* Front Sheet */}
+          <path
+            d="M2,14 L80,14 L80,86 C60,78 22,94 2,86 Z"
+            fill="var(--node-bg-color, #ffffff)"
+            stroke="var(--node-border-color, var(--border-color))"
+            strokeWidth="2"
+          />
+        </>
       );
       break;
 
@@ -411,11 +431,14 @@ export const NodeShapeRenderer = ({
     case 'forkJoin':
       svgContent = (
         <rect
-          x="42"
+          x="2"
           y="2"
-          width="16"
+          width="96"
           height="96"
-          fill="var(--node-border-color, var(--border-color))"
+          fill="var(--node-bg-color, #ffffff)"
+          stroke="var(--node-border-color, var(--border-color))"
+          strokeWidth="2"
+          vectorEffect="non-scaling-stroke"
         />
       );
       break;
@@ -435,7 +458,7 @@ export const NodeShapeRenderer = ({
         <circle
           cx="50"
           cy="50"
-          r="30"
+          r="45"
           fill="var(--node-border-color, var(--border-color))"
         />
       );
@@ -445,15 +468,19 @@ export const NodeShapeRenderer = ({
       svgContent = (
         <>
           <path
-            d="M2,2 L70,2 L98,30 L98,98 L2,98 Z"
+            d="M2,15 L98,15 L98,80 C70,65 30,95 2,80 Z"
             fill="var(--node-bg-color, #ffffff)"
             stroke="var(--node-border-color, var(--border-color))"
             strokeWidth="2"
           />
-          <path d="M70,2 L70,30 L98,30" fill="none" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
-          <line x1="15" y1="45" x2="85" y2="45" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
-          <line x1="15" y1="60" x2="85" y2="60" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
-          <line x1="15" y1="75" x2="65" y2="75" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
+          <line
+            x1="6"
+            y1="15"
+            x2="6"
+            y2="81.5"
+            stroke="var(--node-border-color, var(--border-color))"
+            strokeWidth="2"
+          />
         </>
       );
       break;
@@ -461,7 +488,18 @@ export const NodeShapeRenderer = ({
     case 'loopLimit':
       svgContent = (
         <polygon
-          points="2,15 98,15 98,60 75,85 25,85 2,60"
+          points="2,95 2,21 25,5 75,5 98,21 98,95"
+          fill="var(--node-bg-color, #ffffff)"
+          stroke="var(--node-border-color, var(--border-color))"
+          strokeWidth="2"
+        />
+      );
+      break;
+
+    case 'file':
+      svgContent = (
+        <path
+          d="M5,5 L95,5 L95,85 C70,70 30,100 5,85 Z"
           fill="var(--node-bg-color, #ffffff)"
           stroke="var(--node-border-color, var(--border-color))"
           strokeWidth="2"
@@ -471,15 +509,12 @@ export const NodeShapeRenderer = ({
 
     case 'manualFile':
       svgContent = (
-        <>
-          <path
-            d="M2,2 L98,2 L98,70 L70,98 L2,98 Z"
-            fill="var(--node-bg-color, #ffffff)"
-            stroke="var(--node-border-color, var(--border-color))"
-            strokeWidth="2"
-          />
-          <path d="M98,70 L70,70 L70,98" fill="none" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
-        </>
+        <polygon
+          points="5,10 95,10 50,95"
+          fill="var(--node-bg-color, #ffffff)"
+          stroke="var(--node-border-color, var(--border-color))"
+          strokeWidth="2"
+        />
       );
       break;
 
@@ -517,7 +552,7 @@ export const NodeShapeRenderer = ({
     case 'storedData':
       svgContent = (
         <path
-          d="M2,15 L98,15 C85,30 85,70 98,85 L2,85 C15,70 15,30 2,15 Z"
+          d="M17,15 L98,15 C83,30 83,70 98,85 L17,85 C2,70 2,30 17,15 Z"
           fill="var(--node-bg-color, #ffffff)"
           stroke="var(--node-border-color, var(--border-color))"
           strokeWidth="2"
@@ -539,13 +574,17 @@ export const NodeShapeRenderer = ({
       svgContent = (
         <>
           <path
-            d="M2,2 L70,2 L98,30 L98,98 L2,98 Z"
+            d="M2,15 L98,15 L98,80 C70,70 30,90 2,80 Z"
             fill="var(--node-bg-color, #ffffff)"
             stroke="var(--node-border-color, var(--border-color))"
             strokeWidth="2"
           />
-          <path d="M70,2 L70,30 L98,30" fill="none" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
-          <circle cx="35" cy="30" r="8" fill="var(--node-bg-color, #ffffff)" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
+          <polygon
+            points="98,80 83,78 98,65"
+            fill="var(--node-bg-color, #ffffff)"
+            stroke="var(--node-border-color, var(--border-color))"
+            strokeWidth="2"
+          />
         </>
       );
       break;
@@ -553,8 +592,22 @@ export const NodeShapeRenderer = ({
     case 'taggedProcess':
       svgContent = (
         <>
-          <rect x="2" y="15" width="96" height="70" rx="4" fill="var(--node-bg-color, #ffffff)" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
-          <circle cx="20" cy="35" r="6" fill="var(--node-bg-color, #ffffff)" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
+          <rect
+            x="2"
+            y="15"
+            width="96"
+            height="70"
+            rx="0"
+            fill="var(--node-bg-color, #ffffff)"
+            stroke="var(--node-border-color, var(--border-color))"
+            strokeWidth="2"
+          />
+          <polygon
+            points="98,85 82,85 98,69"
+            fill="var(--node-bg-color, #ffffff)"
+            stroke="var(--node-border-color, var(--border-color))"
+            strokeWidth="2"
+          />
         </>
       );
       break;
@@ -568,7 +621,7 @@ export const NodeShapeRenderer = ({
     case 'odd':
       svgContent = (
         <polygon
-          points="15,15 85,15 98,50 85,85 15,85 2,50"
+          points="2,15 98,15 98,85 2,85 20,50"
           fill="var(--node-bg-color, #ffffff)"
           stroke="var(--node-border-color, var(--border-color))"
           strokeWidth="2"
@@ -625,11 +678,14 @@ export const NodeShapeRenderer = ({
       <div
         className={`new-shape-label-wrapper`}
         style={{
-          position: 'relative',
+          position: ['documents', 'manualFile', 'forkJoin'].includes(shape) ? 'absolute' : 'relative',
+          left: shape === 'documents' ? '2%' : (shape === 'manualFile' ? '10%' : (shape === 'forkJoin' ? '50%' : undefined)),
+          top: shape === 'documents' ? '14%' : (shape === 'manualFile' ? '10%' : (shape === 'forkJoin' ? '50%' : undefined)),
+          width: shape === 'documents' ? '78%' : (shape === 'manualFile' ? '80%' : (shape === 'forkJoin' ? '150px' : '100%')),
+          height: shape === 'documents' ? '72%' : (shape === 'manualFile' ? '35%' : (shape === 'forkJoin' ? '40px' : '100%')),
+          transform: shape === 'forkJoin' ? 'translate(-50%, -50%)' : undefined,
           zIndex: 1,
           padding: '4px 8px',
-          width: '100%',
-          height: '100%',
           boxSizing: 'border-box',
           display: 'flex',
           alignItems: 'center',

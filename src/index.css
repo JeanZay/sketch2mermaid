@@ -360,7 +360,7 @@ body {
 }
 
 .shape-process {
-  border-radius: 2px; /* sm border radius */
+  border-radius: 0; /* sharp corners */
 }
 
 .shape-rounded {

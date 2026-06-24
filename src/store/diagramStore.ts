@@ -491,7 +491,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     const sizeDefaults = NODE_SIZE_DEFAULTS[shape];
     const newNode: DiagramNode = {
       id: newId,
-      label: 'Nouveau nœud',
+      label: ['forkJoin', 'junction', 'summary'].includes(shape) ? '' : 'Nouveau nœud',
       shape,
       position: { x: targetX, y: targetY },
       width: sizeDefaults.width,
