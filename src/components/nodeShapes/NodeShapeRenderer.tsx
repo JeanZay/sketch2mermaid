@@ -27,7 +27,7 @@ export const NodeShapeRenderer = ({
           flexDirection: 'row',
           alignItems: 'center',
           boxSizing: 'border-box',
-          padding: '4px 8px 4px 18px',
+          padding: '4px 8px 4px 14px',
         }}
       >
         <svg
@@ -45,7 +45,7 @@ export const NodeShapeRenderer = ({
           <path
             d="M 8,2 Q 2,2 2,12 L 2,34 Q 2,40 0,40 Q 2,40 2,46 L 2,68 Q 2,78 8,78"
             fill="none"
-            stroke="var(--node-border-color, var(--border-color))"
+            stroke="var(--node-border-color, #9370DB)"
             strokeWidth="2"
             strokeLinecap="round"
           />
@@ -59,7 +59,7 @@ export const NodeShapeRenderer = ({
             height: '100%',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
+            justifyContent: 'flex-start',
             pointerEvents: 'none',
             boxSizing: 'border-box',
           }}
@@ -84,7 +84,7 @@ export const NodeShapeRenderer = ({
           flexDirection: 'row',
           alignItems: 'center',
           boxSizing: 'border-box',
-          padding: '4px 18px 4px 8px',
+          padding: '4px 14px 4px 8px',
         }}
       >
         <div
@@ -96,7 +96,7 @@ export const NodeShapeRenderer = ({
             height: '100%',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
+            justifyContent: 'flex-end',
             pointerEvents: 'none',
             boxSizing: 'border-box',
           }}
@@ -120,7 +120,7 @@ export const NodeShapeRenderer = ({
           <path
             d="M 2,2 Q 8,2 8,12 L 8,34 Q 8,40 10,40 Q 8,40 8,46 L 8,68 Q 8,78 2,78"
             fill="none"
-            stroke="var(--node-border-color, var(--border-color))"
+            stroke="var(--node-border-color, #9370DB)"
             strokeWidth="2"
             strokeLinecap="round"
           />
@@ -159,7 +159,7 @@ export const NodeShapeRenderer = ({
           <path
             d="M 8,2 Q 2,2 2,12 L 2,34 Q 2,40 0,40 Q 2,40 2,46 L 2,68 Q 2,78 8,78"
             fill="none"
-            stroke="var(--node-border-color, var(--border-color))"
+            stroke="var(--node-border-color, #9370DB)"
             strokeWidth="2"
             strokeLinecap="round"
           />
@@ -197,7 +197,7 @@ export const NodeShapeRenderer = ({
           <path
             d="M 2,2 Q 8,2 8,12 L 8,34 Q 8,40 10,40 Q 8,40 8,46 L 8,68 Q 8,78 2,78"
             fill="none"
-            stroke="var(--node-border-color, var(--border-color))"
+            stroke="var(--node-border-color, #9370DB)"
             strokeWidth="2"
             strokeLinecap="round"
           />

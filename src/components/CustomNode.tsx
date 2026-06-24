@@ -36,12 +36,17 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   const autoFontSize = computeNodeFontSize({ label, width, height });
   const fontSize = textStyle?.fontSize ?? autoFontSize;
 
+  const defaultTextAlign = shape === 'comment' ? 'left' : (shape === 'commentRight' ? 'right' : 'center');
+  const resolvedTextAlign = textStyle?.textAlign ?? defaultTextAlign;
   const nodeTextStyle: React.CSSProperties = {
     fontSize: `${fontSize}px`,
     fontWeight: textStyle?.bold ? 'bold' : 'normal',
     fontStyle: textStyle?.italic ? 'italic' : 'normal',
-    textAlign: textStyle?.textAlign ?? 'center',
+    textAlign: resolvedTextAlign,
     color: textStyle?.color ?? 'inherit',
+    justifyContent: resolvedTextAlign === 'left' ? 'flex-start' : (resolvedTextAlign === 'right' ? 'flex-end' : 'center'),
+    ...(shape === 'comment' ? { paddingLeft: '4px' } : {}),
+    ...(shape === 'commentRight' ? { paddingRight: '4px' } : {}),
   };
 
   const shapeStyle: React.CSSProperties = {
