@@ -714,5 +714,57 @@ describe('Mermaid Flowchart Import Tests', () => {
     expect(nodes.find(n => n.id === 'A')?.label).toBe('Apostrophe\'s and double "quotes", colons: , commas, brackets [] braces {}');
     expect(nodes.find(n => n.id === 'B')?.label).toBe('Unicode: éàçü');
   });
+
+  test('paper-tape imports as paperTape shape', () => {
+    const res = importMermaidFlowchart(`graph TD
+      A@{ shape: paper-tape, label: "Tape" }
+    `);
+    const node = res.diagram.nodes.find(n => n.id === 'A');
+    expect(node?.shape).toBe('paperTape');
+    expect(node?.label).toBe('Tape');
+  });
+
+  test('Space between node ID and @{ is accepted (whitespace tolerance)', () => {
+    // Our parser skips whitespace between node ID and classic/metadata delimiters.
+    // This matches Mermaid's own tolerance for whitespace before brackets.
+    const res = importMermaidFlowchart(`graph TD
+      A @{ shape: doc, label: "Spaced" }
+    `);
+    const node = res.diagram.nodes.find(n => n.id === 'A');
+    expect(node?.shape).toBe('file');
+    expect(node?.label).toBe('Spaced');
+  });
+
+  test('Labels with parentheses, slashes, and backslashes in metadata', () => {
+    const res = importMermaidFlowchart(`graph TD
+      A@{ shape: doc, label: "Path (C:\\\\Users\\\\test) / home/user" }
+      B@{ shape: cloud, label: "Func(a, b) => [result]" }
+    `);
+    const nodes = res.diagram.nodes;
+    expect(nodes.find(n => n.id === 'A')?.label).toBe('Path (C:\\Users\\test) / home/user');
+    expect(nodes.find(n => n.id === 'B')?.label).toBe('Func(a, b) => [result]');
+  });
+
+  test('Generic shape export→import round-trip preserves shape and label', () => {
+    const res1 = importMermaidFlowchart(`graph TD
+      A@{ shape: paper-tape, label: "Wavy Tape" }
+      B@{ shape: doc, label: "Document" }
+      C@{ shape: cloud, label: "Cloud" }
+      D@{ shape: notch-rect, label: "Card" }
+    `);
+    // Verify import
+    const nodes = res1.diagram.nodes;
+    expect(nodes.find(n => n.id === 'A')?.shape).toBe('paperTape');
+    expect(nodes.find(n => n.id === 'B')?.shape).toBe('file');
+    expect(nodes.find(n => n.id === 'C')?.shape).toBe('cloud');
+    expect(nodes.find(n => n.id === 'D')?.shape).toBe('card');
+
+    // Re-export and verify generic syntax
+    const exported = toMermaid(res1.diagram);
+    expect(exported).toContain('@{ shape: paper-tape, label: "Wavy Tape" }');
+    expect(exported).toContain('@{ shape: doc, label: "Document" }');
+    expect(exported).toContain('@{ shape: cloud, label: "Cloud" }');
+    expect(exported).toContain('@{ shape: notch-rect, label: "Card" }');
+  });
 });
 

@@ -599,4 +599,40 @@ describe('Mermaid Node Styling tests', () => {
     expect(output).toContain('n2@{ shape: notch-rect, label: "Card : #quot;quoted#quot; &amp; commas , colons :" }');
     expect(output).toContain('n3@{ shape: cloud, label: "Cloud \\\\ slash / braces { }" }');
   });
+
+  test('paperTape exports as @{ shape: paper-tape }', () => {
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        { id: 'n1', label: 'Tape', shape: 'paperTape', position: { x: 0, y: 0 } },
+      ],
+      edges: [],
+      textBoxes: [],
+    };
+    const output = toMermaid(diagram);
+    expect(output).toContain('n1@{ shape: paper-tape, label: "Tape" }');
+    // Must NOT export as 'flag' (which is a different Mermaid shape)
+    expect(output).not.toContain('shape: flag');
+  });
+
+  test('Generic export with Unicode accents, parentheses, brackets, and slashes', () => {
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        { id: 'n1', label: 'Décision : éàçü (oui/non)', shape: 'dataStore', position: { x: 0, y: 0 } },
+        { id: 'n2', label: 'Array [0] and {key: val}', shape: 'delay', position: { x: 0, y: 100 } },
+        { id: 'n3', label: 'Path: C:\\Users\\test / home/user', shape: 'manualInput', position: { x: 0, y: 200 } },
+      ],
+      edges: [],
+      textBoxes: [],
+    };
+    const output = toMermaid(diagram);
+    expect(output).toContain('n1@{ shape: datastore, label: "Décision : éàçü (oui/non)" }');
+    expect(output).toContain('n2@{ shape: delay, label: "Array [0] and {key: val}" }');
+    expect(output).toContain('n3@{ shape: sl-rect, label: "Path: C:\\\\Users\\\\test / home/user" }');
+  });
 });

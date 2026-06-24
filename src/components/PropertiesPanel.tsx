@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useNodes, useEdges, useReactFlow } from '@xyflow/react';
 import { useDiagramStore, DEFAULT_NODE_TEXT_STYLE, DEFAULT_EDGE_TEXT_STYLE, DEFAULT_TEXT_BOX_STYLE } from '../store/diagramStore';
 import type { TextStyle, TextBoxStyle } from '../core/types';
-import { SHAPE_DEFINITIONS } from '../core/shapeRegistry';
+import { SHAPE_DEFINITIONS, SHAPE_CATEGORIES } from '../core/shapeRegistry';
 import { SHAPE_ICONS } from './shapeIcons';
 import { FontSizeControl } from './properties/FontSizeControl';
 import { ConfirmModal } from './ConfirmModal';
@@ -498,14 +498,7 @@ export const PropertiesPanel = () => {
           <div className="property-group">
             <label className="property-label">Shape</label>
             <div className="properties-shape-selector" style={{ maxHeight: '250px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '4px', padding: '6px' }}>
-              {[
-                { key: 'basic', label: 'Basic' },
-                { key: 'data', label: 'Data / Storage' },
-                { key: 'document', label: 'Documents' },
-                { key: 'event', label: 'Events / Control' },
-                { key: 'comment', label: 'Comments' },
-                { key: 'advanced', label: 'Advanced' },
-              ].map((cat) => {
+              {SHAPE_CATEGORIES.map((cat) => {
                 const catShapes = SHAPE_DEFINITIONS.filter((def) => def.category === cat.key);
                 return (
                   <div key={cat.key} className="properties-shape-cat-section" style={{ marginBottom: '8px' }}>

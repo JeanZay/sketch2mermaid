@@ -1,5 +1,18 @@
 import type { NodeShape } from './types';
 
+/**
+ * Ordered shape category definitions for UI rendering.
+ * This is the single source of truth for category display order and labels.
+ */
+export const SHAPE_CATEGORIES = [
+  { key: 'basic', label: 'Basic' },
+  { key: 'data', label: 'Data / Storage' },
+  { key: 'document', label: 'Documents' },
+  { key: 'event', label: 'Events / Control' },
+  { key: 'comment', label: 'Comments' },
+  { key: 'advanced', label: 'Advanced' },
+] as const;
+
 export type ShapeCategory = 'basic' | 'data' | 'document' | 'event' | 'comment' | 'advanced';
 
 export type ShapeIconKey =
@@ -300,7 +313,7 @@ export const SHAPE_DEFINITIONS: ShapeDefinition[] = [
   {
     nodeShape: 'paperTape',
     uiLabel: 'Paper Tape',
-    mermaidShape: 'flag',
+    mermaidShape: 'paper-tape',
     mermaidAliases: [],
     category: 'document',
     iconKey: 'paperTape',
@@ -458,6 +471,17 @@ export const SHAPE_DEFINITIONS: ShapeDefinition[] = [
     iconKey: 'odd',
   },
 ];
+
+/**
+ * Set of NodeShape values that have legacy bracket syntax (e.g. `[...]`, `{...}`).
+ * Used by UI components to choose between legacy HTML/CSS rendering and new SVG rendering.
+ * Derived from SHAPE_DEFINITIONS — this is the single source of truth.
+ */
+export const LEGACY_NODE_SHAPES: ReadonlySet<NodeShape> = new Set<NodeShape>(
+  SHAPE_DEFINITIONS
+    .filter((definition) => definition.legacySyntax)
+    .map((definition) => definition.nodeShape)
+);
 
 export function findDefinitionByShape(shape: NodeShape): ShapeDefinition | undefined {
   return SHAPE_DEFINITIONS.find((def) => def.nodeShape === shape);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SHAPE_DEFINITIONS, findDefinitionByShape, findDefinitionByMermaidName } from './shapeRegistry';
+import { SHAPE_DEFINITIONS, findDefinitionByShape, findDefinitionByMermaidName, LEGACY_NODE_SHAPES, SHAPE_CATEGORIES } from './shapeRegistry';
 import type { NodeShape } from './types';
 
 describe('Centralized Shape Registry', () => {
@@ -55,5 +55,61 @@ describe('Centralized Shape Registry', () => {
   it('should return undefined for unknown Mermaid shape names', () => {
     const unknown = findDefinitionByMermaidName('nonexistent-shape');
     expect(unknown).toBeUndefined();
+  });
+
+  it('should resolve paper-tape to paperTape (not flag)', () => {
+    const def = findDefinitionByMermaidName('paper-tape');
+    expect(def?.nodeShape).toBe('paperTape');
+    expect(def?.mermaidShape).toBe('paper-tape');
+
+    // Verify 'flag' does NOT resolve to paperTape
+    const flagDef = findDefinitionByMermaidName('flag');
+    expect(flagDef).toBeUndefined();
+  });
+
+  it('should have no alias that collides with another definition canonical name', () => {
+    const canonicalNames = new Map<string, string>();
+    for (const def of SHAPE_DEFINITIONS) {
+      canonicalNames.set(def.mermaidShape.toLowerCase(), def.nodeShape);
+    }
+
+    for (const def of SHAPE_DEFINITIONS) {
+      for (const alias of def.mermaidAliases) {
+        const normalizedAlias = alias.toLowerCase();
+        if (canonicalNames.has(normalizedAlias)) {
+          // An alias matching a canonical name is only valid if it points to the same shape
+          expect(canonicalNames.get(normalizedAlias)).toBe(def.nodeShape);
+        }
+      }
+    }
+  });
+
+  it('LEGACY_NODE_SHAPES should match exactly the shapes with legacySyntax', () => {
+    const expected = SHAPE_DEFINITIONS
+      .filter((d) => d.legacySyntax)
+      .map((d) => d.nodeShape);
+    expect(LEGACY_NODE_SHAPES.size).toBe(expected.length);
+    for (const shape of expected) {
+      expect(LEGACY_NODE_SHAPES.has(shape)).toBe(true);
+    }
+    // Spot-check known legacy shapes
+    expect(LEGACY_NODE_SHAPES.has('process')).toBe(true);
+    expect(LEGACY_NODE_SHAPES.has('decision')).toBe(true);
+    expect(LEGACY_NODE_SHAPES.has('database')).toBe(true);
+    // Spot-check known non-legacy shapes
+    expect(LEGACY_NODE_SHAPES.has('cloud')).toBe(false);
+    expect(LEGACY_NODE_SHAPES.has('paperTape')).toBe(false);
+  });
+
+  it('SHAPE_CATEGORIES should cover all categories in SHAPE_DEFINITIONS', () => {
+    const categoryKeys = new Set(SHAPE_CATEGORIES.map((c) => c.key));
+    for (const def of SHAPE_DEFINITIONS) {
+      expect(categoryKeys.has(def.category)).toBe(true);
+    }
+    // Every category should have at least one shape
+    for (const cat of SHAPE_CATEGORIES) {
+      const shapes = SHAPE_DEFINITIONS.filter((d) => d.category === cat.key);
+      expect(shapes.length).toBeGreaterThan(0);
+    }
   });
 });

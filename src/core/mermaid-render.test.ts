@@ -177,7 +177,34 @@ describe('Mermaid empirical SVG rendering verification under strict security', (
     const errorNode = doc.querySelector('.error-icon, .error-text, #error-div');
     expect(errorNode).toBeNull();
   });
-});
 
+  test('Compilation of paper-tape and additional generic shapes', async () => {
+    const code = [
+      'flowchart TD',
+      '  pt@{ shape: paper-tape, label: "Paper Tape" }',
+      '  cl@{ shape: cloud, label: "Cloud" }',
+      '  nr@{ shape: notch-rect, label: "Card" }',
+      '  dl@{ shape: delay, label: "Delay" }',
+      '  bo@{ shape: bolt, label: "Bolt" }',
+      '  br@{ shape: brace, label: "Brace" }',
+      '  hg@{ shape: hourglass, label: "Collate" }',
+      '  tr@{ shape: tri, label: "Extract" }',
+      '  pt --> cl --> nr --> dl',
+      '  bo --> br --> hg --> tr',
+    ].join('\n');
+
+    const renderId = `generic-shapes-compile-test-${Math.floor(Math.random() * 100000)}`;
+    const { svg } = await mermaid.render(renderId, code);
+
+    expect(svg).toBeDefined();
+    expect(svg.length).toBeGreaterThan(0);
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svg, 'image/svg+xml');
+
+    const errorNode = doc.querySelector('.error-icon, .error-text, #error-div');
+    expect(errorNode).toBeNull();
+  });
+});
 
 

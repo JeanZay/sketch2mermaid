@@ -1,12 +1,9 @@
 import React from 'react';
 import type { NodeShape } from '../../core/types';
+import { LEGACY_NODE_SHAPES } from '../../core/shapeRegistry';
 
 export interface NodeShapeRendererProps {
   shape: NodeShape;
-  width: number;
-  height: number;
-  selected?: boolean;
-  hovered?: boolean;
   className?: string;
   children: React.ReactNode;
 }
@@ -16,24 +13,7 @@ export const NodeShapeRenderer = ({
   className = '',
   children,
 }: NodeShapeRendererProps) => {
-  const isLegacyShape = [
-    'process',
-    'rounded',
-    'stadium',
-    'decision',
-    'event',
-    'endEvent',
-    'database',
-    'file',
-    'subroutine',
-    'hexagon',
-    'parallelogram',
-    'parallelogramAlt',
-    'trapezoid',
-    'trapezoidAlt',
-    'asymmetric',
-    'documents',
-  ].includes(shape);
+  const isLegacyShape = LEGACY_NODE_SHAPES.has(shape);
 
   if (isLegacyShape) {
     // Return legacy HTML/CSS wrapper structure to guarantee zero regressions for original shapes

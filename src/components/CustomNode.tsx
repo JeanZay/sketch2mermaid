@@ -3,6 +3,7 @@ import { Handle, Position, type NodeProps, useConnection, NodeResizer } from '@x
 import { useDiagramStore } from '../store/diagramStore';
 import type { NodeShape } from '../core/types';
 import { NODE_SIZE_DEFAULTS } from '../core/nodeSizeConfig';
+import { LEGACY_NODE_SHAPES } from '../core/shapeRegistry';
 import { computeNodeFontSize } from '../core/nodeText';
 import { NodeShapeRenderer } from './nodeShapes/NodeShapeRenderer';
 
@@ -143,26 +144,9 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   if (shape === 'rounded') wrapperClass = 'custom-node shape-rounded';
   if (shape === 'stadium') wrapperClass = 'custom-node shape-stadium';
 
-  const isLegacyShape = [
-    'process',
-    'rounded',
-    'stadium',
-    'decision',
-    'event',
-    'endEvent',
-    'database',
-    'file',
-    'subroutine',
-    'hexagon',
-    'parallelogram',
-    'parallelogramAlt',
-    'trapezoid',
-    'trapezoidAlt',
-    'asymmetric',
-    'documents',
-  ].includes(shape);
+  const isLegacy = LEGACY_NODE_SHAPES.has(shape);
 
-  if (!isLegacyShape) {
+  if (!isLegacy) {
     wrapperClass = `new-shape-node-wrapper shape-${shape}-node`;
   }
 
@@ -174,10 +158,6 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
       {renderResizer()}
       <NodeShapeRenderer
         shape={shape}
-        width={width}
-        height={height}
-        selected={selected}
-        hovered={false}
       >
         {renderInner()}
       </NodeShapeRenderer>

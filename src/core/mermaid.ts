@@ -125,6 +125,10 @@ export function toMermaid(diagram: CanonicalDiagram): string {
       const { open, close } = definition.legacySyntax;
       lines.push(`  ${node.id}${open}"${finalLabel}"${close}`);
     } else {
+      // DESIGN NOTE: escapeLabel() uses Mermaid entity escaping (#quot;, &amp;, etc.)
+      // even inside generic @{ } metadata labels. This is intentional — Mermaid's
+      // strict security post-processor decodes these entities globally, including
+      // inside metadata label strings. Empirically verified by mermaid-render.test.ts.
       const shapeName = definition?.mermaidShape || 'rect';
       lines.push(`  ${node.id}@{ shape: ${shapeName}, label: "${finalLabel}" }`);
     }
