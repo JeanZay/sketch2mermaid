@@ -341,13 +341,12 @@ export const NodeShapeRenderer = ({
       svgContent = (
         <>
           <path
-            d="M15,15 L85,15 A15,35 0 0,1 85,85 L15,85 A15,35 0 0,1 15,15 Z"
+            d="M7,15 L93,15 A4,35 0 0,1 93,85 L7,85 A4,35 0 0,1 7,15 Z"
             fill="var(--node-bg-color, #ffffff)"
             stroke="var(--node-border-color, var(--border-color))"
             strokeWidth="2"
           />
-          <path d="M15,15 A15,35 0 0,1 15,85" fill="none" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
-          <path d="M85,15 A15,35 0 0,1 85,85" fill="none" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
+          <path d="M93,15 A4,35 0 0,0 93,85" fill="none" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
         </>
       );
       break;

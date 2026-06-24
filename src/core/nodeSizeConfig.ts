@@ -41,7 +41,7 @@ export const NODE_SIZE_DEFAULTS: Record<NodeShape, NodeSizeConfig> = {
   commentBoth:          { width: 150, height: 56, minWidth: 90, minHeight: 44 },
   dataStore:            { width: 150, height: 56, minWidth: 100, minHeight: 44 },
   delay:                { width: 140, height: 56, minWidth: 90, minHeight: 44 },
-  directAccessStorage:  { width: 150, height: 76, minWidth: 110, minHeight: 64 },
+  directAccessStorage:  { width: 190, height: 50, minWidth: 110, minHeight: 44 },
   diskStorage:          { width: 150, height: 76, minWidth: 110, minHeight: 64 },
   display:              { width: 150, height: 112, minWidth: 100, minHeight: 88 },
   dividedProcess:       { width: 180, height: 56, minWidth: 90, minHeight: 44 },

@@ -88,8 +88,8 @@ export const SHAPE_ICONS: Record<ShapeIconKey, React.ReactNode> = {
   ),
   directAccessStorage: (
     <>
-      <path d="M4 6a3 6 0 0 0 0 12h14a3 6 0 0 0 0-12Z" />
-      <path d="M18 6a3 6 0 0 1 0 12" />
+      <path d="M4 6a1 6 0 0 0 0 12h14a1 6 0 0 0 0-12Z" />
+      <path d="M18 6a1 6 0 0 1 0 12" />
     </>
   ),
   diskStorage: (
