@@ -93,6 +93,20 @@ async function generate() {
       process.exit(1);
     }
 
+    // Adjust viewBox to scale down shape and add uniform padding to prevent clipping
+    const viewBoxAttr = svgEl.getAttribute('viewBox');
+    if (viewBoxAttr) {
+      const [minX, minY, w, h] = viewBoxAttr.split(' ').map(Number);
+      const cx = minX + w / 2;
+      const cy = minY + h / 2;
+      const scale = 1.35; // Scale factor > 1 adds outer margin and scales down the shape visually
+      const newW = w * scale;
+      const newH = h * scale;
+      const newMinX = cx - newW / 2;
+      const newMinY = cy - newH / 2;
+      svgEl.setAttribute('viewBox', `${newMinX.toFixed(2)} ${newMinY.toFixed(2)} ${newW.toFixed(2)} ${newH.toFixed(2)}`);
+    }
+
     // 4. Remove unwanted blocks
     // Remove style blocks
     svgEl.querySelectorAll('style').forEach(el => el.remove());
