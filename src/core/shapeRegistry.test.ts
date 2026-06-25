@@ -163,6 +163,16 @@ describe('Centralized Shape Registry', () => {
       expect(getShapeFixedSize('forkJoin')).toEqual({ width: 70, height: 8 });
     });
 
+    it('should configure summary as label-less and fixed-size 64x64', () => {
+      const caps = getShapeCapabilities('summary');
+      expect(caps.supportsLabel).toBe(false);
+      expect(caps.sizingMode).toBe('fixed');
+      expect(caps.fixedSize).toEqual({ width: 64, height: 64 });
+      expect(shapeSupportsLabel('summary')).toBe(false);
+      expect(isFixedSizeShape('summary')).toBe(true);
+      expect(getShapeFixedSize('summary')).toEqual({ width: 64, height: 64 });
+    });
+
     it('should configure process (normal shape) as label-supporting and content-sized', () => {
       const caps = getShapeCapabilities('process');
       expect(caps.supportsLabel).toBe(true);

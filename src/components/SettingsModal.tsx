@@ -30,19 +30,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
       case 'general':
         return (
           <div className="settings-tab-pane">
-            <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', color: 'var(--text-primary)' }}>General Info</h4>
-            <p className="modal-message" style={{ margin: 0, lineHeight: 1.5 }}>
+            <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#f1f5f9' }}>General Info</h4>
+            <p className="modal-message" style={{ margin: 0, lineHeight: 1.5, color: '#cbd5e1' }}>
               Sketch2Mermaid is configured for standard Mermaid flowchart visualization.
               All shapes and sizes are optimized to map directly to standard Mermaid rendering formats.
             </p>
-            <div style={{ marginTop: '20px', padding: '12px', borderRadius: '6px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-muted)' }}>
+            <div style={{ marginTop: '20px', padding: '12px', borderRadius: '6px', background: '#151821', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#94a3b8' }}>
                 <span>App Version</span>
-                <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>v0.1.0</span>
+                <span style={{ fontWeight: 'bold', color: '#f1f5f9' }}>v0.1.0</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#94a3b8', marginTop: '8px' }}>
                 <span>Mermaid Compatibility</span>
-                <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>v11.x</span>
+                <span style={{ fontWeight: 'bold', color: '#f1f5f9' }}>v11.x</span>
               </div>
             </div>
           </div>
@@ -52,12 +52,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         return (
           <div className="settings-tab-pane">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
-              <h4 style={{ margin: 0, fontSize: '15px', color: 'var(--text-primary)' }}>Shape Capabilities</h4>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+              <h4 style={{ margin: 0, fontSize: '15px', color: '#f1f5f9' }}>Shape Capabilities</h4>
+              <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
                 Read-only semantic registry
               </span>
             </div>
-            <p className="modal-message" style={{ marginBottom: '16px', fontSize: '12px', lineHeight: 1.4 }}>
+            <p className="modal-message" style={{ marginBottom: '16px', fontSize: '12px', lineHeight: 1.4, color: '#94a3b8' }}>
               Some Mermaid shapes are structural symbols rather than text containers. Sketch2Mermaid keeps their behavior explicit so the canvas remains visually useful while Mermaid export stays clean.
             </p>
 
@@ -65,20 +65,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               style={{ 
                 maxHeight: '280px', 
                 overflowY: 'auto', 
-                border: '1px solid var(--border-color)', 
+                border: '1px solid rgba(255, 255, 255, 0.08)', 
                 borderRadius: '6px',
-                background: 'var(--bg-secondary)'
+                background: '#151821'
               }}
             >
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left', color: '#cbd5e1' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'var(--bg-primary)', position: 'sticky', top: 0, zIndex: 1 }}>
-                    <th style={{ padding: '8px 12px', fontWeight: 'bold' }}>ID</th>
-                    <th style={{ padding: '8px 12px', fontWeight: 'bold' }}>Display Name</th>
-                    <th style={{ padding: '8px 12px', fontWeight: 'bold' }}>Mermaid Shape</th>
-                    <th style={{ padding: '8px 12px', fontWeight: 'bold' }}>Supports Label</th>
-                    <th style={{ padding: '8px 12px', fontWeight: 'bold' }}>Sizing Mode</th>
-                    <th style={{ padding: '8px 12px', fontWeight: 'bold' }}>Fixed Size</th>
+                  <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', background: '#1c202e', position: 'sticky', top: 0, zIndex: 1 }}>
+                    <th style={{ padding: '8px 12px', fontWeight: 'bold', color: '#f1f5f9' }}>ID</th>
+                    <th style={{ padding: '8px 12px', fontWeight: 'bold', color: '#f1f5f9' }}>Display Name</th>
+                    <th style={{ padding: '8px 12px', fontWeight: 'bold', color: '#f1f5f9' }}>Mermaid Shape</th>
+                    <th style={{ padding: '8px 12px', fontWeight: 'bold', color: '#f1f5f9' }}>Supports Label</th>
+                    <th style={{ padding: '8px 12px', fontWeight: 'bold', color: '#f1f5f9' }}>Sizing Mode</th>
+                    <th style={{ padding: '8px 12px', fontWeight: 'bold', color: '#f1f5f9' }}>Fixed Size</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -87,12 +87,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     return (
                       <tr 
                         key={def.nodeShape} 
-                        style={{ borderBottom: '1px solid var(--border-color)' }}
+                        style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.06)' }}
                         className="settings-table-row"
                       >
-                        <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: 'var(--accent-color)' }}>{def.nodeShape}</td>
-                        <td style={{ padding: '8px 12px', fontWeight: 'bold' }}>{def.uiLabel}</td>
-                        <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>{def.mermaidShape}</td>
+                        <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: '#38bdf8' }}>{def.nodeShape}</td>
+                        <td style={{ padding: '8px 12px', fontWeight: 'bold', color: '#f1f5f9' }}>{def.uiLabel}</td>
+                        <td style={{ padding: '8px 12px', color: '#cbd5e1' }}>{def.mermaidShape}</td>
                         <td style={{ padding: '8px 12px' }}>
                           <span 
                             style={{ 
@@ -100,15 +100,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                               borderRadius: '4px', 
                               fontSize: '10px', 
                               fontWeight: 'bold',
-                              background: caps.supportsLabel ? 'rgba(76, 175, 80, 0.1)' : 'rgba(244, 67, 54, 0.1)',
-                              color: caps.supportsLabel ? '#4caf50' : '#f44336'
+                              background: caps.supportsLabel ? 'rgba(76, 175, 80, 0.15)' : 'rgba(244, 67, 54, 0.15)',
+                              color: caps.supportsLabel ? '#4caf50' : '#ef4444'
                             }}
                           >
                             {caps.supportsLabel ? 'Yes' : 'No'}
                           </span>
                         </td>
-                        <td style={{ padding: '8px 12px', textTransform: 'capitalize' }}>{caps.sizingMode}</td>
-                        <td style={{ padding: '8px 12px', color: caps.fixedSize ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                        <td style={{ padding: '8px 12px', textTransform: 'capitalize', color: '#cbd5e1' }}>{caps.sizingMode}</td>
+                        <td style={{ padding: '8px 12px', color: caps.fixedSize ? '#f1f5f9' : '#64748b' }}>
                           {caps.fixedSize ? `${caps.fixedSize.width} × ${caps.fixedSize.height}` : '—'}
                         </td>
                       </tr>
@@ -123,15 +123,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
       case 'semantics':
         return (
           <div className="settings-tab-pane">
-            <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', color: 'var(--text-primary)' }}>About Export Semantics</h4>
-            <div style={{ lineHeight: 1.5, color: 'var(--text-muted)', fontSize: '13px' }}>
+            <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#f1f5f9' }}>About Export Semantics</h4>
+            <div style={{ lineHeight: 1.5, color: '#cbd5e1', fontSize: '13px' }}>
               <p style={{ marginTop: 0 }}>
                 In Mermaid, structural flowchart elements like **junctions**, **forks**, or **joins** are parsed and rendered purely as visual nodes without labels. Adding labels to these elements is not supported by the Mermaid engine.
               </p>
               <p>
                 To provide a high-fidelity visual authoring experience, Sketch2Mermaid:
               </p>
-              <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>
+              <ul style={{ paddingLeft: '20px', margin: '8px 0', color: '#cbd5e1' }}>
                 <li style={{ marginBottom: '6px' }}>Enforces strict fixed sizing on canvas so labels cannot distort shape layout.</li>
                 <li style={{ marginBottom: '6px' }}>Hides all visual text-style options for label-less shapes in the properties sidebar.</li>
                 <li style={{ marginBottom: '6px' }}>Outputs clean syntax declarations (e.g. <code>A@&#123; shape: f-circ &#125;</code>) in Mermaid export to ensure zero syntax noise.</li>
@@ -161,7 +161,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         aria-modal="true"
         aria-labelledby="settings-modal-title"
       >
-        <h3 id="settings-modal-title" className="modal-title" style={{ margin: '0 0 16px 0' }}>
+        <h3 id="settings-modal-title" className="modal-title" style={{ margin: '0 0 16px 0', color: '#f1f5f9' }}>
           Application Settings
         </h3>
 
@@ -169,28 +169,55 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         <div 
           style={{ 
             display: 'flex', 
-            borderBottom: '1px solid var(--border-color)', 
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)', 
             marginBottom: '16px',
             gap: '8px'
           }}
         >
           <button
             className={`format-tab-btn ${activeTab === 'capabilities' ? 'active' : ''}`}
-            style={{ padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer', outline: 'none' }}
+            style={{
+              padding: '8px 12px',
+              border: 'none',
+              cursor: 'pointer',
+              outline: 'none',
+              color: activeTab === 'capabilities' ? '#ffffff' : '#94a3b8',
+              fontWeight: activeTab === 'capabilities' ? 'bold' : 'normal',
+              background: activeTab === 'capabilities' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+              borderRadius: '6px'
+            }}
             onClick={() => setActiveTab('capabilities')}
           >
             Shape Capabilities
           </button>
           <button
             className={`format-tab-btn ${activeTab === 'general' ? 'active' : ''}`}
-            style={{ padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer', outline: 'none' }}
+            style={{
+              padding: '8px 12px',
+              border: 'none',
+              cursor: 'pointer',
+              outline: 'none',
+              color: activeTab === 'general' ? '#ffffff' : '#94a3b8',
+              fontWeight: activeTab === 'general' ? 'bold' : 'normal',
+              background: activeTab === 'general' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+              borderRadius: '6px'
+            }}
             onClick={() => setActiveTab('general')}
           >
             General
           </button>
           <button
             className={`format-tab-btn ${activeTab === 'semantics' ? 'active' : ''}`}
-            style={{ padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer', outline: 'none' }}
+            style={{
+              padding: '8px 12px',
+              border: 'none',
+              cursor: 'pointer',
+              outline: 'none',
+              color: activeTab === 'semantics' ? '#ffffff' : '#94a3b8',
+              fontWeight: activeTab === 'semantics' ? 'bold' : 'normal',
+              background: activeTab === 'semantics' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+              borderRadius: '6px'
+            }}
             onClick={() => setActiveTab('semantics')}
           >
             Export Semantics
@@ -203,7 +230,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         </div>
 
         {/* Footer Actions */}
-        <div className="modal-actions" style={{ marginTop: '20px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+        <div className="modal-actions" style={{ marginTop: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '16px' }}>
           <button className="modal-btn modal-btn--confirm" onClick={onClose}>
             Fermer
           </button>

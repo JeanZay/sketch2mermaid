@@ -637,9 +637,10 @@ describe('Mermaid Node Styling tests', () => {
     expect(output).toContain('n3@{ shape: sl-rect, label: "Path: C:\\\\Users\\\\test / home/user" }');
   });
 
-  test('Export behavior for shapes that do not support labels (junction, forkJoin)', () => {
+  test('Export behavior for shapes that do not support labels (junction, forkJoin, summary)', () => {
     const junctionShape = findDefinitionByShape('junction')?.mermaidShape || 'f-circ';
     const forkJoinShape = findDefinitionByShape('forkJoin')?.mermaidShape || 'fork';
+    const summaryShape = findDefinitionByShape('summary')?.mermaidShape || 'cross-circ';
 
     const diagram: CanonicalDiagram = {
       schemaVersion: 1,
@@ -648,7 +649,8 @@ describe('Mermaid Node Styling tests', () => {
       nodes: [
         { id: 'n1', label: 'Legacy label', shape: 'junction', position: { x: 0, y: 0 } },
         { id: 'n2', label: 'Fork label', shape: 'forkJoin', position: { x: 0, y: 100 } },
-        { id: 'n3', label: 'Normal node label', shape: 'process', position: { x: 0, y: 200 } }
+        { id: 'n3', label: 'Normal node label', shape: 'process', position: { x: 0, y: 200 } },
+        { id: 'n4', label: 'Summary label', shape: 'summary', position: { x: 0, y: 300 } }
       ],
       edges: [],
       textBoxes: []
@@ -660,5 +662,7 @@ describe('Mermaid Node Styling tests', () => {
     expect(output).toContain(`n2@{ shape: ${forkJoinShape} }`);
     expect(output).not.toContain('Fork label');
     expect(output).toContain('n3["Normal node label"]');
+    expect(output).toContain(`n4@{ shape: ${summaryShape} }`);
+    expect(output).not.toContain('Summary label');
   });
 });

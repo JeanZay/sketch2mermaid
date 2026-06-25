@@ -411,6 +411,11 @@ export const SHAPE_DEFINITIONS: ShapeDefinition[] = [
     mermaidAliases: [],
     category: 'event',
     iconKey: 'summary',
+    capabilities: {
+      supportsLabel: false,
+      sizingMode: 'fixed',
+      fixedSize: { width: 64, height: 64 },
+    },
   },
 
   // --- COMMENTS CATEGORY ---
