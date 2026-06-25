@@ -25,9 +25,19 @@ export interface MermaidImportWarning {
   raw?: string;
 }
 
+export interface LayoutOracleDiagnostics {
+  oracleAttempted: boolean;
+  renderSucceeded: boolean;
+  nodesExtracted: number;
+  positionsApplied: number;
+  fallbackUsed: boolean;
+  fallbackReason?: string;
+}
+
 export interface MermaidImportResult {
   diagram: CanonicalDiagram;
   warnings: MermaidImportWarning[];
+  diagnostics?: LayoutOracleDiagnostics;
 }
 
 interface ParsedNode {
@@ -657,15 +667,55 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
   return { diagram, warnings: uniqueWarnings };
 }
 
+function matchNodeElement(el: Element, nodeId: string, renderId: string): boolean {
+  if (el.getAttribute('data-id') === nodeId) {
+    return true;
+  }
+  const idAttr = el.getAttribute('id');
+  if (!idAttr) return false;
+
+  // Mermaid v10/v11 pattern: ${renderId}-flowchart-${nodeId}-${index}
+  // Because nodeId could contain special characters, prefix match + numeric suffix is very reliable.
+  const prefix = `${renderId}-flowchart-${nodeId}-`;
+  if (idAttr.startsWith(prefix)) {
+    const suffix = idAttr.substring(prefix.length);
+    return /^\d+$/.test(suffix);
+  }
+
+  // Fallback pattern without flowchart class suffix: ${renderId}-${nodeId}-${index}
+  const fallbackPrefix = `${renderId}-${nodeId}-`;
+  if (idAttr.startsWith(fallbackPrefix)) {
+    const suffix = idAttr.substring(fallbackPrefix.length);
+    return /^\d+$/.test(suffix);
+  }
+
+  return false;
+}
+
 export async function importMermaidFlowchartAsync(code: string): Promise<MermaidImportResult> {
   // 1. Run the synchronous parsing first (which acts as the baseline/fallback)
   const result = importMermaidFlowchart(code);
   const { diagram, warnings } = result;
 
+  const diagnostics: LayoutOracleDiagnostics = {
+    oracleAttempted: false,
+    renderSucceeded: false,
+    nodesExtracted: 0,
+    positionsApplied: 0,
+    fallbackUsed: false,
+  };
+
   // 2. Oracle Layout pass (only works in browser context)
   if (typeof window === 'undefined' || diagram.nodes.length === 0) {
-    return result;
+    diagnostics.fallbackUsed = true;
+    diagnostics.fallbackReason = typeof window === 'undefined'
+      ? 'Non-browser context (window is undefined)'
+      : 'Diagram has no nodes';
+    console.log('[Layout Oracle Diagnostic]', diagnostics);
+    return { diagram, warnings, diagnostics };
   }
+
+  diagnostics.oracleAttempted = true;
 
   try {
     // Unique ID for the render cycle
@@ -673,7 +723,14 @@ export async function importMermaidFlowchartAsync(code: string): Promise<Mermaid
 
     // Render the flowchart using Mermaid.js
     const { svg } = await mermaid.render(renderId, code);
-    if (!svg) return result;
+    if (!svg) {
+      diagnostics.fallbackUsed = true;
+      diagnostics.fallbackReason = 'Mermaid render returned empty SVG';
+      console.log('[Layout Oracle Diagnostic]', diagnostics);
+      return { diagram, warnings, diagnostics };
+    }
+
+    diagnostics.renderSucceeded = true;
 
     // Mount SVG to offscreen container for client measurements
     const container = document.createElement('div');
@@ -686,15 +743,25 @@ export async function importMermaidFlowchartAsync(code: string): Promise<Mermaid
 
     try {
       const svgElement = container.querySelector('svg');
-      if (!svgElement) return result;
+      if (!svgElement) {
+        diagnostics.fallbackUsed = true;
+        diagnostics.fallbackReason = 'Could not find svg element in rendered container';
+        console.log('[Layout Oracle Diagnostic]', diagnostics);
+        return { diagram, warnings, diagnostics };
+      }
 
       const svgRect = svgElement.getBoundingClientRect();
 
       // Extract positions and bounding boxes for each node
+      const allNodeGroups = Array.from(svgElement.querySelectorAll('.node'));
+      diagnostics.nodesExtracted = allNodeGroups.length;
+
+      let hasValidDimensions = false;
+      const proposedPositions = new Map<string, { position: { x: number; y: number }; width: number; height: number }>();
+
       for (const node of diagram.nodes) {
-        // Query the node element using class ".node" and matching "data-id"
-        const nodeElement = Array.from(svgElement.querySelectorAll('.node')).find(
-          (el) => el.getAttribute('data-id') === node.id
+        const nodeElement = allNodeGroups.find(
+          (el) => matchNodeElement(el, node.id, renderId)
         ) as SVGGraphicsElement | null;
 
         if (nodeElement) {
@@ -705,39 +772,65 @@ export async function importMermaidFlowchartAsync(code: string): Promise<Mermaid
           const width = nodeRect.width;
           const height = nodeRect.height;
 
-          // Override layout positions
-          node.position = { x: Math.round(x), y: Math.round(y) };
-          node.width = Math.round(width);
-          node.height = Math.round(height);
+          if (width > 0 && height > 0) {
+            hasValidDimensions = true;
+          }
+
+          proposedPositions.set(node.id, {
+            position: { x: Math.round(x), y: Math.round(y) },
+            width: Math.round(width),
+            height: Math.round(height),
+          });
+          diagnostics.positionsApplied++;
         }
       }
 
-      // Recompute handles based on new high-fidelity positions
-      for (const edge of diagram.edges) {
-        if (edge.from.kind === 'connected' && edge.to.kind === 'connected') {
-          const sourceNode = diagram.nodes.find((n) => n.id === edge.from.nodeId);
-          const targetNode = diagram.nodes.find((n) => n.id === edge.to.nodeId);
-          if (sourceNode && targetNode) {
-            const sourceCenter = {
-              x: sourceNode.position.x + (sourceNode.width || 140) / 2,
-              y: sourceNode.position.y + (sourceNode.height || 56) / 2,
-            };
-            const targetCenter = {
-              x: targetNode.position.x + (targetNode.width || 140) / 2,
-              y: targetNode.position.y + (targetNode.height || 56) / 2,
-            };
-
-            const handlePair = selectHandlesDirectionAware(
-              sourceCenter,
-              targetCenter,
-              diagram.direction
-            );
-
-            edge.sourceHandle = handlePair.sourceHandle;
-            edge.targetHandle = handlePair.targetHandle;
-            edge.from.handleId = handlePair.sourceHandle;
-            edge.to.handleId = handlePair.targetHandle;
+      // Check if we successfully matched all nodes and got non-zero dimensions
+      if (diagnostics.positionsApplied === diagram.nodes.length && hasValidDimensions) {
+        // Apply positions
+        for (const node of diagram.nodes) {
+          const prop = proposedPositions.get(node.id);
+          if (prop) {
+            node.position = prop.position;
+            node.width = prop.width;
+            node.height = prop.height;
           }
+        }
+
+        // Recompute handles based on new high-fidelity positions
+        for (const edge of diagram.edges) {
+          if (edge.from.kind === 'connected' && edge.to.kind === 'connected') {
+            const sourceNode = diagram.nodes.find((n) => n.id === edge.from.nodeId);
+            const targetNode = diagram.nodes.find((n) => n.id === edge.to.nodeId);
+            if (sourceNode && targetNode) {
+              const sourceCenter = {
+                x: sourceNode.position.x + (sourceNode.width || 140) / 2,
+                y: sourceNode.position.y + (sourceNode.height || 56) / 2,
+              };
+              const targetCenter = {
+                x: targetNode.position.x + (targetNode.width || 140) / 2,
+                y: targetNode.position.y + (targetNode.height || 56) / 2,
+              };
+
+              const handlePair = selectHandlesDirectionAware(
+                sourceCenter,
+                targetCenter,
+                diagram.direction
+              );
+
+              edge.sourceHandle = handlePair.sourceHandle;
+              edge.targetHandle = handlePair.targetHandle;
+              edge.from.handleId = handlePair.sourceHandle;
+              edge.to.handleId = handlePair.targetHandle;
+            }
+          }
+        }
+      } else {
+        diagnostics.fallbackUsed = true;
+        if (diagnostics.positionsApplied < diagram.nodes.length) {
+          diagnostics.fallbackReason = `Not all nodes were matched in SVG (matched ${diagnostics.positionsApplied}/${diagram.nodes.length})`;
+        } else {
+          diagnostics.fallbackReason = 'Rendered nodes have 0 dimensions (JSDOM/headless environment or collapsed SVG)';
         }
       }
     } finally {
@@ -745,10 +838,13 @@ export async function importMermaidFlowchartAsync(code: string): Promise<Mermaid
       document.body.removeChild(container);
     }
   } catch (err) {
+    diagnostics.fallbackUsed = true;
+    diagnostics.fallbackReason = err instanceof Error ? err.message : String(err);
     console.warn('[mermaidImport] Mermaid layout oracle failed, falling back to local Dagre:', err);
   }
 
-  return { diagram, warnings };
+  console.log('[Layout Oracle Diagnostic]', diagnostics);
+  return { diagram, warnings, diagnostics };
 }
 
 

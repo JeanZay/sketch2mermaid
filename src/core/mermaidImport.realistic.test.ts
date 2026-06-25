@@ -653,10 +653,24 @@ flowchart TD
   describe('Mermaid SVG Layout Oracle tests', () => {
     test('importMermaidFlowchartAsync falls back gracefully to local layout on render failure', async () => {
       const code = 'flowchart TD\n  A --> B';
+      const renderId = `test-temp-${Math.floor(Math.random() * 100000)}`;
+      const { svg } = await mermaid.render(renderId, code);
+      const fs = await import('fs');
+      fs.writeFileSync('rendered_svg.xml', svg);
+      
       const res = await importMermaidFlowchartAsync(code);
       expect(res.diagram.nodes.length).toBe(2);
       expect(res.diagram.edges.length).toBe(1);
       expect(res.diagram.nodes.some(n => n.id === 'A')).toBe(true);
+
+      // Verify diagnostics object
+      expect(res.diagnostics).toBeDefined();
+      expect(res.diagnostics!.oracleAttempted).toBe(true);
+      expect(res.diagnostics!.renderSucceeded).toBe(true);
+      expect(res.diagnostics!.nodesExtracted).toBe(2);
+      expect(res.diagnostics!.positionsApplied).toBe(2);
+      expect(res.diagnostics!.fallbackUsed).toBe(true);
+      expect(res.diagnostics!.fallbackReason).toBe('Rendered nodes have 0 dimensions (JSDOM/headless environment or collapsed SVG)');
     });
 
     test('importMermaidFlowchartAsync overrides positions and dimensions using Mermaid SVG oracle when render succeeds', async () => {
@@ -712,6 +726,14 @@ flowchart TD
         const edge = result.diagram.edges[0];
         expect(edge.sourceHandle).toBe('b-source');
         expect(edge.targetHandle).toBe('t-target');
+
+        // Verify diagnostics object
+        expect(result.diagnostics).toBeDefined();
+        expect(result.diagnostics!.oracleAttempted).toBe(true);
+        expect(result.diagnostics!.renderSucceeded).toBe(true);
+        expect(result.diagnostics!.nodesExtracted).toBe(2);
+        expect(result.diagnostics!.positionsApplied).toBe(2);
+        expect(result.diagnostics!.fallbackUsed).toBe(false);
         
       } finally {
         mermaid.render = originalRender;
