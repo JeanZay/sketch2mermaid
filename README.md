@@ -18,8 +18,8 @@
 
 **Sketch2Mermaid** bridges the gap between visual thinking and LLM-ready text output. While users can easily sketch a process, decision, or flow, Large Language Models (LLMs) parse and generate structured text far better than they analyze images. Mermaid.js is the perfect pivot format: readable by humans, versionable in Git, native to Markdown, and highly exploitable by LLMs.
 
-Sketch2Mermaid provides a **strictly unidirectional** workflow:  
-**Editor (Canvas) → Canonical JSON Model → Clean Mermaid Code**
+Sketch2Mermaid provides a bidirectional workflow:  
+**Editor (Canvas) ↔ Canonical JSON Model ↔ Clean Mermaid Code**
 
 Unlike generic diagramming tools, Sketch2Mermaid is explicitly constrained to what standard Mermaid flowcharts can express. It is an AI-ready enabler, designed to seamlessly feed diagrams into LLM prompts, documentation, or codebases without formatting errors.
 
@@ -28,6 +28,8 @@ Unlike generic diagramming tools, Sketch2Mermaid is explicitly constrained to wh
 - **Pure Visual Editing:** Drag-and-drop nodes, draw connections, and edit labels seamlessly.
 - **Strictly Flowcharts:** Implements 6 core Mermaid flowchart shapes (`process`, `rounded`, `stadium`, `decision`, `event`, `endEvent`) and 2 edge styles (`solid`, `dotted`).
 - **Deterministic Export:** Generates character-by-character accurate Mermaid.js code with proper escaping to avoid parse errors.
+- **Mermaid Import (Beta):** Import standard Mermaid flowchart markup back into the visual canvas.
+- **Save/Load Projects:** Export and import your visual diagrams natively using the `.s2m` format.
 - **Auto-Layout Native:** Uses standard flowchart directions (`TD`, `LR`, `BT`, `RL`). Canvas positions are pure editor metadata and do not leak into the generated code.
 - **Zero-Backend Security:** 100% client-side web application. No database, no telemetry, no API keys.
 - **Local Persistence:** Your work is saved directly in your browser's `localStorage`.
@@ -86,8 +88,7 @@ Sketch2Mermaid is built securely by design:
 
 ## 🤝 Contributing
 
-We welcome contributions! Please review our [Contributing Guidelines](CONTRIBUTING.md) and our core architecture decisions in [ADR-001](ADR-001-Sketch2Mermaid.md) before opening a pull request. 
-> **Note:** Bidirectional import (Mermaid to Canvas) is explicitly out of scope for v0. Please read the ADR.
+We welcome contributions! Please review our [Contributing Guidelines](CONTRIBUTING.md) before opening a pull request.
 
 ## 📝 License
 
