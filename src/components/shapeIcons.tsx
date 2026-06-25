@@ -111,7 +111,7 @@ export const SHAPE_ICONS: Record<ShapeIconKey, React.ReactNode> = {
     <polygon points="12 4 21 18 3 18" />
   ),
   forkJoin: (
-    <rect x="10" y="4" width="4" height="16" rx="1" fill="currentColor" />
+    <rect x="4" y="10" width="16" height="4" rx="1" fill="currentColor" />
   ),
   internalStorage: (
     <>

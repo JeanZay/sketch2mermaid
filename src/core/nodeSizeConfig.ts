@@ -46,7 +46,7 @@ export const NODE_SIZE_DEFAULTS: Record<NodeShape, NodeSizeConfig> = {
   display:              { width: 150, height: 112, minWidth: 100, minHeight: 88 },
   dividedProcess:       { width: 180, height: 56, minWidth: 90, minHeight: 44 },
   extract:              { width: 120, height: 90, minWidth: 90, minHeight: 70 },
-  forkJoin:             { width: 16, height: 96, minWidth: 8, minHeight: 44 },
+  forkJoin:             { width: 96, height: 16, minWidth: 44, minHeight: 8 },
   internalStorage:      { width: 150, height: 56, minWidth: 100, minHeight: 44 },
   junction:             { width: 64, height: 64, minWidth: 44, minHeight: 44 },
   linedDocument:        { width: 150, height: 90, minWidth: 110, minHeight: 76 },
