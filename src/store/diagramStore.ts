@@ -416,10 +416,16 @@ export interface DiagramState {
   deleteTextBox: (id: string) => void;
   resetDiagram: () => void;
   loadDiagram: (diagram: CanonicalDiagram, options: { resetHistory: boolean }) => void;
+
+  // UI State for right panel
+  rightPanelTab: 'export' | 'guide';
+  setRightPanelTab: (tab: 'export' | 'guide') => void;
 }
 
 export const useDiagramStore = create<DiagramState>((set, get) => ({
   diagram: loadInitialDiagram(),
+  rightPanelTab: 'export',
+  setRightPanelTab: (tab) => set({ rightPanelTab: tab }),
 
   // History state
   past: [],

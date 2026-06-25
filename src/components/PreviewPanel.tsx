@@ -8,6 +8,7 @@ import { useNodes, useEdges } from '@xyflow/react';
 import PropertiesPanel from './PropertiesPanel';
 import SvgPreviewViewer from './SvgPreviewViewer';
 import SvgPreviewModal from './SvgPreviewModal';
+import UserGuide from './UserGuide';
 
 // Initialize mermaid with strict security level to prevent script injections and script execution
 if (typeof window !== 'undefined') {
@@ -19,6 +20,8 @@ if (typeof window !== 'undefined') {
 
 export const PreviewPanel = () => {
   const diagram = useDiagramStore((state) => state.diagram);
+  const rightPanelTab = useDiagramStore((state) => state.rightPanelTab);
+  const setRightPanelTab = useDiagramStore((state) => state.setRightPanelTab);
   
   // Direct live conversion to Mermaid string
   const mermaidCode = toMermaid(diagram);
@@ -110,89 +113,117 @@ export const PreviewPanel = () => {
         <PropertiesPanel />
       ) : (
         <>
-          {/* Code panel header */}
-          <div className="panel-header">
-            <span className="panel-title">Code Mermaid Export</span>
-            <button 
-              onClick={handleCopy} 
-              className="copy-button"
-              title="Copier le code Mermaid dans le presse-papiers"
-            >
-              {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
-              <span>{copied ? 'Copié !' : 'Copier'}</span>
-            </button>
-          </div>
-
-          {/* Format Selection Tabs */}
-          <div className="format-tabs" role="tablist" aria-label="Format d'export Mermaid">
+          {/* Main Top Tab switcher in right panel */}
+          <div className="main-panel-tabs" role="tablist" aria-label="Onglets du panneau de droite">
             <button
               type="button"
               role="tab"
-              aria-selected={exportFormat === 'markdown'}
-              aria-pressed={exportFormat === 'markdown'}
-              className={`format-tab-btn ${exportFormat === 'markdown' ? 'active' : ''}`}
-              onClick={() => setExportFormat('markdown')}
+              aria-selected={rightPanelTab === 'export'}
+              className={`main-panel-tab-btn ${rightPanelTab === 'export' ? 'active' : ''}`}
+              onClick={() => setRightPanelTab('export')}
             >
-              Markdown
+              Export & Preview
             </button>
             <button
               type="button"
               role="tab"
-              aria-selected={exportFormat === 'html'}
-              aria-pressed={exportFormat === 'html'}
-              className={`format-tab-btn ${exportFormat === 'html' ? 'active' : ''}`}
-              onClick={() => setExportFormat('html')}
+              aria-selected={rightPanelTab === 'guide'}
+              className={`main-panel-tab-btn ${rightPanelTab === 'guide' ? 'active' : ''}`}
+              onClick={() => setRightPanelTab('guide')}
             >
-              HTML / API
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={exportFormat === 'raw'}
-              aria-pressed={exportFormat === 'raw'}
-              className={`format-tab-btn ${exportFormat === 'raw' ? 'active' : ''}`}
-              onClick={() => setExportFormat('raw')}
-            >
-              Code Brut
+              Mode d'emploi
             </button>
           </div>
 
-          {/* Mermaid Raw Code View */}
-          <div className="code-view-wrapper">
-            <pre className="code-pre">
-              <code>{formattedCode}</code>
-            </pre>
-          </div>
+          {rightPanelTab === 'guide' ? (
+            <UserGuide />
+          ) : (
+            <>
+              {/* Code panel header */}
+              <div className="panel-header">
+                <span className="panel-title">Code Mermaid Export</span>
+                <button 
+                  onClick={handleCopy} 
+                  className="copy-button"
+                  title="Copier le code Mermaid dans le presse-papiers"
+                >
+                  {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                  <span>{copied ? 'Copié !' : 'Copier'}</span>
+                </button>
+              </div>
 
-          {diagram.textBoxes.length > 0 && (
-            <div className="annotation-info-text">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="16" x2="12" y2="12"></line>
-                <line x1="12" y1="8" x2="12.01" y2="8"></line>
-              </svg>
-              <span>
-                {diagram.textBoxes.length} visual annotation{diagram.textBoxes.length > 1 ? 's are' : ' is'} not included in Mermaid export.
-              </span>
-            </div>
+              {/* Format Selection Tabs */}
+              <div className="format-tabs" role="tablist" aria-label="Format d'export Mermaid">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={exportFormat === 'markdown'}
+                  aria-pressed={exportFormat === 'markdown'}
+                  className={`format-tab-btn ${exportFormat === 'markdown' ? 'active' : ''}`}
+                  onClick={() => setExportFormat('markdown')}
+                >
+                  Markdown
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={exportFormat === 'html'}
+                  aria-pressed={exportFormat === 'html'}
+                  className={`format-tab-btn ${exportFormat === 'html' ? 'active' : ''}`}
+                  onClick={() => setExportFormat('html')}
+                >
+                  HTML / API
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={exportFormat === 'raw'}
+                  aria-pressed={exportFormat === 'raw'}
+                  className={`format-tab-btn ${exportFormat === 'raw' ? 'active' : ''}`}
+                  onClick={() => setExportFormat('raw')}
+                >
+                  Code Brut
+                </button>
+              </div>
+
+              {/* Mermaid Raw Code View */}
+              <div className="code-view-wrapper">
+                <pre className="code-pre">
+                  <code>{formattedCode}</code>
+                </pre>
+              </div>
+
+              {diagram.textBoxes.length > 0 && (
+                <div className="annotation-info-text">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                  </svg>
+                  <span>
+                    {diagram.textBoxes.length} visual annotation{diagram.textBoxes.length > 1 ? 's are' : ' is'} not included in Mermaid export.
+                  </span>
+                </div>
+              )}
+
+              {/* Preview header */}
+              <div className="panel-header" style={{ marginTop: '16px' }}>
+                <span className="panel-title">Prévisualisation SVG</span>
+              </div>
+
+              {/* SVG Preview Viewer with zoom/pan/fit */}
+              <SvgPreviewViewer
+                svgHtml={svgHtml}
+                error={error}
+                compact={true}
+                showLargePreviewButton={true}
+                showDownloadButton={true}
+                onOpenLargePreview={() => setIsModalOpen(true)}
+              />
+            </>
           )}
         </>
       )}
-
-      {/* Preview header */}
-      <div className="panel-header" style={{ marginTop: '16px' }}>
-        <span className="panel-title">Prévisualisation SVG</span>
-      </div>
-
-      {/* SVG Preview Viewer with zoom/pan/fit */}
-      <SvgPreviewViewer
-        svgHtml={svgHtml}
-        error={error}
-        compact={true}
-        showLargePreviewButton={true}
-        showDownloadButton={true}
-        onOpenLargePreview={() => setIsModalOpen(true)}
-      />
 
       {/* Large preview modal */}
       {isModalOpen && svgHtml && (
