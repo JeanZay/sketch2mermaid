@@ -117,8 +117,8 @@ export const SHAPE_ICONS: Record<ShapeIconKey, React.ReactNode> = {
   internalStorage: (
     <>
       <rect x="3" y="6" width="18" height="12" rx="1" />
-      <line x1="9" y1="6" x2="9" y2="18" />
-      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="5" y1="6" x2="5" y2="18" />
+      <line x1="3" y1="8" x2="21" y2="8" />
     </>
   ),
   junction: (
