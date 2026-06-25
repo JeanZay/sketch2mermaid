@@ -3,7 +3,7 @@ import { useNodes, useEdges, useReactFlow } from '@xyflow/react';
 import { useDiagramStore, DEFAULT_NODE_TEXT_STYLE, DEFAULT_EDGE_TEXT_STYLE, DEFAULT_TEXT_BOX_STYLE } from '../store/diagramStore';
 import type { TextStyle, TextBoxStyle } from '../core/types';
 import { SHAPE_DEFINITIONS, SHAPE_CATEGORIES } from '../core/shapeRegistry';
-import { SHAPE_ICONS } from './shapeIcons';
+import { ShapePaletteIcon } from './ShapePaletteIcon';
 import { FontSizeControl } from './properties/FontSizeControl';
 import { ConfirmModal } from './ConfirmModal';
 import { useVirtualEdgeAnchors } from '../hooks/useVirtualEdgeAnchors';
@@ -507,7 +507,6 @@ export const PropertiesPanel = () => {
                     </div>
                     <div className="shape-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
                       {catShapes.map((s) => {
-                        const icon = SHAPE_ICONS[s.iconKey];
                         return (
                           <button
                             key={s.nodeShape}
@@ -515,9 +514,7 @@ export const PropertiesPanel = () => {
                             onClick={() => updateNodeShape(selectedNode.id, s.nodeShape)}
                             title={`${s.uiLabel} (shape: ${s.mermaidShape})`}
                           >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              {icon}
-                            </svg>
+                            <ShapePaletteIcon shapeId={s.nodeShape} width="18" height="18" />
                           </button>
                         );
                       })}

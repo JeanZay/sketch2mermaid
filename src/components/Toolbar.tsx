@@ -3,7 +3,7 @@ import { useEdges, useReactFlow } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
 import type { NodeShape } from '../core/types';
 import { SHAPE_DEFINITIONS, SHAPE_CATEGORIES } from '../core/shapeRegistry';
-import { SHAPE_ICONS } from './shapeIcons';
+import { ShapePaletteIcon } from './ShapePaletteIcon';
 
 export const Toolbar = () => {
   const addNode = useDiagramStore((state) => state.addNode);
@@ -64,7 +64,6 @@ export const Toolbar = () => {
               </summary>
               <div className="shapes-list">
                 {catShapes.map((s) => {
-                  const icon = SHAPE_ICONS[s.iconKey];
                   return (
                     <button
                       key={s.nodeShape}
@@ -72,9 +71,7 @@ export const Toolbar = () => {
                       title={`Ajouter un nœud ${s.uiLabel} (shape: ${s.mermaidShape})`}
                       className="palette-shape-btn"
                     >
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        {icon}
-                      </svg>
+                      <ShapePaletteIcon shapeId={s.nodeShape} width="24" height="24" />
                       <span className="palette-shape-btn-text">{s.uiLabel}</span>
                     </button>
                   );

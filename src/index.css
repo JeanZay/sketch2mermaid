@@ -2646,4 +2646,31 @@ details:not([open]) .sidebar-category-summary::before {
   box-sizing: border-box;
 }
 
+/* Mermaid Generated Shape Icons styling */
+.mermaid-generated-shape-icon-container svg {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+.mermaid-generated-shape-icon-container svg path,
+.mermaid-generated-shape-icon-container svg polygon,
+.mermaid-generated-shape-icon-container svg rect,
+.mermaid-generated-shape-icon-container svg circle,
+.mermaid-generated-shape-icon-container svg ellipse,
+.mermaid-generated-shape-icon-container svg line,
+.mermaid-generated-shape-icon-container svg polyline {
+  stroke: currentColor !important;
+  stroke-width: 2px !important;
+  vector-effect: non-scaling-stroke !important;
+  fill: none !important;
+}
+
+/* Specific styling for solid-fill shapes (junction, forkJoin) */
+.mermaid-generated-shape-icon-container svg [fill="currentColor"] {
+  fill: currentColor !important;
+  stroke: none !important;
+}
+
+
 

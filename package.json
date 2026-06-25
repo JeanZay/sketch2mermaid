@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint . --max-warnings 0",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "generate:shape-icons": "npx tsx scripts/generate-shape-icons.ts",
+    "check:shape-icons": "npx tsx scripts/check-shape-icons.ts"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.0.0",
