@@ -317,12 +317,11 @@ export const NodeShapeRenderer = ({
 
     case 'dataStore':
       svgContent = (
-        <path
-          d="M98,5 L2,5 L2,95 L98,95"
-          fill="var(--node-bg-color, #ffffff)"
-          stroke="var(--node-border-color, var(--border-color))"
-          strokeWidth="2"
-        />
+        <>
+          <rect x="2" y="5" width="96" height="90" fill="var(--node-bg-color, #ffffff)" stroke="none" />
+          <line x1="2" y1="5" x2="98" y2="5" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
+          <line x1="2" y1="95" x2="98" y2="95" stroke="var(--node-border-color, var(--border-color))" strokeWidth="2" />
+        </>
       );
       break;
 
