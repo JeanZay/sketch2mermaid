@@ -2672,5 +2672,32 @@ details:not([open]) .sidebar-category-summary::before {
   stroke: none !important;
 }
 
+/* Settings Modal Tabs */
+.settings-tab-btn {
+  padding: 8px 12px;
+  border: none;
+  cursor: pointer;
+  outline: none;
+  color: #94a3b8;
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 500;
+  background: transparent;
+  border-radius: 6px;
+  transition: all 0.15s ease-in-out;
+}
+
+.settings-tab-btn:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #f1f5f9;
+}
+
+.settings-tab-btn.active {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.08);
+  font-weight: 600;
+}
+
+
 
 

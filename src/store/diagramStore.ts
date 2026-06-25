@@ -164,6 +164,12 @@ export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
             height: capabilities.fixedSize.height,
           };
         }
+        if (!capabilities.supportsLabel && normalized.label !== '') {
+          normalized = {
+            ...normalized,
+            label: '',
+          };
+        }
         return normalized;
       })
     : [];
@@ -528,7 +534,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       diagram: {
         ...state.diagram,
         nodes: state.diagram.nodes.map((node) =>
-          node.id === id ? { ...node, label } : node
+          node.id === id ? { ...node, label: getShapeCapabilities(node.shape).supportsLabel ? label : '' } : node
         ),
       },
     }));
@@ -546,7 +552,13 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
         ...state.diagram,
         nodes: state.diagram.nodes.map((node) =>
           node.id === id
-            ? { ...node, shape, width, height }
+            ? { 
+                ...node, 
+                shape, 
+                width, 
+                height,
+                ...(capabilities.supportsLabel ? {} : { label: '' })
+              }
             : node
         ),
       },

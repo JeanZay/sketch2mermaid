@@ -175,49 +175,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           }}
         >
           <button
-            className={`format-tab-btn ${activeTab === 'capabilities' ? 'active' : ''}`}
-            style={{
-              padding: '8px 12px',
-              border: 'none',
-              cursor: 'pointer',
-              outline: 'none',
-              color: activeTab === 'capabilities' ? '#ffffff' : '#94a3b8',
-              fontWeight: activeTab === 'capabilities' ? 'bold' : 'normal',
-              background: activeTab === 'capabilities' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-              borderRadius: '6px'
-            }}
+            className={`settings-tab-btn ${activeTab === 'capabilities' ? 'active' : ''}`}
             onClick={() => setActiveTab('capabilities')}
           >
             Shape Capabilities
           </button>
           <button
-            className={`format-tab-btn ${activeTab === 'general' ? 'active' : ''}`}
-            style={{
-              padding: '8px 12px',
-              border: 'none',
-              cursor: 'pointer',
-              outline: 'none',
-              color: activeTab === 'general' ? '#ffffff' : '#94a3b8',
-              fontWeight: activeTab === 'general' ? 'bold' : 'normal',
-              background: activeTab === 'general' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-              borderRadius: '6px'
-            }}
+            className={`settings-tab-btn ${activeTab === 'general' ? 'active' : ''}`}
             onClick={() => setActiveTab('general')}
           >
             General
           </button>
           <button
-            className={`format-tab-btn ${activeTab === 'semantics' ? 'active' : ''}`}
-            style={{
-              padding: '8px 12px',
-              border: 'none',
-              cursor: 'pointer',
-              outline: 'none',
-              color: activeTab === 'semantics' ? '#ffffff' : '#94a3b8',
-              fontWeight: activeTab === 'semantics' ? 'bold' : 'normal',
-              background: activeTab === 'semantics' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-              borderRadius: '6px'
-            }}
+            className={`settings-tab-btn ${activeTab === 'semantics' ? 'active' : ''}`}
             onClick={() => setActiveTab('semantics')}
           >
             Export Semantics
