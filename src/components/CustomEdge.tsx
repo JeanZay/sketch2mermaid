@@ -2,34 +2,9 @@ import React, { useState, useId } from 'react';
 import { EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
 import { useDiagramStore, DEFAULT_EDGE_TEXT_STYLE } from '../store/diagramStore';
 import { useVirtualAnchors } from './VirtualAnchorsContext';
-
-/**
- * Inline SVG arrow marker for edges.
- * We render our own markers rather than relying on React Flow's marker
- * resolution pipeline, which can drop `undefined` markers in some
- * reconciliation paths and show stale arrowheads.
- */
-const ArrowMarker = ({ id, color }: { id: string; color: string }) => (
-  <marker
-    id={id}
-    markerWidth="20"
-    markerHeight="20"
-    viewBox="-10 -10 20 20"
-    markerUnits="strokeWidth"
-    orient="auto-start-reverse"
-    refX="0"
-    refY="0"
-  >
-    <polyline
-      stroke={color}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="1"
-      fill={color}
-      points="-5,-4 0,0 -5,4 -5,-4"
-    />
-  </marker>
-);
+import { USE_MERMAID_LIKE_EDGE_RENDERING } from '../core/config';
+import { getMermaidLikeOrthogonalEdgePath } from '../utils/edgeRouting';
+import { ArrowMarker, MermaidArrowMarker } from './EdgeMarkers';
 
 export const CustomEdge = ({
   id,
@@ -53,18 +28,27 @@ export const CustomEdge = ({
   const endX = anchor?.targetX ?? targetX;
   const endY = anchor?.targetY ?? targetY;
 
-  const bezier = getBezierPath({
-    sourceX: startX,
-    sourceY: startY,
-    targetX: endX,
-    targetY: endY,
-    sourcePosition,
-    targetPosition,
-  });
+  const pathResult = USE_MERMAID_LIKE_EDGE_RENDERING
+    ? getMermaidLikeOrthogonalEdgePath({
+        sourceX: startX,
+        sourceY: startY,
+        targetX: endX,
+        targetY: endY,
+        sourcePosition,
+        targetPosition,
+      })
+    : getBezierPath({
+        sourceX: startX,
+        sourceY: startY,
+        targetX: endX,
+        targetY: endY,
+        sourcePosition,
+        targetPosition,
+      });
   
-  const edgePath = bezier[0];
-  const labelX = bezier[1];
-  const labelY = bezier[2];
+  const edgePath = pathResult[0];
+  const labelX = pathResult[1];
+  const labelY = pathResult[2];
 
   const updateEdgeLabel = useDiagramStore((state) => state.updateEdgeLabel);
   const storeEdge = useDiagramStore((state) => 
@@ -97,10 +81,14 @@ export const CustomEdge = ({
   const isDotted = storeEdge?.style === 'dotted';
   const color = selected ? '#8b5cf6' : '#4b5563';
 
+  const strokeWidth = USE_MERMAID_LIKE_EDGE_RENDERING
+    ? (selected ? 2 : 1.5)
+    : (selected ? 3 : 2);
+
   const edgeStyle: React.CSSProperties = {
     ...style,
     strokeDasharray: isDotted ? '5,5' : undefined,
-    strokeWidth: selected ? 3 : 2,
+    strokeWidth,
     stroke: color,
     transition: 'stroke 0.2s, stroke-width 0.2s',
   };
@@ -112,6 +100,8 @@ export const CustomEdge = ({
 
   const hasMarkerEnd = direction === 'directed' || direction === 'bidirectional';
   const hasMarkerStart = direction === 'reverse' || direction === 'bidirectional';
+
+  const MarkerComponent = USE_MERMAID_LIKE_EDGE_RENDERING ? MermaidArrowMarker : ArrowMarker;
 
   const textStyleObj = storeEdge ? { ...DEFAULT_EDGE_TEXT_STYLE, ...storeEdge.textStyle } : DEFAULT_EDGE_TEXT_STYLE;
   const edgeTextStyle: React.CSSProperties = {
@@ -125,8 +115,8 @@ export const CustomEdge = ({
     <>
       {/* Self-contained SVG markers for this edge */}
       <defs>
-        {hasMarkerEnd && <ArrowMarker id={markerEndId} color={color} />}
-        {hasMarkerStart && <ArrowMarker id={markerStartId} color={color} />}
+        {hasMarkerEnd && <MarkerComponent id={markerEndId} color={color} />}
+        {hasMarkerStart && <MarkerComponent id={markerStartId} color={color} />}
       </defs>
       <path
         d={edgePath}

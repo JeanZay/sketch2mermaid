@@ -8,3 +8,10 @@
  * Can be toggled without requiring any code rollbacks or git reverts.
  */
 export const USE_MERMAID_GENERATED_SHAPE_ICONS = true;
+
+/**
+ * When true, the canvas uses thin orthogonal edge routing and smaller arrowheads.
+ * When false, it falls back immediately to the legacy curved Bézier paths and styling.
+ */
+export const USE_MERMAID_LIKE_EDGE_RENDERING = true;
+

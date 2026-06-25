@@ -7,6 +7,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { getBezierPath, Position } from '@xyflow/system';
+import { USE_MERMAID_LIKE_EDGE_RENDERING } from '../config';
+import { getMermaidLikeOrthogonalEdgePath } from '../../utils/edgeRouting';
 import {
   layoutImportedDiagram,
   LABEL_CHAR_WIDTH,
@@ -586,10 +588,15 @@ function labelBBox(
     : targetPosition === Position.Bottom ? tgtPos.y + tgtH
     : tgtPos.y + tgtH / 2;
 
-  let [, labelX, labelY] = getBezierPath({
-    sourceX, sourceY, sourcePosition,
-    targetX, targetY, targetPosition,
-  });
+  let [, labelX, labelY] = USE_MERMAID_LIKE_EDGE_RENDERING
+    ? getMermaidLikeOrthogonalEdgePath({
+        sourceX, sourceY, sourcePosition,
+        targetX, targetY, targetPosition,
+      })
+    : getBezierPath({
+        sourceX, sourceY, sourcePosition,
+        targetX, targetY, targetPosition,
+      });
 
   const dagreLabelPos = edgeLabelPositions?.get(edge.id);
   if (dagreLabelPos) {
