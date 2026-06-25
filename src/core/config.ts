@@ -15,3 +15,29 @@ export const USE_MERMAID_GENERATED_SHAPE_ICONS = true;
  */
 export const USE_MERMAID_LIKE_EDGE_RENDERING = true;
 
+/**
+ * When true, imports compile with a layout configured to mimic Mermaid.js's
+ * native vertical/horizontal rank alignments and spacing.
+ */
+export let USE_MERMAID_LIKE_IMPORTED_LAYOUT = true;
+export function setUseMermaidLikeImportedLayout(val: boolean) {
+  USE_MERMAID_LIKE_IMPORTED_LAYOUT = val;
+}
+
+// ---------------------------------------------------------------------------
+// Layout spacing constants for Mermaid-like diagrams
+// ---------------------------------------------------------------------------
+export const MERMAID_LIKE_RANK_SEP = 60;
+export const MERMAID_LIKE_NODE_SEP = 50;
+export const MERMAID_LIKE_EDGE_SEP = 10;
+export const MERMAID_LIKE_MARGIN_X = 40;
+export const MERMAID_LIKE_MARGIN_Y = 40;
+export const MERMAID_LIKE_LABEL_PADDING = 32;
+export const MERMAID_LIKE_MIN_EDGE_BEND = 20;
+
+/**
+ * Threshold (in pixels) below which nodes are considered to be on the same rank (sibling nodes).
+ * If undefined/null, defaults dynamically to MERMAID_LIKE_RANK_SEP / 2.
+ */
+export const MERMAID_LIKE_SAME_RANK_THRESHOLD = MERMAID_LIKE_RANK_SEP / 2;
+

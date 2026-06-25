@@ -13,6 +13,16 @@ import { Graph, layout } from '@dagrejs/dagre';
 import type { DiagramNode, DiagramEdge, DiagramDirection, ConnectedEdgeEndpoint, DiagramEdgeEndpoint } from '../types';
 import { isStructurallyConnectedEdge } from '../types';
 import { NODE_SIZE_DEFAULTS } from '../nodeSizeConfig';
+import {
+  USE_MERMAID_LIKE_IMPORTED_LAYOUT,
+  MERMAID_LIKE_RANK_SEP,
+  MERMAID_LIKE_NODE_SEP,
+  MERMAID_LIKE_EDGE_SEP,
+  MERMAID_LIKE_MARGIN_X,
+  MERMAID_LIKE_MARGIN_Y,
+  MERMAID_LIKE_LABEL_PADDING,
+  MERMAID_LIKE_SAME_RANK_THRESHOLD,
+} from '../config';
 
 // ---------------------------------------------------------------------------
 // Label-sizing constants for Dagre edge-label proxies
@@ -134,6 +144,106 @@ function selectHandlesGeometrically(
     } else {
       sourceSide = 't';
       targetSide = 'b';
+    }
+  }
+
+  return {
+    sourceHandle: `${sourceSide}-source`,
+    targetHandle: `${targetSide}-target`,
+  };
+}
+
+/**
+ * Direction-Aware Handle Selection (First layout correction pass).
+ * Uses diagram flow direction and a dynamic/configured threshold to correctly identify
+ * lateral sibling nodes and vertical flows, preventing excessive orthogonal S-curves.
+ *
+ * Note: This represents an initial correction pass for visual fidelity. Subsequent
+ * iterations may introduce advanced edge collision avoidance or custom routing paths.
+ */
+export function selectHandlesDirectionAware(
+  sourceCenter: { x: number; y: number },
+  targetCenter: { x: number; y: number },
+  direction: DiagramDirection,
+): HandlePair {
+  const dx = targetCenter.x - sourceCenter.x;
+  const dy = targetCenter.y - sourceCenter.y;
+
+  const rankSep = USE_MERMAID_LIKE_IMPORTED_LAYOUT ? MERMAID_LIKE_RANK_SEP : BASE_RANK_GAP;
+  // Calculate same-rank threshold dynamically from rank separation.
+  // Uses MERMAID_LIKE_SAME_RANK_THRESHOLD when imported layout is active.
+  const threshold = USE_MERMAID_LIKE_IMPORTED_LAYOUT ? MERMAID_LIKE_SAME_RANK_THRESHOLD : rankSep / 2;
+
+  let sourceSide: 't' | 'b' | 'l' | 'r';
+  let targetSide: 't' | 'b' | 'l' | 'r';
+
+  if (direction === 'TD') {
+    if (dy >= threshold) {
+      sourceSide = 'b';
+      targetSide = 't';
+    } else if (dy <= -threshold) {
+      sourceSide = 't';
+      targetSide = 'b';
+    } else {
+      // Lateral/sibling
+      if (dx >= 0) {
+        sourceSide = 'r';
+        targetSide = 'l';
+      } else {
+        sourceSide = 'l';
+        targetSide = 'r';
+      }
+    }
+  } else if (direction === 'BT') {
+    if (dy <= -threshold) {
+      sourceSide = 't';
+      targetSide = 'b';
+    } else if (dy >= threshold) {
+      sourceSide = 'b';
+      targetSide = 't';
+    } else {
+      // Lateral/sibling
+      if (dx >= 0) {
+        sourceSide = 'r';
+        targetSide = 'l';
+      } else {
+        sourceSide = 'l';
+        targetSide = 'r';
+      }
+    }
+  } else if (direction === 'LR') {
+    if (dx >= threshold) {
+      sourceSide = 'r';
+      targetSide = 'l';
+    } else if (dx <= -threshold) {
+      sourceSide = 'l';
+      targetSide = 'r';
+    } else {
+      // Vertical sibling
+      if (dy >= 0) {
+        sourceSide = 'b';
+        targetSide = 't';
+      } else {
+        sourceSide = 't';
+        targetSide = 'b';
+      }
+    }
+  } else { // RL
+    if (dx <= -threshold) {
+      sourceSide = 'l';
+      targetSide = 'r';
+    } else if (dx >= threshold) {
+      sourceSide = 'r';
+      targetSide = 'l';
+    } else {
+      // Vertical sibling
+      if (dy >= 0) {
+        sourceSide = 'b';
+        targetSide = 't';
+      } else {
+        sourceSide = 't';
+        targetSide = 'b';
+      }
     }
   }
 
@@ -282,17 +392,23 @@ function dagreLayout(
 ): LayoutResult {
   const rankdir = toRankdir(direction);
 
+  const nodeSep = USE_MERMAID_LIKE_IMPORTED_LAYOUT ? MERMAID_LIKE_NODE_SEP : BASE_NODE_GAP;
+  const rankSep = USE_MERMAID_LIKE_IMPORTED_LAYOUT ? MERMAID_LIKE_RANK_SEP : BASE_RANK_GAP;
+  const edgeSep = USE_MERMAID_LIKE_IMPORTED_LAYOUT ? MERMAID_LIKE_EDGE_SEP : BASE_EDGE_GAP;
+  const marginX = USE_MERMAID_LIKE_IMPORTED_LAYOUT ? MERMAID_LIKE_MARGIN_X : 20;
+  const marginY = USE_MERMAID_LIKE_IMPORTED_LAYOUT ? MERMAID_LIKE_MARGIN_Y : 20;
+
   // 1. Create and configure the Dagre graph
   const g = new Graph({ directed: true, multigraph: true, compound: false });
   g.setGraph({
     rankdir,
     ranker: 'network-simplex',
     acyclicer: 'greedy',
-    nodesep: BASE_NODE_GAP,
-    ranksep: BASE_RANK_GAP,
-    edgesep: BASE_EDGE_GAP,
-    marginx: 20,
-    marginy: 20,
+    nodesep: nodeSep,
+    ranksep: rankSep,
+    edgesep: edgeSep,
+    marginx: marginX,
+    marginy: marginY,
   });
 
   // 2. Insert nodes in stable order (determinism prerequisite)
@@ -315,26 +431,17 @@ function dagreLayout(
   const sortedEdges = [...edges].filter(isStructurallyConnectedEdge).sort(stableEdgeOrder);
   for (const edge of sortedEdges) {
     const label = edge.label || '';
-    const w = label ? label.length * LABEL_CHAR_WIDTH + LABEL_PADDING_X : 0;
+    const labelPadding = USE_MERMAID_LIKE_IMPORTED_LAYOUT ? MERMAID_LIKE_LABEL_PADDING : LABEL_PADDING_X;
+    const w = label ? label.length * LABEL_CHAR_WIDTH + labelPadding : 0;
     const h = label ? LABEL_LINE_HEIGHT : 0;
 
     const fromId = (edge.from as ConnectedEdgeEndpoint).nodeId;
     const toId = (edge.to as ConnectedEdgeEndpoint).nodeId;
 
-    // All edge types (directed, undirected, bidirectional) are given to Dagre
-    // to influence rank and proximity. For undirected/bidirectional edges,
-    // use a deterministic orientation (lexicographic) for Dagre's DAG.
-    // This orientation is internal to layout and has no effect on rendering.
-    const dir = edge.direction ?? 'directed';
-    if (dir === 'undirected' || dir === 'bidirectional') {
-      // Deterministic orientation for layout: lower id → higher id
-      const [from, to] = fromId <= toId
-        ? [fromId, toId]
-        : [toId, fromId];
-      g.setEdge(from, to, { width: w, height: h, labelpos: 'c' }, edge.id);
-    } else {
-      g.setEdge(fromId, toId, { width: w, height: h, labelpos: 'c' }, edge.id);
-    }
+    // All edge types are given to Dagre to influence rank and proximity.
+    // Use the natural parsed direction (from -> to) to align hierarchy with
+    // Mermaid's native layout engine behavior.
+    g.setEdge(fromId, toId, { width: w, height: h, labelpos: 'c' }, edge.id);
   }
 
   // 4. Run Dagre layout
@@ -377,7 +484,10 @@ function dagreLayout(
       if (fromId === toId) {
         handles.set(edge.id, { ...defaultHandles });
       } else {
-        handles.set(edge.id, selectHandlesGeometrically(sourceCenter, targetCenter));
+        const handlePair = USE_MERMAID_LIKE_IMPORTED_LAYOUT
+          ? selectHandlesDirectionAware(sourceCenter, targetCenter, direction)
+          : selectHandlesGeometrically(sourceCenter, targetCenter);
+        handles.set(edge.id, handlePair);
       }
     } else {
       handles.set(edge.id, { ...defaultHandles });
@@ -391,17 +501,8 @@ function dagreLayout(
     
     // Dagre requires querying the edge using the exact from/to direction
     // that was passed to g.setEdge. We used 'directed' behavior.
-    let from = (edge.from as ConnectedEdgeEndpoint).nodeId;
-    let to = (edge.to as ConnectedEdgeEndpoint).nodeId;
-    
-    // For undirected/bidirectional edges we sorted from/to alphabetically in setEdge
-    const dir = edge.direction ?? 'directed';
-    if (dir === 'undirected' || dir === 'bidirectional') {
-      if (from > to) {
-        from = (edge.to as ConnectedEdgeEndpoint).nodeId;
-        to = (edge.from as ConnectedEdgeEndpoint).nodeId;
-      }
-    }
+    const from = (edge.from as ConnectedEdgeEndpoint).nodeId;
+    const to = (edge.to as ConnectedEdgeEndpoint).nodeId;
     
     const dagreEdge = g.edge(from, to, edge.id);
     if (dagreEdge && dagreEdge.x !== undefined && dagreEdge.y !== undefined) {

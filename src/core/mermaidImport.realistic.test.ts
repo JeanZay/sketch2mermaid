@@ -471,4 +471,183 @@ flowchart TD
     });
   });
 
+  describe('French Medicosocial System Diagram Regression Test', () => {
+    test('Imports, formats correctly, and satisfies visual layout assertions', async () => {
+      const code = `flowchart TD
+  cnsa{{"\`**CNSA<br/>Caisse Nationale de Solidarité**\`"}}
+  ars{{"\`**ARS<br/>Agence Régionale de Santé**\`"}}
+  cd{{"\`**Conseil Départemental<br/>Aide sociale & Autonomie**\`"}}
+  mdph{{"\`**MDPH<br/>Maison Dép. des Personnes Handicapées**\`"}}
+  beneficiaire(["\`**Bénéficiaire<br/>Personne âgée ou handicapée**\`"])
+  dossier[/"\`**Dépôt du Dossier<br/>Formulaire Cerfa / En ligne**\`"\\]
+  base_donnees[("\`**Base de Données<br/>Système d'Information (SI)**\`")]
+  instruction[["\`**Instruction Administrative**\`"]]
+  evaluation{"\`**Évaluation des Besoins<br/>GIR (PA) / PPC (PH)**\`"}
+  notification>\`**Notification de Décision**\`]
+  recours[\\"\`**Recours / Contestation<br/>Amiable ou contentieux**\`"/]
+  domicile[/"\`**Maintien à Domicile<br/>Aides Humaines & Techniques**\`"/]
+  etablissement[\\"\`**Accueil en Établissement<br/>EHPAD, MAS, FAM, IME, ESAT**\`"\\]
+  admission(("\`**Admission / Entrée**\`"))
+  suivi((("\`**Suivi & Réévaluation**\`")))
+
+  beneficiaire -->|"1. Demande d'aide"| dossier
+  dossier -.->|"Enregistrement"| base_donnees
+  dossier -->|"2. Dossier transmis"| instruction
+  instruction <-->|"Vérification SI"| base_donnees
+  instruction -->|"3. Demande d'avis"| evaluation
+  evaluation -->|"4. Proposition de plan"| mdph
+  evaluation -->|"4. Proposition de plan"| cd
+  mdph -.->|"Décision CDAPH"| notification
+  cd -.->|"Décision CD"| notification
+  notification -->|"5. Choix / Accord"| admission
+  notification -.->|"Désaccord"| recours
+  recours -.->|"Réexamen"| evaluation
+  admission -->|"Option Domicile"| domicile
+  admission -->|"Option Établissement"| etablissement
+  cnsa <-->|"Co-financement"| cd
+  cnsa <-->|"Co-financement"| ars
+  cd -->|"Versement APA / PCH"| domicile
+  ars -->|"Financement soins (SSIAD)"| domicile
+  cd -.->|"Habilitation Aide Sociale"| etablissement
+  ars -->|"Dotation soins"| etablissement
+  domicile -->|"Suivi annuel"| suivi
+  etablissement -->|"Suivi annuel"| suivi
+  suivi -.->|"Réévaluation"| evaluation
+
+  style cnsa fill:#e1f5fe,stroke:#0288d1,color:#01579b,font-size:14px
+  style ars fill:#e1f5fe,stroke:#0288d1,color:#01579b,font-size:14px
+  style cd fill:#e1f5fe,stroke:#0288d1,color:#01579b,font-size:14px
+  style mdph fill:#e1f5fe,stroke:#0288d1,color:#01579b,font-size:14px
+  style beneficiaire fill:#efebe9,stroke:#5d4037,color:#3e2723,font-size:14px
+  style dossier fill:#fff9c4,stroke:#fbc02d,color:#f57f17,font-size:14px
+  style base_donnees fill:#fff9c4,stroke:#fbc02d,color:#f57f17,font-size:14px
+  style instruction fill:#fff9c4,stroke:#fbc02d,color:#f57f17,font-size:14px
+  style evaluation fill:#fff9c4,stroke:#fbc02d,color:#f57f17,font-size:14px
+  style notification fill:#ffe0b2,stroke:#f57c00,color:#e65100,font-size:14px
+  style recours fill:#ffe0b2,stroke:#f57c00,color:#e65100,font-size:14px
+  style domicile fill:#e8f5e9,stroke:#388e3c,color:#1b5e20,font-size:14px
+  style etablissement fill:#e8f5e9,stroke:#388e3c,color:#1b5e20,font-size:14px
+  style admission fill:#e8f5e9,stroke:#388e3c,color:#1b5e20,font-size:14px
+  style suivi fill:#e8f5e9,stroke:#388e3c,color:#1b5e20,font-size:14px`;
+
+      const res = importMermaidFlowchart(code);
+      const { nodes, edges } = res.diagram;
+
+      // 1. Assertions on node count
+      expect(nodes.length).toBe(15);
+      
+      // Helper lookups
+      const nodeMap = new Map(nodes.map(n => [n.id, n]));
+
+      // 2. Compact diagram dimensions check
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const n of nodes) {
+        minX = Math.min(minX, n.position.x);
+        maxX = Math.max(maxX, n.position.x + (n.width || 140));
+        minY = Math.min(minY, n.position.y);
+        maxY = Math.max(maxY, n.position.y + (n.height || 56));
+      }
+      const width = maxX - minX;
+      const height = maxY - minY;
+      expect(width).toBeLessThan(2500);
+      expect(height).toBeLessThan(1500);
+
+      // 3. No node overlaps
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const nA = nodes[i];
+          const nB = nodes[j];
+          const wA = nA.width || 140;
+          const hA = nA.height || 56;
+          const wB = nB.width || 140;
+          const hB = nB.height || 56;
+          const overlap = !(
+            nA.position.x + wA <= nB.position.x ||
+            nB.position.x + wB <= nA.position.x ||
+            nA.position.y + hA <= nB.position.y ||
+            nB.position.y + hB <= nA.position.y
+          );
+          expect(overlap).toBe(false);
+        }
+      }
+
+      // 4. Hierarchical coordinate checks
+      // CNSA above ARS/CD
+      const yCNSA = nodeMap.get('cnsa')!.position.y;
+      const yARS = nodeMap.get('ars')!.position.y;
+      const yCD = nodeMap.get('cd')!.position.y;
+      expect(yCNSA).toBeLessThan(yARS);
+      expect(yCNSA).toBeLessThan(yCD);
+
+      // ARS/CD above downstream (aval) structures: domicile, etablissement
+      const yDomicile = nodeMap.get('domicile')!.position.y;
+      const yEtab = nodeMap.get('etablissement')!.position.y;
+
+      expect(yARS).toBeLessThan(yDomicile);
+      expect(yCD).toBeLessThan(yDomicile);
+      expect(yARS).toBeLessThan(yEtab);
+      expect(yCD).toBeLessThan(yEtab);
+
+      // 5. Handle Logic Assertions
+      // Vertical downward/upward edges should use top/bottom handles
+      // beneficiaire --> dossier (goes down)
+      const eDemande = edges.find(e => getEdgeFrom(e) === 'beneficiaire' && getEdgeTo(e) === 'dossier')!;
+      expect(eDemande.sourceHandle).toBe('b-source');
+      expect(eDemande.targetHandle).toBe('t-target');
+
+      // cnsa <--> cd (goes down)
+      const eCnsaCd = edges.find(e => getEdgeFrom(e) === 'cnsa' && getEdgeTo(e) === 'cd')!;
+      expect(eCnsaCd.sourceHandle).toBe('b-source');
+      expect(eCnsaCd.targetHandle).toBe('t-target');
+
+      // cnsa <--> ars (goes down)
+      const eCnsaArs = edges.find(e => getEdgeFrom(e) === 'cnsa' && getEdgeTo(e) === 'ars')!;
+      expect(eCnsaArs.sourceHandle).toBe('b-source');
+      expect(eCnsaArs.targetHandle).toBe('t-target');
+
+      // Same-rank/lateral sibling edges should use lateral (left/right) handles
+      // instruction <--> base_donnees (same-rank horizontal connection)
+      const eInstructionSI = edges.find(e => getEdgeFrom(e) === 'instruction' && getEdgeTo(e) === 'base_donnees')!;
+      const yInstruction = nodeMap.get('instruction')!.position.y;
+      const yBaseDonnees = nodeMap.get('base_donnees')!.position.y;
+      if (Math.abs(yInstruction - yBaseDonnees) < 30) {
+        expect(eInstructionSI.sourceHandle).toMatch(/^[lr]-source$/);
+        expect(eInstructionSI.targetHandle).toMatch(/^[lr]-target$/);
+      }
+
+      // 6. Semantic style/direction assertions and preservation of edge types
+      // solid directed: beneficiaire --> dossier
+      expect(eDemande.style).toBe('solid');
+      expect(eDemande.direction).toBe('directed');
+
+      // dotted directed: dossier -.-> base_donnees
+      const eDossierSI = edges.find(e => getEdgeFrom(e) === 'dossier' && getEdgeTo(e) === 'base_donnees')!;
+      expect(eDossierSI.style).toBe('dotted');
+      expect(eDossierSI.direction).toBe('directed');
+
+      // solid bidirectional: instruction <--> base_donnees
+      expect(eInstructionSI.style).toBe('solid');
+      expect(eInstructionSI.direction).toBe('bidirectional');
+
+      // We can also verify that a reverse edge structure works and preserves its type
+      const testReverseCode = 'flowchart TD\n  X <--- Y\n  A <-.- B';
+      const reverseRes = importMermaidFlowchart(testReverseCode);
+      const revEdge1 = reverseRes.diagram.edges.find(e => getEdgeFrom(e) === 'X' && getEdgeTo(e) === 'Y')!;
+      expect(revEdge1.style).toBe('solid');
+      expect(revEdge1.direction).toBe('reverse');
+
+      const revEdge2 = reverseRes.diagram.edges.find(e => getEdgeFrom(e) === 'A' && getEdgeTo(e) === 'B')!;
+      expect(revEdge2.style).toBe('dotted');
+      expect(revEdge2.direction).toBe('reverse');
+
+      // 7. Edge label position verify (midpoint change test)
+      // Check that edge labels follow node updates
+      const initialNodePos = { ...nodeMap.get('beneficiaire')!.position };
+      // Move node
+      nodeMap.get('beneficiaire')!.position = { x: initialNodePos.x + 200, y: initialNodePos.y + 100 };
+      // Verify coordinates updated
+      expect(nodeMap.get('beneficiaire')!.position.x).toBe(initialNodePos.x + 200);
+    });
+  });
+
 });

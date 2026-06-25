@@ -7,7 +7,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import { getBezierPath, Position } from '@xyflow/system';
-import { USE_MERMAID_LIKE_EDGE_RENDERING } from '../config';
+import { USE_MERMAID_LIKE_EDGE_RENDERING, setUseMermaidLikeImportedLayout } from '../config';
+import { importMermaidFlowchart } from '../mermaidImport';
+import { normalizeDiagram } from '../../store/diagramStore';
 import { getMermaidLikeOrthogonalEdgePath } from '../../utils/edgeRouting';
 import {
   layoutImportedDiagram,
@@ -16,8 +18,9 @@ import {
   LABEL_LINE_HEIGHT,
   BASE_RANK_GAP,
   type HandlePair,
+  selectHandlesDirectionAware,
 } from './mermaidLayout';
-import type { DiagramNode, DiagramEdge, DiagramDirection } from '../types';
+import type { DiagramNode, DiagramEdge, DiagramDirection, ConnectedEdgeEndpoint } from '../types';
 import { NODE_SIZE_DEFAULTS } from '../nodeSizeConfig';
 import { toMermaid } from '../mermaid';
 
@@ -753,5 +756,109 @@ describe('layoutImportedDiagram — edge label spacing', () => {
 
     // Byte-identical — layout positions never leak into Mermaid output
     expect(exportAfter).toBe(exportBefore);
+  });
+});
+
+describe('layoutImportedDiagram — Mermaid-like layout & handle persistence', () => {
+  it('assigns lateral handles to sibling nodes on the same rank', () => {
+    // Sibling nodes B and C on same rank (Y = 100)
+    const B_Center = { x: 100, y: 100 };
+    const C_Center = { x: 300, y: 100 };
+    
+    // TD diagram: same-rank should connect side-to-side (r -> l)
+    const tdHandles = selectHandlesDirectionAware(B_Center, C_Center, 'TD');
+    expect(tdHandles.sourceHandle).toBe('r-source');
+    expect(tdHandles.targetHandle).toBe('l-target');
+
+    // LR diagram: vertical sibling nodes (X = 100, Y = 100 and Y = 300) should connect top-to-bottom (b -> t)
+    const B_CenterLR = { x: 100, y: 100 };
+    const C_CenterLR = { x: 100, y: 300 };
+    const lrHandles = selectHandlesDirectionAware(B_CenterLR, C_CenterLR, 'LR');
+    expect(lrHandles.sourceHandle).toBe('b-source');
+    expect(lrHandles.targetHandle).toBe('t-target');
+    
+    // Check that diagonal downward nodes in TD connect bottom-to-top because gap exceeds threshold
+    const diagHandles = selectHandlesDirectionAware({ x: 100, y: 100 }, { x: 250, y: 220 }, 'TD');
+    expect(diagHandles.sourceHandle).toBe('b-source');
+    expect(diagHandles.targetHandle).toBe('t-target');
+  });
+
+  it('preserves handle persistence through normalizeDiagram (Critical Bug Test)', () => {
+    const code = 'flowchart TD\n  A --> B\n  B --> C';
+    const importRes = importMermaidFlowchart(code);
+    
+    const edge1 = importRes.diagram.edges[0];
+    expect(edge1.from.kind).toBe('connected');
+    expect((edge1.from as ConnectedEdgeEndpoint).handleId).not.toBeNull();
+    expect(edge1.to.kind).toBe('connected');
+    expect((edge1.to as ConnectedEdgeEndpoint).handleId).not.toBeNull();
+
+    const normalized = normalizeDiagram(importRes.diagram);
+    const normEdge1 = normalized.edges[0];
+    
+    expect((normEdge1.from as ConnectedEdgeEndpoint).handleId).toBe((edge1.from as ConnectedEdgeEndpoint).handleId);
+    expect((normEdge1.to as ConnectedEdgeEndpoint).handleId).toBe((edge1.to as ConnectedEdgeEndpoint).handleId);
+    expect(normEdge1.sourceHandle).toBe(edge1.sourceHandle);
+    expect(normEdge1.targetHandle).toBe(edge1.targetHandle);
+  });
+
+  it('restores legacy layout behavior when feature flag is disabled', () => {
+    setUseMermaidLikeImportedLayout(false);
+    try {
+      const code = 'flowchart TD\n  A --> B\n  B --> C';
+      const importRes = importMermaidFlowchart(code);
+      
+      const edge1 = importRes.diagram.edges[0];
+      // Under legacy mode, handles should not be persisted on endpoints
+      expect(edge1.from.kind).toBe('connected');
+      expect((edge1.from as ConnectedEdgeEndpoint).handleId).toBeNull();
+      expect(edge1.to.kind).toBe('connected');
+      expect((edge1.to as ConnectedEdgeEndpoint).handleId).toBeNull();
+    } finally {
+      setUseMermaidLikeImportedLayout(true);
+    }
+  });
+
+  it('recalculates edge label positions dynamically when a node is moved after import', () => {
+    const code = 'flowchart TD\n  A -->|MyLabel| B';
+    const importRes = importMermaidFlowchart(code);
+    const { nodes } = importRes.diagram;
+    const nodeA = nodes.find(n => n.id === 'A')!;
+    const nodeB = nodes.find(n => n.id === 'B')!;
+
+    // Helper to calculate label position using the same logic as CustomEdge.tsx
+    const getLabelPos = (posA: { x: number; y: number }, posB: { x: number; y: number }) => {
+      const srcW = nodeA.width || 140;
+      const srcH = nodeA.height || 56;
+      const tgtW = nodeB.width || 140;
+
+      // Top/bottom handles for vertical flow
+      const sourceX = posA.x + srcW / 2;
+      const sourceY = posA.y + srcH;
+      const targetX = posB.x + tgtW / 2;
+      const targetY = posB.y;
+
+      const [, lx, ly] = getMermaidLikeOrthogonalEdgePath({
+        sourceX,
+        sourceY,
+        sourcePosition: Position.Bottom,
+        targetX,
+        targetY,
+        targetPosition: Position.Top,
+      });
+      return { x: lx, y: ly };
+    };
+
+    const initialPosA = { ...nodeA.position };
+    const initialPosB = { ...nodeB.position };
+    const initialLabelPos = getLabelPos(initialPosA, initialPosB);
+
+    // Move node A (source node)
+    const newPosA = { x: initialPosA.x + 150, y: initialPosA.y - 50 };
+    const movedLabelPos = getLabelPos(newPosA, initialPosB);
+
+    // Verify label position has changed
+    expect(movedLabelPos.x).not.toBe(initialLabelPos.x);
+    expect(movedLabelPos.y).not.toBe(initialLabelPos.y);
   });
 });

@@ -1,4 +1,5 @@
 import { Position } from '@xyflow/react';
+import { USE_MERMAID_LIKE_EDGE_RENDERING, MERMAID_LIKE_MIN_EDGE_BEND } from '../core/config';
 
 interface GetOrthogonalPathParams {
   sourceX: number;
@@ -49,7 +50,7 @@ export function getMermaidLikeOrthogonalEdgePath({
   const sPos = normalizePosition(sourcePosition);
   const tPos = normalizePosition(targetPosition);
 
-  const minExt = 20; // minimal extension length before turning
+  const minExt = USE_MERMAID_LIKE_EDGE_RENDERING ? MERMAID_LIKE_MIN_EDGE_BEND : 20; // minimal extension length before turning
 
   let points: Point[] = [];
 

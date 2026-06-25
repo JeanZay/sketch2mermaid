@@ -2,6 +2,7 @@ import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, 
 import { NODE_SIZE_DEFAULTS } from './nodeSizeConfig';
 import { findDefinitionByMermaidName, getShapeCapabilities } from './shapeRegistry';
 import { layoutImportedDiagram } from './layout/mermaidLayout';
+import { USE_MERMAID_LIKE_IMPORTED_LAYOUT } from './config';
 
 export type MermaidImportWarningType =
   | 'unsupportedDiagramType'
@@ -621,6 +622,14 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
     if (handlePair) {
       edge.sourceHandle = handlePair.sourceHandle;
       edge.targetHandle = handlePair.targetHandle;
+      if (USE_MERMAID_LIKE_IMPORTED_LAYOUT) {
+        if (edge.from.kind === 'connected') {
+          edge.from.handleId = handlePair.sourceHandle;
+        }
+        if (edge.to.kind === 'connected') {
+          edge.to.handleId = handlePair.targetHandle;
+        }
+      }
     }
   }
 
