@@ -766,5 +766,52 @@ describe('Mermaid Flowchart Import Tests', () => {
     expect(exported).toContain('@{ shape: cloud, label: "Cloud" }');
     expect(exported).toContain('@{ shape: notch-rect, label: "Card" }');
   });
+
+  test('Import and normalization behavior for label-less/fixed-size shapes (junction, forkJoin)', () => {
+    // 1. Import junction/forkJoin with labels: they should assign their capabilities fixed sizes
+    const res = importMermaidFlowchart(`graph TD
+      n1@{ shape: f-circ, label: "Legacy label" }
+      n2@{ shape: fork, label: "Fork label" }
+    `);
+    const nodes = res.diagram.nodes;
+    const n1 = nodes.find(n => n.id === 'n1');
+    const n2 = nodes.find(n => n.id === 'n2');
+
+    expect(n1?.shape).toBe('junction');
+    expect(n1?.width).toBe(14);
+    expect(n1?.height).toBe(14);
+    expect(n1?.label).toBe('Legacy label');
+
+    expect(n2?.shape).toBe('forkJoin');
+    expect(n2?.width).toBe(70);
+    expect(n2?.height).toBe(8);
+    expect(n2?.label).toBe('Fork label');
+
+    // 2. Normalization of existing .s2m-like nodes via normalizeDiagram
+    const mockDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart' as const,
+      direction: 'TD' as const,
+      nodes: [
+        { id: 'n1', label: 'Legacy label', shape: 'junction' as const, position: { x: 0, y: 0 }, width: 100, height: 100 },
+        { id: 'n2', label: 'Fork label', shape: 'forkJoin' as const, position: { x: 0, y: 0 }, width: 200, height: 50 },
+        { id: 'n3', label: 'Normal node label', shape: 'process' as const, position: { x: 0, y: 0 }, width: 140, height: 56 }
+      ],
+      edges: [],
+      textBoxes: []
+    };
+
+    const normalized = normalizeDiagram(mockDiagram);
+    const normalizedN1 = normalized.nodes.find(n => n.id === 'n1');
+    const normalizedN2 = normalized.nodes.find(n => n.id === 'n2');
+    const normalizedN3 = normalized.nodes.find(n => n.id === 'n3');
+
+    expect(normalizedN1?.width).toBe(14);
+    expect(normalizedN1?.height).toBe(14);
+    expect(normalizedN2?.width).toBe(70);
+    expect(normalizedN2?.height).toBe(8);
+    expect(normalizedN3?.width).toBe(140);
+    expect(normalizedN3?.height).toBe(56);
+  });
 });
 

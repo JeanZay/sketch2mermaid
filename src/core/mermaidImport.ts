@@ -1,6 +1,6 @@
 import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, EdgeDirection, DiagramDirection, NodeStyle } from './types';
 import { NODE_SIZE_DEFAULTS } from './nodeSizeConfig';
-import { findDefinitionByMermaidName } from './shapeRegistry';
+import { findDefinitionByMermaidName, getShapeCapabilities } from './shapeRegistry';
 import { layoutImportedDiagram } from './layout/mermaidLayout';
 
 export type MermaidImportWarningType =
@@ -529,7 +529,9 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
 
   // Map final DiagramNodes and assign default sizes
   const finalNodes: DiagramNode[] = Array.from(nodesMap.values()).map(node => {
-    const size = NODE_SIZE_DEFAULTS[node.shape] || NODE_SIZE_DEFAULTS.process;
+    const capabilities = getShapeCapabilities(node.shape);
+    const isFixed = capabilities.sizingMode === 'fixed' && capabilities.fixedSize;
+    const size = isFixed ? capabilities.fixedSize! : (NODE_SIZE_DEFAULTS[node.shape] || NODE_SIZE_DEFAULTS.process);
     return {
       id: node.id,
       label: node.label,

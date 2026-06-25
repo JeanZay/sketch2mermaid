@@ -14,6 +14,7 @@ import type {
   TextStyle
 } from '../core/types';
 import { NODE_SIZE_DEFAULTS } from '../core/nodeSizeConfig';
+import { getShapeCapabilities } from '../core/shapeRegistry';
 
 const SCHEMA_VERSION = 1;
 const STORAGE_KEY = 'sketch2mermaid_diagram_v1';
@@ -139,10 +140,11 @@ export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
     : [];
   const nodes = Array.isArray(raw.nodes)
     ? raw.nodes.map((node) => {
+        let normalized = node;
         // @ts-expect-error - legacy field migration
         if (node.textStyle) {
           const { textStyle, ...rest } = node as { textStyle?: unknown } & DiagramNode;
-          return {
+          normalized = {
             ...rest,
             style: {
               ...node.style,
@@ -153,7 +155,16 @@ export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
             },
           };
         }
-        return node;
+        // Force fixedSize dimensions if fixed sizing mode is active
+        const capabilities = getShapeCapabilities(normalized.shape);
+        if (capabilities.sizingMode === 'fixed' && capabilities.fixedSize) {
+          normalized = {
+            ...normalized,
+            width: capabilities.fixedSize.width,
+            height: capabilities.fixedSize.height,
+          };
+        }
+        return normalized;
       })
     : [];
 
@@ -488,14 +499,19 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       targetY += 30;
     }
 
+    const capabilities = getShapeCapabilities(shape);
+    const isFixed = capabilities.sizingMode === 'fixed' && capabilities.fixedSize;
     const sizeDefaults = NODE_SIZE_DEFAULTS[shape];
+    const width = isFixed ? capabilities.fixedSize!.width : sizeDefaults.width;
+    const height = isFixed ? capabilities.fixedSize!.height : sizeDefaults.height;
+
     const newNode: DiagramNode = {
       id: newId,
-      label: ['forkJoin', 'junction', 'summary'].includes(shape) ? '' : 'Nouveau nœud',
+      label: capabilities.supportsLabel ? 'Nouveau nœud' : '',
       shape,
       position: { x: targetX, y: targetY },
-      width: sizeDefaults.width,
-      height: sizeDefaults.height,
+      width,
+      height,
     };
     set((state) => ({
       diagram: {
@@ -520,13 +536,17 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   updateNodeShape: (id, shape) => {
     get().takeSnapshot();
+    const capabilities = getShapeCapabilities(shape);
+    const isFixed = capabilities.sizingMode === 'fixed' && capabilities.fixedSize;
     const sizeDefaults = NODE_SIZE_DEFAULTS[shape];
+    const width = isFixed ? capabilities.fixedSize!.width : sizeDefaults.width;
+    const height = isFixed ? capabilities.fixedSize!.height : sizeDefaults.height;
     set((state) => ({
       diagram: {
         ...state.diagram,
         nodes: state.diagram.nodes.map((node) =>
           node.id === id
-            ? { ...node, shape, width: sizeDefaults.width, height: sizeDefaults.height }
+            ? { ...node, shape, width, height }
             : node
         ),
       },
@@ -552,6 +572,14 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
         ...state.diagram,
         nodes: state.diagram.nodes.map((node) => {
           if (node.id !== id) return node;
+          const capabilities = getShapeCapabilities(node.shape);
+          if (capabilities.sizingMode === 'fixed' && capabilities.fixedSize) {
+            return {
+              ...node,
+              width: capabilities.fixedSize.width,
+              height: capabilities.fixedSize.height,
+            };
+          }
           const sizeConfig = NODE_SIZE_DEFAULTS[node.shape];
           return {
             ...node,

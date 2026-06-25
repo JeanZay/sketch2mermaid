@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { CanonicalDiagram } from './types';
 import { toMermaid, escapeLabel, formatMermaidExport } from './mermaid';
+import { findDefinitionByShape } from './shapeRegistry';
 
 describe('toMermaid pure serialization tests', () => {
   test('AC1 — Empty diagram returns flowchart TD', () => {
@@ -634,5 +635,30 @@ describe('Mermaid Node Styling tests', () => {
     expect(output).toContain('n1@{ shape: datastore, label: "Décision : éàçü (oui/non)" }');
     expect(output).toContain('n2@{ shape: delay, label: "Array [0] and {key: val}" }');
     expect(output).toContain('n3@{ shape: sl-rect, label: "Path: C:\\\\Users\\\\test / home/user" }');
+  });
+
+  test('Export behavior for shapes that do not support labels (junction, forkJoin)', () => {
+    const junctionShape = findDefinitionByShape('junction')?.mermaidShape || 'f-circ';
+    const forkJoinShape = findDefinitionByShape('forkJoin')?.mermaidShape || 'fork';
+
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        { id: 'n1', label: 'Legacy label', shape: 'junction', position: { x: 0, y: 0 } },
+        { id: 'n2', label: 'Fork label', shape: 'forkJoin', position: { x: 0, y: 100 } },
+        { id: 'n3', label: 'Normal node label', shape: 'process', position: { x: 0, y: 200 } }
+      ],
+      edges: [],
+      textBoxes: []
+    };
+
+    const output = toMermaid(diagram);
+    expect(output).toContain(`n1@{ shape: ${junctionShape} }`);
+    expect(output).not.toContain('Legacy label');
+    expect(output).toContain(`n2@{ shape: ${forkJoinShape} }`);
+    expect(output).not.toContain('Fork label');
+    expect(output).toContain('n3["Normal node label"]');
   });
 });

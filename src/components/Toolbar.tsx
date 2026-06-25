@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useEdges, useReactFlow } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
 import type { NodeShape } from '../core/types';
 import { SHAPE_DEFINITIONS, SHAPE_CATEGORIES } from '../core/shapeRegistry';
 import { ShapePaletteIcon } from './ShapePaletteIcon';
+import { SettingsModal } from './SettingsModal';
 
 export const Toolbar = () => {
   const addNode = useDiagramStore((state) => state.addNode);
@@ -13,6 +14,8 @@ export const Toolbar = () => {
 
   const edges = useEdges();
   const { screenToFlowPosition } = useReactFlow();
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const selectedEdge = edges.find((e) => e.selected);
   const currentEdgeData = selectedEdge ? diagram.edges.find((e) => e.id === selectedEdge.id) : null;
@@ -134,9 +137,32 @@ export const Toolbar = () => {
         </div>
       </div>
 
-      <div className="sidebar-footer">
+      <div className="sidebar-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '8px 16px', boxSizing: 'border-box' }}>
+        <button
+          onClick={() => setIsSettingsOpen(true)}
+          className="sidebar-settings-btn"
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            fontSize: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: 0,
+          }}
+          title="Open Application Settings"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          Settings
+        </button>
         <span className="version-label">v0.1.0</span>
       </div>
+      {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
     </aside>
   );
 };

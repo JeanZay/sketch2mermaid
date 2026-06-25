@@ -3,7 +3,7 @@ import { Handle, Position, type NodeProps, useConnection, NodeResizer } from '@x
 import { useDiagramStore } from '../store/diagramStore';
 import type { NodeShape } from '../core/types';
 import { NODE_SIZE_DEFAULTS } from '../core/nodeSizeConfig';
-import { LEGACY_NODE_SHAPES } from '../core/shapeRegistry';
+import { LEGACY_NODE_SHAPES, getShapeCapabilities, shapeSupportsLabel } from '../core/shapeRegistry';
 import { computeNodeFontSize } from '../core/nodeText';
 import { NodeShapeRenderer } from './nodeShapes/NodeShapeRenderer';
 
@@ -28,9 +28,11 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   const connectingClass = isConnecting ? 'is-connecting' : '';
 
   // Resolve dimensions from data or config defaults
+  const capabilities = getShapeCapabilities(shape);
+  const isFixed = capabilities.sizingMode === 'fixed' && capabilities.fixedSize;
   const sizeConfig = NODE_SIZE_DEFAULTS[shape];
-  const width = nodeWidth ?? sizeConfig.width;
-  const height = nodeHeight ?? sizeConfig.height;
+  const width = isFixed ? capabilities.fixedSize!.width : (nodeWidth ?? sizeConfig.width);
+  const height = isFixed ? capabilities.fixedSize!.height : (nodeHeight ?? sizeConfig.height);
 
   // Compute auto-fit font size
   const autoFontSize = computeNodeFontSize({ label, width, height });
@@ -54,6 +56,14 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
     height,
     ...((nodeStyle?.backgroundColor) ? { '--node-bg-color': nodeStyle.backgroundColor } : {}),
     ...((nodeStyle?.borderColor) ? { '--node-border-color': nodeStyle.borderColor } : {}),
+    ...(isFixed ? {
+      minWidth: width,
+      maxWidth: width,
+      minHeight: height,
+      maxHeight: height,
+      padding: 0,
+      lineHeight: 0,
+    } : {}),
   } as React.CSSProperties;
 
 
@@ -111,19 +121,22 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
   };
 
   // NodeResizer — visible only when selected
-  const renderResizer = () => (
-    <NodeResizer
-      isVisible={!!selected}
-      minWidth={sizeConfig.minWidth}
-      minHeight={sizeConfig.minHeight}
-      keepAspectRatio={shape === 'event' || shape === 'endEvent'}
-      onResizeStart={startTransaction}
-      onResize={handleResize}
-      onResizeEnd={commitTransaction}
-      lineClassName="node-resize-line"
-      handleClassName="node-resize-handle"
-    />
-  );
+  const renderResizer = () => {
+    if (isFixed) return null;
+    return (
+      <NodeResizer
+        isVisible={!!selected}
+        minWidth={sizeConfig.minWidth}
+        minHeight={sizeConfig.minHeight}
+        keepAspectRatio={shape === 'event' || shape === 'endEvent'}
+        onResizeStart={startTransaction}
+        onResize={handleResize}
+        onResizeEnd={commitTransaction}
+        lineClassName="node-resize-line"
+        handleClassName="node-resize-handle"
+      />
+    );
+  };
 
   // Four handles for flexible connections (each side has both target and source)
   const renderHandles = () => (
@@ -155,6 +168,10 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
     wrapperClass = `new-shape-node-wrapper shape-${shape}-node`;
   }
 
+  if (isFixed) {
+    wrapperClass += ' fixed-size-node-wrapper';
+  }
+
   return (
     <div
       className={`${wrapperClass} s2m-node-wrapper ${selected ? 'node-selected' : ''} ${connectingClass}`}
@@ -164,7 +181,7 @@ export const CustomNode = ({ id, selected, data }: NodeProps) => {
       <NodeShapeRenderer
         shape={shape}
       >
-        {renderInner()}
+        {shapeSupportsLabel(shape) ? renderInner() : null}
       </NodeShapeRenderer>
       {renderHandles()}
     </div>

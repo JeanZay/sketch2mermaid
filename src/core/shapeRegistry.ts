@@ -63,6 +63,21 @@ export type ShapeIconKey =
   | 'textBlock'
   | 'odd';
 
+export interface ShapeSize {
+  width: number;
+  height: number;
+}
+
+export type ShapeSizingMode =
+  | 'content'
+  | 'fixed';
+
+export interface ShapeCapabilities {
+  supportsLabel: boolean;
+  sizingMode: ShapeSizingMode;
+  fixedSize?: ShapeSize;
+}
+
 export interface ShapeDefinition {
   nodeShape: NodeShape;
   uiLabel: string;
@@ -74,6 +89,7 @@ export interface ShapeDefinition {
     open: string;
     close: string;
   };
+  capabilities?: ShapeCapabilities;
 }
 
 export const SHAPE_DEFINITIONS: ShapeDefinition[] = [
@@ -361,6 +377,11 @@ export const SHAPE_DEFINITIONS: ShapeDefinition[] = [
     mermaidAliases: [],
     category: 'event',
     iconKey: 'forkJoin',
+    capabilities: {
+      supportsLabel: false,
+      sizingMode: 'fixed',
+      fixedSize: { width: 70, height: 8 },
+    },
   },
   {
     nodeShape: 'junction',
@@ -369,6 +390,11 @@ export const SHAPE_DEFINITIONS: ShapeDefinition[] = [
     mermaidAliases: [],
     category: 'event',
     iconKey: 'junction',
+    capabilities: {
+      supportsLabel: false,
+      sizingMode: 'fixed',
+      fixedSize: { width: 14, height: 14 },
+    },
   },
   {
     nodeShape: 'loopLimit',
@@ -494,4 +520,28 @@ export function findDefinitionByMermaidName(name: string): ShapeDefinition | und
       def.mermaidShape.toLowerCase() === normalized ||
       def.mermaidAliases.some((alias) => alias.toLowerCase() === normalized)
   );
+}
+
+export function getShapeCapabilities(shape: NodeShape): ShapeCapabilities {
+  const def = findDefinitionByShape(shape);
+  if (def && def.capabilities) {
+    return def.capabilities;
+  }
+  return {
+    supportsLabel: true,
+    sizingMode: 'content',
+    fixedSize: undefined,
+  };
+}
+
+export function shapeSupportsLabel(shape: NodeShape): boolean {
+  return getShapeCapabilities(shape).supportsLabel;
+}
+
+export function getShapeFixedSize(shape: NodeShape): ShapeSize | undefined {
+  return getShapeCapabilities(shape).fixedSize;
+}
+
+export function isFixedSizeShape(shape: NodeShape): boolean {
+  return getShapeCapabilities(shape).sizingMode === 'fixed';
 }

@@ -1,6 +1,6 @@
 import type { CanonicalDiagram, MermaidExportFormat, DiagramNode, EdgeStyle, EdgeDirection, ConnectedEdgeEndpoint } from './types';
 import { isExportableEdge } from './types';
-import { findDefinitionByShape } from './shapeRegistry';
+import { findDefinitionByShape, shapeSupportsLabel } from './shapeRegistry';
 
 /**
  * Helper to sort IDs numerically by their numeric suffix (e.g., n1, n2, n10).
@@ -105,6 +105,15 @@ export function toMermaid(diagram: CanonicalDiagram): string {
   const sortedNodes = [...diagram.nodes].sort((a, b) => sortById(a.id, b.id));
 
   for (const node of sortedNodes) {
+    const definition = findDefinitionByShape(node.shape);
+    const shapeName = definition?.mermaidShape || 'rect';
+    const supportsLabel = shapeSupportsLabel(node.shape);
+
+    if (!supportsLabel) {
+      lines.push(`  ${node.id}@{ shape: ${shapeName} }`);
+      continue;
+    }
+
     const escaped = escapeLabel(node.label);
 
     let finalLabel = escaped;
@@ -120,7 +129,6 @@ export function toMermaid(diagram: CanonicalDiagram): string {
       finalLabel = `\`${markdownLabel}\``;
     }
 
-    const definition = findDefinitionByShape(node.shape);
     if (definition?.legacySyntax) {
       const { open, close } = definition.legacySyntax;
       lines.push(`  ${node.id}${open}"${finalLabel}"${close}`);
@@ -129,7 +137,6 @@ export function toMermaid(diagram: CanonicalDiagram): string {
       // even inside generic @{ } metadata labels. This is intentional — Mermaid's
       // strict security post-processor decodes these entities globally, including
       // inside metadata label strings. Empirically verified by mermaid-render.test.ts.
-      const shapeName = definition?.mermaidShape || 'rect';
       lines.push(`  ${node.id}@{ shape: ${shapeName}, label: "${finalLabel}" }`);
     }
   }

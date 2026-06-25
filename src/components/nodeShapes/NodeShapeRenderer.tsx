@@ -1,6 +1,6 @@
 import React from 'react';
 import type { NodeShape } from '../../core/types';
-import { LEGACY_NODE_SHAPES } from '../../core/shapeRegistry';
+import { LEGACY_NODE_SHAPES, shapeSupportsLabel } from '../../core/shapeRegistry';
 
 export interface NodeShapeRendererProps {
   shape: NodeShape;
@@ -427,14 +427,12 @@ export const NodeShapeRenderer = ({
     case 'forkJoin':
       svgContent = (
         <rect
-          x="2"
-          y="2"
-          width="96"
-          height="96"
-          fill="var(--node-bg-color, #ffffff)"
-          stroke="var(--node-border-color, var(--border-color))"
-          strokeWidth="2"
-          vectorEffect="non-scaling-stroke"
+          x="0"
+          y="0"
+          width="100"
+          height="100"
+          fill="var(--node-border-color, var(--border-color))"
+          stroke="none"
         />
       );
       break;
@@ -673,29 +671,31 @@ export const NodeShapeRenderer = ({
       >
         {svgContent}
       </svg>
-      <div
-        className={`new-shape-label-wrapper`}
-        style={{
-          position: ['documents', 'manualFile', 'forkJoin', 'asymmetric', 'odd', 'dividedProcess', 'multiProcess', 'internalStorage'].includes(shape) ? 'absolute' : 'relative',
-          left: shape === 'documents' ? '2%' : (shape === 'manualFile' ? '10%' : (shape === 'forkJoin' ? '50%' : (['asymmetric', 'odd'].includes(shape) ? '18%' : (shape === 'dividedProcess' ? '2%' : (shape === 'multiProcess' ? '2%' : (shape === 'internalStorage' ? '6.5%' : undefined)))))),
-          top: shape === 'documents' ? '14%' : (shape === 'manualFile' ? '10%' : (shape === 'forkJoin' ? '50%' : (['asymmetric', 'odd'].includes(shape) ? '15%' : (shape === 'dividedProcess' ? '26.6%' : (shape === 'multiProcess' ? '26%' : (shape === 'internalStorage' ? '26.6%' : undefined)))))),
-          width: shape === 'documents' ? '78%' : (shape === 'manualFile' ? '80%' : (shape === 'forkJoin' ? '150px' : (['asymmetric', 'odd'].includes(shape) ? '80%' : (shape === 'dividedProcess' ? '96%' : (shape === 'multiProcess' ? '78%' : (shape === 'internalStorage' ? '91.5%' : '100%')))))),
-          height: shape === 'documents' ? '72%' : (shape === 'manualFile' ? '35%' : (shape === 'forkJoin' ? '40px' : (['asymmetric', 'odd'].includes(shape) ? '70%' : (shape === 'dividedProcess' ? '58.4%' : (shape === 'multiProcess' ? '72%' : (shape === 'internalStorage' ? '58.4%' : '100%')))))),
-          transform: shape === 'forkJoin' ? 'translate(-50%, -50%)' : undefined,
-          zIndex: 1,
-          padding: '4px 8px',
-          boxSizing: 'border-box',
-          display: 'flex',
-          alignItems: shape === 'dividedProcess' ? 'flex-end' : 'center',
-          justifyContent: 'center',
-          pointerEvents: 'none',
-        }}
-      >
-        {/* Enable pointer-events on the actual child label (editing input or text element) */}
-        <div style={{ pointerEvents: 'auto', width: '100%' }}>
-          {children}
+      {shapeSupportsLabel(shape) && (
+        <div
+          className={`new-shape-label-wrapper`}
+          style={{
+            position: ['documents', 'manualFile', 'forkJoin', 'asymmetric', 'odd', 'dividedProcess', 'multiProcess', 'internalStorage'].includes(shape) ? 'absolute' : 'relative',
+            left: shape === 'documents' ? '2%' : (shape === 'manualFile' ? '10%' : (shape === 'forkJoin' ? '50%' : (['asymmetric', 'odd'].includes(shape) ? '18%' : (shape === 'dividedProcess' ? '2%' : (shape === 'multiProcess' ? '2%' : (shape === 'internalStorage' ? '6.5%' : undefined)))))),
+            top: shape === 'documents' ? '14%' : (shape === 'manualFile' ? '10%' : (shape === 'forkJoin' ? '50%' : (['asymmetric', 'odd'].includes(shape) ? '15%' : (shape === 'dividedProcess' ? '26.6%' : (shape === 'multiProcess' ? '26%' : (shape === 'internalStorage' ? '26.6%' : undefined)))))),
+            width: shape === 'documents' ? '78%' : (shape === 'manualFile' ? '80%' : (shape === 'forkJoin' ? '150px' : (['asymmetric', 'odd'].includes(shape) ? '80%' : (shape === 'dividedProcess' ? '96%' : (shape === 'multiProcess' ? '78%' : (shape === 'internalStorage' ? '91.5%' : '100%')))))),
+            height: shape === 'documents' ? '72%' : (shape === 'manualFile' ? '35%' : (shape === 'forkJoin' ? '40px' : (['asymmetric', 'odd'].includes(shape) ? '70%' : (shape === 'dividedProcess' ? '58.4%' : (shape === 'multiProcess' ? '72%' : (shape === 'internalStorage' ? '58.4%' : '100%')))))),
+            transform: shape === 'forkJoin' ? 'translate(-50%, -50%)' : undefined,
+            zIndex: 1,
+            padding: '4px 8px',
+            boxSizing: 'border-box',
+            display: 'flex',
+            alignItems: shape === 'dividedProcess' ? 'flex-end' : 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          {/* Enable pointer-events on the actual child label (editing input or text element) */}
+          <div style={{ pointerEvents: 'auto', width: '100%' }}>
+            {children}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

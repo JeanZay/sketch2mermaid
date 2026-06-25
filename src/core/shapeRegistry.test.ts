@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SHAPE_DEFINITIONS, findDefinitionByShape, findDefinitionByMermaidName, LEGACY_NODE_SHAPES, SHAPE_CATEGORIES } from './shapeRegistry';
+import { SHAPE_DEFINITIONS, findDefinitionByShape, findDefinitionByMermaidName, LEGACY_NODE_SHAPES, SHAPE_CATEGORIES, getShapeCapabilities, shapeSupportsLabel, isFixedSizeShape, getShapeFixedSize } from './shapeRegistry';
 import type { NodeShape } from './types';
 
 describe('Centralized Shape Registry', () => {
@@ -140,5 +140,37 @@ describe('Centralized Shape Registry', () => {
     expect(bracesDef?.nodeShape).toBe('commentBoth');
     expect(commentBothDef?.nodeShape).toBe('commentBoth');
     expect(commentBothHyphenDef?.nodeShape).toBe('commentBoth');
+  });
+
+  describe('Shape Capabilities', () => {
+    it('should configure junction as label-less and fixed-size 14x14', () => {
+      const caps = getShapeCapabilities('junction');
+      expect(caps.supportsLabel).toBe(false);
+      expect(caps.sizingMode).toBe('fixed');
+      expect(caps.fixedSize).toEqual({ width: 14, height: 14 });
+      expect(shapeSupportsLabel('junction')).toBe(false);
+      expect(isFixedSizeShape('junction')).toBe(true);
+      expect(getShapeFixedSize('junction')).toEqual({ width: 14, height: 14 });
+    });
+
+    it('should configure forkJoin as label-less and fixed-size 70x8', () => {
+      const caps = getShapeCapabilities('forkJoin');
+      expect(caps.supportsLabel).toBe(false);
+      expect(caps.sizingMode).toBe('fixed');
+      expect(caps.fixedSize).toEqual({ width: 70, height: 8 });
+      expect(shapeSupportsLabel('forkJoin')).toBe(false);
+      expect(isFixedSizeShape('forkJoin')).toBe(true);
+      expect(getShapeFixedSize('forkJoin')).toEqual({ width: 70, height: 8 });
+    });
+
+    it('should configure process (normal shape) as label-supporting and content-sized', () => {
+      const caps = getShapeCapabilities('process');
+      expect(caps.supportsLabel).toBe(true);
+      expect(caps.sizingMode).toBe('content');
+      expect(caps.fixedSize).toBeUndefined();
+      expect(shapeSupportsLabel('process')).toBe(true);
+      expect(isFixedSizeShape('process')).toBe(false);
+      expect(getShapeFixedSize('process')).toBeUndefined();
+    });
   });
 });
