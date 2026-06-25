@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, test, expect } from 'vitest';
 import mermaid from 'mermaid';
-import { importMermaidFlowchart } from './mermaidImport';
+import { importMermaidFlowchart, importMermaidFlowchartAsync } from './mermaidImport';
 import { toMermaid } from './mermaid';
 import type { DiagramEdge } from './types';
 
@@ -650,4 +650,73 @@ flowchart TD
     });
   });
 
+  describe('Mermaid SVG Layout Oracle tests', () => {
+    test('importMermaidFlowchartAsync falls back gracefully to local layout on render failure', async () => {
+      const code = 'flowchart TD\n  A --> B';
+      const res = await importMermaidFlowchartAsync(code);
+      expect(res.diagram.nodes.length).toBe(2);
+      expect(res.diagram.edges.length).toBe(1);
+      expect(res.diagram.nodes.some(n => n.id === 'A')).toBe(true);
+    });
+
+    test('importMermaidFlowchartAsync overrides positions and dimensions using Mermaid SVG oracle when render succeeds', async () => {
+      // Stub mermaid.render
+      const originalRender = mermaid.render;
+      mermaid.render = async (id: string) => {
+        const mockSvg = `
+          <svg id="${id}" viewBox="0 0 800 600" width="800" height="600">
+            <g class="node" data-id="A" transform="translate(150, 100)">
+              <rect class="label-container" width="100" height="50"></rect>
+            </g>
+            <g class="node" data-id="B" transform="translate(300, 400)">
+              <rect class="label-container" width="120" height="60"></rect>
+            </g>
+          </svg>
+        `;
+        return { svg: mockSvg, bindFunctions: () => {} } as unknown as { svg: string; bindFunctions: () => void };
+      };
+
+      const originalGetClientRect = Element.prototype.getBoundingClientRect;
+      Element.prototype.getBoundingClientRect = function() {
+        const dataId = this.getAttribute('data-id');
+        if (this.tagName.toLowerCase() === 'svg') {
+          return { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 } as DOMRect;
+        }
+        if (dataId === 'A') {
+          return { left: 100, top: 75, right: 200, bottom: 125, width: 100, height: 50 } as DOMRect;
+        }
+        if (dataId === 'B') {
+          return { left: 240, top: 370, right: 360, bottom: 430, width: 120, height: 60 } as DOMRect;
+        }
+        return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 } as DOMRect;
+      };
+
+      try {
+        const code = 'flowchart TD\n  A --> B';
+        const result = await importMermaidFlowchartAsync(code);
+        const nodeA = result.diagram.nodes.find(n => n.id === 'A')!;
+        const nodeB = result.diagram.nodes.find(n => n.id === 'B')!;
+
+        // Check that coordinates and sizes were overridden by the oracle
+        expect(nodeA.position.x).toBe(100);
+        expect(nodeA.position.y).toBe(75);
+        expect(nodeA.width).toBe(100);
+        expect(nodeA.height).toBe(50);
+
+        expect(nodeB.position.x).toBe(240);
+        expect(nodeB.position.y).toBe(370);
+        expect(nodeB.width).toBe(120);
+        expect(nodeB.height).toBe(60);
+
+        // Verify that handles were recomputed based on new coordinates
+        const edge = result.diagram.edges[0];
+        expect(edge.sourceHandle).toBe('b-source');
+        expect(edge.targetHandle).toBe('t-target');
+        
+      } finally {
+        mermaid.render = originalRender;
+        Element.prototype.getBoundingClientRect = originalGetClientRect;
+      }
+    });
+  });
 });

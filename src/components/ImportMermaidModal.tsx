@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { importMermaidFlowchart } from '../core/mermaidImport';
+import { importMermaidFlowchartAsync } from '../core/mermaidImport';
 import type { MermaidImportWarning } from '../core/mermaidImport';
 import type { CanonicalDiagram } from '../core/types';
 
@@ -29,12 +29,12 @@ export const ImportMermaidModal: React.FC<ImportMermaidModalProps> = ({
   const hasWarnings = useMemo(() => warnings.length > 0, [warnings]);
 
   // Handle parse submission
-  const handleParseSubmit = useCallback(() => {
+  const handleParseSubmit = useCallback(async () => {
     if (isInputEmpty) return;
     setError(null);
 
     try {
-      const result = importMermaidFlowchart(rawInput);
+      const result = await importMermaidFlowchartAsync(rawInput);
       
       if (result.warnings && result.warnings.length > 0) {
         setPendingDiagram(result.diagram);

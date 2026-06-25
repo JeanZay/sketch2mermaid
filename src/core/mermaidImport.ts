@@ -1,8 +1,9 @@
 import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, EdgeDirection, DiagramDirection, NodeStyle } from './types';
 import { NODE_SIZE_DEFAULTS } from './nodeSizeConfig';
 import { findDefinitionByMermaidName, getShapeCapabilities } from './shapeRegistry';
-import { layoutImportedDiagram } from './layout/mermaidLayout';
+import { layoutImportedDiagram, selectHandlesDirectionAware } from './layout/mermaidLayout';
 import { USE_MERMAID_LIKE_IMPORTED_LAYOUT } from './config';
+import mermaid from 'mermaid';
 
 export type MermaidImportWarningType =
   | 'unsupportedDiagramType'
@@ -655,6 +656,101 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
 
   return { diagram, warnings: uniqueWarnings };
 }
+
+export async function importMermaidFlowchartAsync(code: string): Promise<MermaidImportResult> {
+  // 1. Run the synchronous parsing first (which acts as the baseline/fallback)
+  const result = importMermaidFlowchart(code);
+  const { diagram, warnings } = result;
+
+  // 2. Oracle Layout pass (only works in browser context)
+  if (typeof window === 'undefined' || diagram.nodes.length === 0) {
+    return result;
+  }
+
+  try {
+    // Unique ID for the render cycle
+    const renderId = `mermaid-oracle-${Math.floor(Math.random() * 100000)}`;
+
+    // Render the flowchart using Mermaid.js
+    const { svg } = await mermaid.render(renderId, code);
+    if (!svg) return result;
+
+    // Mount SVG to offscreen container for client measurements
+    const container = document.createElement('div');
+    container.style.visibility = 'hidden';
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.top = '-9999px';
+    container.innerHTML = svg;
+    document.body.appendChild(container);
+
+    try {
+      const svgElement = container.querySelector('svg');
+      if (!svgElement) return result;
+
+      const svgRect = svgElement.getBoundingClientRect();
+
+      // Extract positions and bounding boxes for each node
+      for (const node of diagram.nodes) {
+        // Query the node element using class ".node" and matching "data-id"
+        const nodeElement = Array.from(svgElement.querySelectorAll('.node')).find(
+          (el) => el.getAttribute('data-id') === node.id
+        ) as SVGGraphicsElement | null;
+
+        if (nodeElement) {
+          const nodeRect = nodeElement.getBoundingClientRect();
+          // Relative coordinates in the SVG viewport
+          const x = nodeRect.left - svgRect.left;
+          const y = nodeRect.top - svgRect.top;
+          const width = nodeRect.width;
+          const height = nodeRect.height;
+
+          // Override layout positions
+          node.position = { x: Math.round(x), y: Math.round(y) };
+          node.width = Math.round(width);
+          node.height = Math.round(height);
+        }
+      }
+
+      // Recompute handles based on new high-fidelity positions
+      for (const edge of diagram.edges) {
+        if (edge.from.kind === 'connected' && edge.to.kind === 'connected') {
+          const sourceNode = diagram.nodes.find((n) => n.id === edge.from.nodeId);
+          const targetNode = diagram.nodes.find((n) => n.id === edge.to.nodeId);
+          if (sourceNode && targetNode) {
+            const sourceCenter = {
+              x: sourceNode.position.x + (sourceNode.width || 140) / 2,
+              y: sourceNode.position.y + (sourceNode.height || 56) / 2,
+            };
+            const targetCenter = {
+              x: targetNode.position.x + (targetNode.width || 140) / 2,
+              y: targetNode.position.y + (targetNode.height || 56) / 2,
+            };
+
+            const handlePair = selectHandlesDirectionAware(
+              sourceCenter,
+              targetCenter,
+              diagram.direction
+            );
+
+            edge.sourceHandle = handlePair.sourceHandle;
+            edge.targetHandle = handlePair.targetHandle;
+            edge.from.handleId = handlePair.sourceHandle;
+            edge.to.handleId = handlePair.targetHandle;
+          }
+        }
+      }
+    } finally {
+      // Clean up DOM container
+      document.body.removeChild(container);
+    }
+  } catch (err) {
+    console.warn('[mermaidImport] Mermaid layout oracle failed, falling back to local Dagre:', err);
+  }
+
+  return { diagram, warnings };
+}
+
 
 // Phase 2 details: parses a single line for a chain of nodes and edges
 type ParsedChainElement =
