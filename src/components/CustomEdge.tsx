@@ -1,4 +1,4 @@
-import React, { useState, useId } from 'react';
+import React, { useEffect, useState, useId } from 'react';
 import { EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
 import { useDiagramStore, DEFAULT_EDGE_TEXT_STYLE } from '../store/diagramStore';
 import { useVirtualAnchors } from './VirtualAnchorsContext';
@@ -110,6 +110,31 @@ export const CustomEdge = ({
     fontStyle: textStyleObj.italic ? 'italic' : 'normal',
     color: textStyleObj.color ?? '#4b5563',
   };
+
+  useEffect(() => {
+    if (!label || typeof window === 'undefined' || !window.location.search.includes('debugMermaidImportLayout=1')) {
+      return;
+    }
+
+    const source = storeEdge?.from.kind === 'connected' ? storeEdge.from.nodeId : 'detached';
+    const target = storeEdge?.to.kind === 'connected' ? storeEdge.to.nodeId : 'detached';
+    const sourceHandle = storeEdge?.from.kind === 'connected' ? storeEdge.from.handleId : undefined;
+    const targetHandle = storeEdge?.to.kind === 'connected' ? storeEdge.to.handleId : undefined;
+
+    console.debug('[Mermaid Edge Label Debug]', JSON.stringify({
+      edgeId: id,
+      label: String(label),
+      labelX,
+      labelY,
+      fontSize: textStyleObj.fontSize,
+      pathMidX: labelX,
+      pathMidY: labelY,
+      source,
+      target,
+      sourceHandle,
+      targetHandle,
+    }));
+  }, [id, label, labelX, labelY, storeEdge, textStyleObj.fontSize]);
 
   return (
     <>

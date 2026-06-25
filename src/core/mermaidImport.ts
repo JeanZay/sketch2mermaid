@@ -2,7 +2,7 @@ import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, 
 import { NODE_SIZE_DEFAULTS } from './nodeSizeConfig';
 import { findDefinitionByMermaidName, getShapeCapabilities } from './shapeRegistry';
 import { layoutImportedDiagram, selectHandlesDirectionAware } from './layout/mermaidLayout';
-import { USE_MERMAID_LIKE_IMPORTED_LAYOUT } from './config';
+import { DEBUG_MERMAID_IMPORT_LAYOUT, USE_MERMAID_LIKE_IMPORTED_LAYOUT } from './config';
 import mermaid from 'mermaid';
 
 export type MermaidImportWarningType =
@@ -26,12 +26,53 @@ export interface MermaidImportWarning {
 }
 
 export interface LayoutOracleDiagnostics {
+  asyncImportUsed?: boolean;
   oracleAttempted: boolean;
+  mermaidRenderSucceeded?: boolean;
   renderSucceeded: boolean;
+  svgMounted?: boolean;
+  svgNodeElementsFound?: number;
+  svgNodesMatchedToInternalIds?: number;
+  svgNodesUnmatched?: string[];
+  internalNodesWithoutSvgMatch?: string[];
+  oraclePositionsExtracted?: number;
+  oracleDimensionsExtracted?: number;
+  oraclePositionsApplied?: number;
+  oracleDimensionsApplied?: number;
   nodesExtracted: number;
   positionsApplied: number;
+  finalNodeCount?: number;
+  finalEdgeCount?: number;
+  svgRect?: { x: number; y: number; width: number; height: number };
+  svgViewBox?: { x: number; y: number; width: number; height: number };
+  cssToViewBoxScale?: { x: number; y: number };
+  nodeComparisons?: LayoutOracleNodeComparison[];
   fallbackUsed: boolean;
   fallbackReason?: string;
+}
+
+export interface LayoutOracleNodeComparison {
+  nodeId: string;
+  dagreX: number;
+  dagreY: number;
+  dagreW: number;
+  dagreH: number;
+  oracleX?: number;
+  oracleY?: number;
+  oracleW?: number;
+  oracleH?: number;
+  finalX: number;
+  finalY: number;
+  finalW: number;
+  finalH: number;
+  matchedBy?: string;
+}
+
+declare global {
+  interface Window {
+    __S2M_DEBUG_MERMAID_IMPORT_LAYOUT__?: boolean;
+    __S2M_LAST_MERMAID_IMPORT_DIAGNOSTICS__?: LayoutOracleDiagnostics;
+  }
 }
 
 export interface MermaidImportResult {
@@ -667,42 +708,193 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
   return { diagram, warnings: uniqueWarnings };
 }
 
-function matchNodeElement(el: Element, nodeId: string, renderId: string): boolean {
+function getNodeElementMatch(el: Element, nodeId: string, renderId: string): string | null {
   if (el.getAttribute('data-id') === nodeId) {
-    return true;
+    return 'data-id';
   }
   const idAttr = el.getAttribute('id');
-  if (!idAttr) return false;
+  if (!idAttr) return null;
 
   // Mermaid v10/v11 pattern: ${renderId}-flowchart-${nodeId}-${index}
   // Because nodeId could contain special characters, prefix match + numeric suffix is very reliable.
   const prefix = `${renderId}-flowchart-${nodeId}-`;
   if (idAttr.startsWith(prefix)) {
     const suffix = idAttr.substring(prefix.length);
-    return /^\d+$/.test(suffix);
+    return /^\d+$/.test(suffix) ? 'id-prefix-flowchart' : null;
   }
 
   // Fallback pattern without flowchart class suffix: ${renderId}-${nodeId}-${index}
   const fallbackPrefix = `${renderId}-${nodeId}-`;
   if (idAttr.startsWith(fallbackPrefix)) {
     const suffix = idAttr.substring(fallbackPrefix.length);
-    return /^\d+$/.test(suffix);
+    return /^\d+$/.test(suffix) ? 'id-prefix' : null;
   }
 
-  return false;
+  return null;
+}
+
+function matchNodeElement(el: Element, nodeId: string, renderId: string): boolean {
+  return getNodeElementMatch(el, nodeId, renderId) !== null;
+}
+
+function rectToPlain(rect: DOMRect | { x?: number; y?: number; left?: number; top?: number; width: number; height: number }) {
+  return {
+    x: Math.round((rect.x ?? rect.left ?? 0) * 100) / 100,
+    y: Math.round((rect.y ?? rect.top ?? 0) * 100) / 100,
+    width: Math.round(rect.width * 100) / 100,
+    height: Math.round(rect.height * 100) / 100,
+  };
+}
+
+function getSvgViewBox(svgElement: SVGSVGElement, svgRect: DOMRect) {
+  const base = svgElement.viewBox?.baseVal;
+  if (base && base.width > 0 && base.height > 0) {
+    return {
+      x: base.x,
+      y: base.y,
+      width: base.width,
+      height: base.height,
+    };
+  }
+
+  const attr = svgElement.getAttribute('viewBox');
+  if (attr) {
+    const parts = attr.trim().split(/[\s,]+/).map(Number);
+    if (parts.length === 4 && parts.every(Number.isFinite) && parts[2] > 0 && parts[3] > 0) {
+      return { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
+    }
+  }
+
+  return {
+    x: 0,
+    y: 0,
+    width: svgRect.width,
+    height: svgRect.height,
+  };
+}
+
+function clientRectToSvgViewBoxRect(
+  rect: DOMRect,
+  svgRect: DOMRect,
+  svgViewBox: { x: number; y: number; width: number; height: number },
+) {
+  if (svgRect.width <= 0 || svgRect.height <= 0 || svgViewBox.width <= 0 || svgViewBox.height <= 0) {
+    return {
+      x: rect.left - svgRect.left,
+      y: rect.top - svgRect.top,
+      width: rect.width,
+      height: rect.height,
+    };
+  }
+
+  const scaleX = svgViewBox.width / svgRect.width;
+  const scaleY = svgViewBox.height / svgRect.height;
+
+  return {
+    x: svgViewBox.x + (rect.left - svgRect.left) * scaleX,
+    y: svgViewBox.y + (rect.top - svgRect.top) * scaleY,
+    width: rect.width * scaleX,
+    height: rect.height * scaleY,
+  };
+}
+
+function shouldDebugMermaidImportLayout(): boolean {
+  if (DEBUG_MERMAID_IMPORT_LAYOUT) return true;
+  if (typeof window === 'undefined') return false;
+  if (window.__S2M_DEBUG_MERMAID_IMPORT_LAYOUT__) return true;
+  if (window.location?.search.includes('debugMermaidImportLayout=1')) return true;
+  try {
+    return window.localStorage?.getItem('S2M_DEBUG_MERMAID_IMPORT_LAYOUT') === '1';
+  } catch {
+    return false;
+  }
+}
+
+function publishLayoutDiagnostics(diagnostics: LayoutOracleDiagnostics) {
+  if (typeof window !== 'undefined') {
+    try {
+      window.__S2M_LAST_MERMAID_IMPORT_DIAGNOSTICS__ = diagnostics;
+    } catch {
+      // Some browser automation sandboxes expose a non-extensible Window proxy.
+    }
+  }
+
+  if (!shouldDebugMermaidImportLayout()) {
+    return;
+  }
+
+  console.groupCollapsed('[Mermaid Import Layout Diagnostics]');
+  console.log('[Mermaid Import Layout Diagnostics JSON]', JSON.stringify(diagnostics, null, 2));
+  if (diagnostics.nodeComparisons?.length) {
+    console.table(diagnostics.nodeComparisons);
+  }
+  console.groupEnd();
 }
 
 export async function importMermaidFlowchartAsync(code: string): Promise<MermaidImportResult> {
   // 1. Run the synchronous parsing first (which acts as the baseline/fallback)
   const result = importMermaidFlowchart(code);
   const { diagram, warnings } = result;
+  const dagreBaseline = new Map(
+    diagram.nodes.map((node) => [
+      node.id,
+      {
+        x: node.position.x,
+        y: node.position.y,
+        width: node.width ?? NODE_SIZE_DEFAULTS[node.shape]?.width ?? NODE_SIZE_DEFAULTS.process.width,
+        height: node.height ?? NODE_SIZE_DEFAULTS[node.shape]?.height ?? NODE_SIZE_DEFAULTS.process.height,
+      },
+    ])
+  );
+  const proposedPositions = new Map<string, { position: { x: number; y: number }; width: number; height: number; matchedBy: string }>();
 
   const diagnostics: LayoutOracleDiagnostics = {
+    asyncImportUsed: true,
     oracleAttempted: false,
+    mermaidRenderSucceeded: false,
     renderSucceeded: false,
+    svgMounted: false,
+    svgNodeElementsFound: 0,
+    svgNodesMatchedToInternalIds: 0,
+    svgNodesUnmatched: [],
+    internalNodesWithoutSvgMatch: [],
+    oraclePositionsExtracted: 0,
+    oracleDimensionsExtracted: 0,
+    oraclePositionsApplied: 0,
+    oracleDimensionsApplied: 0,
     nodesExtracted: 0,
     positionsApplied: 0,
+    finalNodeCount: diagram.nodes.length,
+    finalEdgeCount: diagram.edges.length,
+    nodeComparisons: [],
     fallbackUsed: false,
+  };
+
+  const finalize = () => {
+    diagnostics.finalNodeCount = diagram.nodes.length;
+    diagnostics.finalEdgeCount = diagram.edges.length;
+    diagnostics.nodeComparisons = diagram.nodes.map((node) => {
+      const baseline = dagreBaseline.get(node.id);
+      const oracle = proposedPositions.get(node.id);
+      return {
+        nodeId: node.id,
+        dagreX: baseline?.x ?? 0,
+        dagreY: baseline?.y ?? 0,
+        dagreW: baseline?.width ?? 0,
+        dagreH: baseline?.height ?? 0,
+        oracleX: oracle?.position.x,
+        oracleY: oracle?.position.y,
+        oracleW: oracle?.width,
+        oracleH: oracle?.height,
+        finalX: node.position.x,
+        finalY: node.position.y,
+        finalW: node.width ?? NODE_SIZE_DEFAULTS[node.shape]?.width ?? NODE_SIZE_DEFAULTS.process.width,
+        finalH: node.height ?? NODE_SIZE_DEFAULTS[node.shape]?.height ?? NODE_SIZE_DEFAULTS.process.height,
+        matchedBy: oracle?.matchedBy,
+      };
+    });
+    publishLayoutDiagnostics(diagnostics);
+    return { diagram, warnings, diagnostics };
   };
 
   // 2. Oracle Layout pass (only works in browser context)
@@ -711,8 +903,7 @@ export async function importMermaidFlowchartAsync(code: string): Promise<Mermaid
     diagnostics.fallbackReason = typeof window === 'undefined'
       ? 'Non-browser context (window is undefined)'
       : 'Diagram has no nodes';
-    console.log('[Layout Oracle Diagnostic]', diagnostics);
-    return { diagram, warnings, diagnostics };
+    return finalize();
   }
 
   diagnostics.oracleAttempted = true;
@@ -726,10 +917,10 @@ export async function importMermaidFlowchartAsync(code: string): Promise<Mermaid
     if (!svg) {
       diagnostics.fallbackUsed = true;
       diagnostics.fallbackReason = 'Mermaid render returned empty SVG';
-      console.log('[Layout Oracle Diagnostic]', diagnostics);
-      return { diagram, warnings, diagnostics };
+      return finalize();
     }
 
+    diagnostics.mermaidRenderSucceeded = true;
     diagnostics.renderSucceeded = true;
 
     // Mount SVG to offscreen container for client measurements
@@ -740,50 +931,75 @@ export async function importMermaidFlowchartAsync(code: string): Promise<Mermaid
     container.style.top = '-9999px';
     container.innerHTML = svg;
     document.body.appendChild(container);
+    diagnostics.svgMounted = true;
 
     try {
       const svgElement = container.querySelector('svg');
       if (!svgElement) {
         diagnostics.fallbackUsed = true;
         diagnostics.fallbackReason = 'Could not find svg element in rendered container';
-        console.log('[Layout Oracle Diagnostic]', diagnostics);
-        return { diagram, warnings, diagnostics };
+        return finalize();
       }
 
       const svgRect = svgElement.getBoundingClientRect();
+      const svgViewBox = getSvgViewBox(svgElement as SVGSVGElement, svgRect);
+      diagnostics.svgRect = rectToPlain(svgRect);
+      diagnostics.svgViewBox = {
+        x: Math.round(svgViewBox.x * 100) / 100,
+        y: Math.round(svgViewBox.y * 100) / 100,
+        width: Math.round(svgViewBox.width * 100) / 100,
+        height: Math.round(svgViewBox.height * 100) / 100,
+      };
+      diagnostics.cssToViewBoxScale = {
+        x: svgRect.width > 0 ? Math.round((svgViewBox.width / svgRect.width) * 1000) / 1000 : 0,
+        y: svgRect.height > 0 ? Math.round((svgViewBox.height / svgRect.height) * 1000) / 1000 : 0,
+      };
 
       // Extract positions and bounding boxes for each node
       const allNodeGroups = Array.from(svgElement.querySelectorAll('.node'));
       diagnostics.nodesExtracted = allNodeGroups.length;
+      diagnostics.svgNodeElementsFound = allNodeGroups.length;
 
       let hasValidDimensions = false;
-      const proposedPositions = new Map<string, { position: { x: number; y: number }; width: number; height: number }>();
+      let dimensionsExtracted = 0;
 
       for (const node of diagram.nodes) {
-        const nodeElement = allNodeGroups.find(
-          (el) => matchNodeElement(el, node.id, renderId)
-        ) as SVGGraphicsElement | null;
+        const matched = allNodeGroups
+          .map((el) => ({ el, matchedBy: getNodeElementMatch(el, node.id, renderId) }))
+          .find((candidate) => candidate.matchedBy);
+        const nodeElement = matched?.el as SVGGraphicsElement | null;
 
         if (nodeElement) {
           const nodeRect = nodeElement.getBoundingClientRect();
-          // Relative coordinates in the SVG viewport
-          const x = nodeRect.left - svgRect.left;
-          const y = nodeRect.top - svgRect.top;
-          const width = nodeRect.width;
-          const height = nodeRect.height;
+          const nodeSvgRect = clientRectToSvgViewBoxRect(nodeRect, svgRect, svgViewBox);
+          const x = nodeSvgRect.x;
+          const y = nodeSvgRect.y;
+          const width = nodeSvgRect.width;
+          const height = nodeSvgRect.height;
 
           if (width > 0 && height > 0) {
             hasValidDimensions = true;
+            dimensionsExtracted++;
           }
 
           proposedPositions.set(node.id, {
             position: { x: Math.round(x), y: Math.round(y) },
             width: Math.round(width),
             height: Math.round(height),
+            matchedBy: matched?.matchedBy ?? 'unknown',
           });
           diagnostics.positionsApplied++;
         }
       }
+      diagnostics.svgNodesMatchedToInternalIds = proposedPositions.size;
+      diagnostics.oraclePositionsExtracted = proposedPositions.size;
+      diagnostics.oracleDimensionsExtracted = dimensionsExtracted;
+      diagnostics.internalNodesWithoutSvgMatch = diagram.nodes
+        .filter((node) => !proposedPositions.has(node.id))
+        .map((node) => node.id);
+      diagnostics.svgNodesUnmatched = allNodeGroups
+        .filter((el) => !diagram.nodes.some((node) => matchNodeElement(el, node.id, renderId)))
+        .map((el) => el.getAttribute('data-id') || el.getAttribute('id') || (el.textContent || '').trim().slice(0, 80));
 
       // Check if we successfully matched all nodes and got non-zero dimensions
       if (diagnostics.positionsApplied === diagram.nodes.length && hasValidDimensions) {
@@ -796,6 +1012,8 @@ export async function importMermaidFlowchartAsync(code: string): Promise<Mermaid
             node.height = prop.height;
           }
         }
+        diagnostics.oraclePositionsApplied = proposedPositions.size;
+        diagnostics.oracleDimensionsApplied = proposedPositions.size;
 
         // Recompute handles based on new high-fidelity positions
         for (const edge of diagram.edges) {
@@ -840,11 +1058,12 @@ export async function importMermaidFlowchartAsync(code: string): Promise<Mermaid
   } catch (err) {
     diagnostics.fallbackUsed = true;
     diagnostics.fallbackReason = err instanceof Error ? err.message : String(err);
-    console.warn('[mermaidImport] Mermaid layout oracle failed, falling back to local Dagre:', err);
+    if (shouldDebugMermaidImportLayout()) {
+      console.warn('[mermaidImport] Mermaid layout oracle failed, falling back to local Dagre:', err);
+    }
   }
 
-  console.log('[Layout Oracle Diagnostic]', diagnostics);
-  return { diagram, warnings, diagnostics };
+  return finalize();
 }
 
 
@@ -1321,4 +1540,3 @@ function scanEdgeRef(s: string, start: number): { edge: ParsedEdge; nextIndex: n
 
   return null;
 }
-

@@ -740,5 +740,63 @@ flowchart TD
         Element.prototype.getBoundingClientRect = originalGetClientRect;
       }
     });
+
+    test('importMermaidFlowchartAsync converts SVG CSS pixels back to viewBox coordinates', async () => {
+      const originalRender = mermaid.render;
+      mermaid.render = async (id: string) => {
+        const mockSvg = `
+          <svg id="${id}" viewBox="0 0 1600 1200" width="800" height="600">
+            <g class="node" data-id="A" transform="translate(300, 140)">
+              <rect class="label-container" width="200" height="80"></rect>
+            </g>
+            <g class="node" data-id="B" transform="translate(720, 860)">
+              <rect class="label-container" width="240" height="120"></rect>
+            </g>
+          </svg>
+        `;
+        return { svg: mockSvg, bindFunctions: () => {} } as unknown as { svg: string; bindFunctions: () => void };
+      };
+
+      const originalGetClientRect = Element.prototype.getBoundingClientRect;
+      Element.prototype.getBoundingClientRect = function() {
+        const dataId = this.getAttribute('data-id');
+        if (this.tagName.toLowerCase() === 'svg') {
+          return { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 } as DOMRect;
+        }
+        if (dataId === 'A') {
+          return { left: 100, top: 50, right: 200, bottom: 90, width: 100, height: 40 } as DOMRect;
+        }
+        if (dataId === 'B') {
+          return { left: 300, top: 400, right: 420, bottom: 460, width: 120, height: 60 } as DOMRect;
+        }
+        return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 } as DOMRect;
+      };
+
+      try {
+        const result = await importMermaidFlowchartAsync('flowchart TD\n  A --> B');
+        const nodeA = result.diagram.nodes.find(n => n.id === 'A')!;
+        const nodeB = result.diagram.nodes.find(n => n.id === 'B')!;
+
+        expect(nodeA.position).toEqual({ x: 200, y: 100 });
+        expect(nodeA.width).toBe(200);
+        expect(nodeA.height).toBe(80);
+
+        expect(nodeB.position).toEqual({ x: 600, y: 800 });
+        expect(nodeB.width).toBe(240);
+        expect(nodeB.height).toBe(120);
+
+        expect(result.diagnostics?.fallbackUsed).toBe(false);
+        expect(result.diagnostics?.cssToViewBoxScale).toEqual({ x: 2, y: 2 });
+        expect(result.diagnostics?.oraclePositionsApplied).toBe(2);
+        expect(result.diagnostics?.oracleDimensionsApplied).toBe(2);
+        expect(result.diagnostics?.nodeComparisons?.map((row) => row.matchedBy)).toEqual([
+          'data-id',
+          'data-id',
+        ]);
+      } finally {
+        mermaid.render = originalRender;
+        Element.prototype.getBoundingClientRect = originalGetClientRect;
+      }
+    });
   });
 });

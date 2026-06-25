@@ -24,6 +24,12 @@ export function setUseMermaidLikeImportedLayout(val: boolean) {
   USE_MERMAID_LIKE_IMPORTED_LAYOUT = val;
 }
 
+/**
+ * When true, browser Mermaid imports emit structured diagnostics to the console
+ * and to window.__S2M_LAST_MERMAID_IMPORT_DIAGNOSTICS__.
+ */
+export const DEBUG_MERMAID_IMPORT_LAYOUT = false;
+
 // ---------------------------------------------------------------------------
 // Layout spacing constants for Mermaid-like diagrams
 // ---------------------------------------------------------------------------
@@ -40,4 +46,3 @@ export const MERMAID_LIKE_MIN_EDGE_BEND = 20;
  * If undefined/null, defaults dynamically to MERMAID_LIKE_RANK_SEP / 2.
  */
 export const MERMAID_LIKE_SAME_RANK_THRESHOLD = MERMAID_LIKE_RANK_SEP / 2;
-
