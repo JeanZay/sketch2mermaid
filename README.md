@@ -1,58 +1,94 @@
-# Sketch2Mermaid
+<div align="center">
+  <img src="public/favicon.svg" alt="Sketch2Mermaid Logo" width="120" />
+  <h1>Sketch2Mermaid</h1>
+  <p><strong>A builder-centric visual canvas for generating Mermaid code, tailored for AI-assisted workflows.</strong></p>
+</div>
 
-Sketch2Mermaid v0 is an open-source, client-side web application designed to help users build visual flowchart diagrams easily and export them as clean, valid Mermaid.js markup.
+<div align="center">
 
-## Core Scope & Limitations (v0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![CI Status](https://github.com/OWNER/sketch2mermaid/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/sketch2mermaid/actions/workflows/ci.yml)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
-- **Canvas to Mermaid Only**: Generation is unidirectionally canvas → Mermaid. Import of Mermaid markup back into the canvas is **out of scope** for v0.
-- **Strictly Flowcharts**: Supports standard Mermaid flowcharts. Visual parameters like colors, custom arrows, or subgraphs are not supported in v0.
-- **Layout and Positions**: All node positions are stored locally in the canonical JSON model for canvas rendering but are **strictly omitted** from the exported Mermaid code. Mermaid handles diagram layout dynamically.
+</div>
 
-## Security Model
+---
 
-Sketch2Mermaid is designed to run securely as a static frontend-only site:
-- **No Backend**: No database, server-side processing, API keys, or user sessions.
-- **Sanitized SVG Render**: Mermaid is initialized with `securityLevel: "strict"`. User inputs are fully escaped character-by-character before generation to prevent XSS vector injection.
-- **Isolated Rendering**: SVG renderings are safely updated through controlled rendering paths.
-- **Security Headers**: Standard HTTP security headers (`X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, and CSP) are applied where the hosting platform supports them.
+## 🎯 Vision & Positioning
 
-## Local Development
+**Sketch2Mermaid** bridges the gap between visual thinking and LLM-ready text output. While users can easily sketch a process, decision, or flow, Large Language Models (LLMs) parse and generate structured text far better than they analyze images. Mermaid.js is the perfect pivot format: readable by humans, versionable in Git, native to Markdown, and highly exploitable by LLMs.
+
+Sketch2Mermaid provides a **strictly unidirectional** workflow:  
+**Editor (Canvas) → Canonical JSON Model → Clean Mermaid Code**
+
+Unlike generic diagramming tools, Sketch2Mermaid is explicitly constrained to what standard Mermaid flowcharts can express. It is an AI-ready enabler, designed to seamlessly feed diagrams into LLM prompts, documentation, or codebases without formatting errors.
+
+## ✨ Features (v0)
+
+- **Pure Visual Editing:** Drag-and-drop nodes, draw connections, and edit labels seamlessly.
+- **Strictly Flowcharts:** Implements 6 core Mermaid flowchart shapes (`process`, `rounded`, `stadium`, `decision`, `event`, `endEvent`) and 2 edge styles (`solid`, `dotted`).
+- **Deterministic Export:** Generates character-by-character accurate Mermaid.js code with proper escaping to avoid parse errors.
+- **Auto-Layout Native:** Uses standard flowchart directions (`TD`, `LR`, `BT`, `RL`). Canvas positions are pure editor metadata and do not leak into the generated code.
+- **Zero-Backend Security:** 100% client-side web application. No database, no telemetry, no API keys.
+- **Local Persistence:** Your work is saved directly in your browser's `localStorage`.
+
+## 🚀 Quick Start
 
 ### Requirements
 - Node.js (version 20+ pinned in `.nvmrc`)
 
-### Installation & Run
-1. Install dependencies (commits `package-lock.json` to keep builds identical):
-   ```bash
-   npm ci
-   ```
-2. Start the development server:
-   ```bash
-   npm run dev
-   ```
-3. Run the test suite:
-   ```bash
-   npm run test
-   ```
+### Installation
+Clone the repository and install dependencies using `npm ci` to ensure lockfile fidelity.
 
-### Production Build & Deployment
-Build the static website files:
+```bash
+git clone https://github.com/yourusername/sketch2mermaid.git
+cd sketch2mermaid
+npm ci
+```
+
+### Development
+Start the local Vite development server:
+
+```bash
+npm run dev
+```
+
+### Testing & Linting
+Ensure code quality with strictly configured ESLint and Vitest. *CI requires zero warnings.*
+
+```bash
+npm run typecheck
+npm run lint
+npm run test
+```
+
+### Production Build
+Build the static website files (output to `dist`):
+
 ```bash
 npm run build
 ```
-The output directory will be `dist`.
 
-#### Base Path Configuration
-To support deployment on subpaths (e.g., GitHub Pages repository path `/sketch2mermaid/`):
-- Production builds default to the `/sketch2mermaid/` base path.
-- To override this base path (e.g., for custom root domain deployments `/`), set the environment variable:
-  ```bash
-  VITE_BASE_PATH=/ npm run build
-  ```
+## 🛠️ Technology Stack
 
-#### Local Build Preview
-To preview the production build locally:
-```bash
-npm run preview
-```
-*Note: `npm run preview` is intended for local verification only and should not be used as a production server.*
+- **Core:** React 19, TypeScript, Vite
+- **Canvas Engine:** `@xyflow/react` (React Flow)
+- **State Management:** `zustand` (Single canonical JSON truth)
+- **Mermaid Rendering:** `mermaid` (Strict security level)
+- **Testing:** `vitest`
+
+## 🛡️ Security Model
+
+Sketch2Mermaid is built securely by design:
+- **Client-Side Only:** No data ever leaves your browser.
+- **Strict Execution:** Mermaid operates in `securityLevel: "strict"`.
+- **Sanitized Outputs:** Custom pure functions safely escape all user inputs, preventing injection vectors and SVG XSS.
+
+## 🤝 Contributing
+
+We welcome contributions! Please review our [Contributing Guidelines](CONTRIBUTING.md) and our core architecture decisions in [ADR-001](ADR-001-Sketch2Mermaid.md) before opening a pull request. 
+> **Note:** Bidirectional import (Mermaid to Canvas) is explicitly out of scope for v0. Please read the ADR.
+
+## 📝 License
+
+Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information.
