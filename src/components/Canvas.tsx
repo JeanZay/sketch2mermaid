@@ -10,7 +10,8 @@ import {
   type NodeChange,
   type EdgeChange,
   MarkerType,
-  type Node
+  type Node,
+  SelectionMode
 } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
 import CustomNode from './CustomNode';
@@ -18,8 +19,8 @@ import CustomEdge from './CustomEdge';
 import TextBoxNode from './TextBoxNode';
 import { useVirtualEdgeAnchors } from '../hooks/useVirtualEdgeAnchors';
 import { VirtualAnchorsContext } from './VirtualAnchorsContext';
-
 import GhostAnchorNode from './GhostAnchorNode';
+import { USE_LASSO_SELECTION } from '../core/config';
 
 const nodeTypes = {
   customNode: CustomNode,
@@ -477,6 +478,16 @@ function FlowInner() {
     return `Ces ${nodeIds.length} nœuds sont connectés à ${cascadeEdgeCount} liaison(s) au total. Supprimer ces nœuds supprimera aussi ces liaisons.`;
   }, [pendingDelete]);
 
+  const lassoSelectionProps = USE_LASSO_SELECTION
+    ? {
+        selectionOnDrag: true,
+        selectionMode: SelectionMode.Partial,
+        panOnDrag: [1, 2] as [1, 2],
+        panActivationKeyCode: 'Space',
+        multiSelectionKeyCode: 'Shift',
+      }
+    : {};
+
   return (
     <VirtualAnchorsContext.Provider value={virtualAnchors}>
       <div className="canvas-container" style={{ width: '100%', height: '100%' }}>
@@ -508,6 +519,7 @@ function FlowInner() {
             },
           }}
           fitView
+          {...lassoSelectionProps}
         >
           <Background color="#374151" gap={16} />
           <Controls showInteractive={false} className="rf-controls" />

@@ -46,3 +46,10 @@ export const MERMAID_LIKE_MIN_EDGE_BEND = 20;
  * If undefined/null, defaults dynamically to MERMAID_LIKE_RANK_SEP / 2.
  */
 export const MERMAID_LIKE_SAME_RANK_THRESHOLD = MERMAID_LIKE_RANK_SEP / 2;
+
+/**
+ * When true, click-dragging on an empty area of the canvas draws a selection rectangle
+ * to select multiple nodes. When false, click-dragging on the pane pans the viewport.
+ */
+export const USE_LASSO_SELECTION = true;
+
