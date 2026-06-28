@@ -3,11 +3,15 @@ import { useEdges, useReactFlow } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
 import type { NodeShape } from '../core/types';
 import { SHAPE_DEFINITIONS, SHAPE_CATEGORIES } from '../core/shapeRegistry';
-import { USE_GROUPS_AND_SWIMLANES } from '../core/config';
+import { USE_GROUPS_AND_SWIMLANES, APP_VERSION } from '../core/config';
 import { ShapePaletteIcon } from './ShapePaletteIcon';
 import { SettingsModal } from './SettingsModal';
 
-export const Toolbar = () => {
+interface ToolbarProps {
+  onOpenChangelog: () => void;
+}
+
+export const Toolbar = ({ onOpenChangelog }: ToolbarProps) => {
   const addNode = useDiagramStore((state) => state.addNode);
   const addEdge = useDiagramStore((state) => state.addEdge);
   const toggleEdgeStyle = useDiagramStore((state) => state.toggleEdgeStyle);
@@ -215,9 +219,26 @@ export const Toolbar = () => {
           </svg>
           Settings
         </button>
-        <span className="version-label">v0.1.0</span>
+        <span
+          className="version-label"
+          onClick={onOpenChangelog}
+          style={{
+            cursor: 'pointer',
+            transition: 'color 0.2s',
+          }}
+          title="Click to view What's New"
+          onMouseEnter={(e) => (e.currentTarget.style.color = '#6366f1')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+        >
+          v{APP_VERSION}
+        </span>
       </div>
-      {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
+      {isSettingsOpen && (
+        <SettingsModal
+          onClose={() => setIsSettingsOpen(false)}
+          onOpenChangelog={onOpenChangelog}
+        />
+      )}
     </aside>
   );
 };

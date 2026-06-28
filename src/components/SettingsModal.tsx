@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { SHAPE_DEFINITIONS, getShapeCapabilities } from '../core/shapeRegistry';
+import { APP_VERSION } from '../core/config';
 
 interface SettingsModalProps {
   onClose: () => void;
+  onOpenChangelog: () => void;
 }
 
 type TabType = 'general' | 'capabilities' | 'semantics';
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onOpenChangelog }) => {
   const [activeTab, setActiveTab] = useState<TabType>('capabilities');
 
   // Keyboard listener: Escape to close
@@ -36,9 +38,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               All shapes and sizes are optimized to map directly to standard Mermaid rendering formats.
             </p>
             <div style={{ marginTop: '20px', padding: '12px', borderRadius: '6px', background: '#151821', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#94a3b8' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', color: '#94a3b8' }}>
                 <span>App Version</span>
-                <span style={{ fontWeight: 'bold', color: '#f1f5f9' }}>v0.1.0</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontWeight: 'bold', color: '#f1f5f9' }}>v{APP_VERSION}</span>
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onOpenChangelog();
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#6366f1',
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                      padding: 0,
+                      textDecoration: 'underline',
+                      transition: 'color 0.2s',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = '#818cf8')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = '#6366f1')}
+                  >
+                    What's New
+                  </button>
+                </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#94a3b8', marginTop: '8px' }}>
                 <span>Mermaid Compatibility</span>

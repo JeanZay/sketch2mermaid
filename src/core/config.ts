@@ -78,5 +78,16 @@ export const MIN_GROUP_HEIGHT = 140;
 /** Snapping distance in pixels for edge endpoints */
 export const SNAP_THRESHOLD = 25;
 
+import { APP_VERSION as appVersion } from './appVersion';
+
+/** Current application version */
+export const APP_VERSION = appVersion;
+
+/** Feature flag configuration for changelog notifications */
+export const USE_CHANGELOG_NOTIFICATIONS = true;
+export const CHANGELOG_NOTIFICATION_MIN_IMPORTANCE: 'minor' | 'normal' | 'major' = 'normal';
+
+
+
 
 
