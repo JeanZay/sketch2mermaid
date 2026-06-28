@@ -1443,6 +1443,30 @@ body {
   background-color: rgba(220, 38, 38, 0.08);
 }
 
+.properties-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.duplicate-button {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.duplicate-button:hover {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+}
+
 .properties-body {
   padding: 16px;
   display: flex;

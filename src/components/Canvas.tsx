@@ -56,6 +56,8 @@ function FlowInner() {
 
   const activeTool = useDiagramStore((state) => state.activeTool);
   const setActiveTool = useDiagramStore((state) => state.setActiveTool);
+  const copySelection = useDiagramStore((state) => state.copySelection);
+  const pasteSelection = useDiagramStore((state) => state.pasteSelection);
 
   const { screenToFlowPosition } = useReactFlow();
 
@@ -438,6 +440,37 @@ function FlowInner() {
         return;
       }
 
+      // Copy shortcut (Ctrl+C / Cmd+C)
+      if (isMod && event.key.toLowerCase() === 'c') {
+        event.preventDefault();
+        const selNodeIds: string[] = [];
+        const selTextBoxIds: string[] = [];
+        for (const id of selectedNodeIds) {
+          const nType = nodeTypeById.get(id);
+          if (nType === 'textBox') {
+            selTextBoxIds.push(id);
+          } else if (nType === 'customNode') {
+            selNodeIds.push(id);
+          }
+        }
+        const selEdgeIds = Array.from(selectedEdgeIds);
+        copySelection({ nodeIds: selNodeIds, edgeIds: selEdgeIds, textBoxIds: selTextBoxIds });
+        return;
+      }
+
+      // Paste shortcut (Ctrl+V / Cmd+V)
+      if (isMod && event.key.toLowerCase() === 'v') {
+        event.preventDefault();
+        const pasted = pasteSelection();
+        if (pasted) {
+          const newNodes = new Set([...pasted.nodeIds, ...pasted.textBoxIds]);
+          const newEdges = new Set(pasted.edgeIds);
+          setSelectedNodeIds(newNodes);
+          setSelectedEdgeIds(newEdges);
+        }
+        return;
+      }
+
       // Delete/Backspace — custom handling to intercept before React Flow
       if (event.key === 'Delete' || event.key === 'Backspace') {
         event.preventDefault();
@@ -469,7 +502,7 @@ function FlowInner() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [nodes, updateNodePosition, undo, redo, handleDeleteSelected, activeTool, setActiveTool]);
+  }, [nodes, updateNodePosition, undo, redo, handleDeleteSelected, activeTool, setActiveTool, copySelection, pasteSelection, selectedNodeIds, selectedEdgeIds, nodeTypeById]);
 
 
   // Handle ALL node changes — selection tracked in state, position updated continuously

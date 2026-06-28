@@ -35,6 +35,7 @@ export const PropertiesPanel = () => {
   const deleteSelectedElements = useDiagramStore((state) => state.deleteSelectedElements);
   const assignNodeToGroup = useDiagramStore((state) => state.assignNodeToGroup);
   const groupSelection = useDiagramStore((state) => state.groupSelection);
+  const duplicateSelection = useDiagramStore((state) => state.duplicateSelection);
 
   const virtualAnchors = useVirtualEdgeAnchors();
 
@@ -42,6 +43,42 @@ export const PropertiesPanel = () => {
     setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
     setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
   };
+
+  const handleDuplicate = useCallback(() => {
+    const selNodeIds: string[] = [];
+    const selTextBoxIds: string[] = [];
+    for (const node of selectedNodes) {
+      if (node.type === 'textBox') {
+        selTextBoxIds.push(node.id);
+      } else if (node.type === 'customNode') {
+        selNodeIds.push(node.id);
+      }
+    }
+    const selEdgeIds = edges.filter((e) => e.selected).map((e) => e.id);
+
+    const result = duplicateSelection({
+      nodeIds: selNodeIds,
+      edgeIds: selEdgeIds,
+      textBoxIds: selTextBoxIds,
+    });
+
+    if (result) {
+      const nextNodeIds = new Set([...result.nodeIds, ...result.textBoxIds]);
+      const nextEdgeIds = new Set(result.edgeIds);
+      setNodes((nds) =>
+        nds.map((n) => ({
+          ...n,
+          selected: nextNodeIds.has(n.id),
+        }))
+      );
+      setEdges((eds) =>
+        eds.map((e) => ({
+          ...e,
+          selected: nextEdgeIds.has(e.id),
+        }))
+      );
+    }
+  }, [selectedNodes, edges, duplicateSelection, setNodes, setEdges]);
 
   const getEdgeEndpointPosition = useCallback((edgeId: string, endpoint: 'from' | 'to') => {
     const anchor = virtualAnchors[edgeId];
@@ -124,7 +161,7 @@ export const PropertiesPanel = () => {
   };
 
   // ------ MULTI SELECTION properties ------
-  if (selectedNodes.length > 1 && USE_GROUPS_AND_SWIMLANES) {
+  if (selectedNodes.length > 1) {
     const customNodeIds = selectedNodes
       .filter((n) => n.type === 'customNode')
       .map((n) => n.id);
@@ -141,6 +178,18 @@ export const PropertiesPanel = () => {
             </button>
             <span className="properties-title-text">Sélection multiple</span>
           </div>
+          <div className="properties-actions">
+            <button
+              className="duplicate-button"
+              onClick={handleDuplicate}
+              title="Dupliquer"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="properties-body">
@@ -148,7 +197,7 @@ export const PropertiesPanel = () => {
             {selectedNodes.length} éléments sélectionnés.
           </p>
 
-          {customNodeIds.length > 0 && (
+          {customNodeIds.length > 0 && USE_GROUPS_AND_SWIMLANES && (
             <div className="property-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <label className="property-label">Créer un groupe</label>
               <button
@@ -382,14 +431,26 @@ export const PropertiesPanel = () => {
             </button>
             <span className="properties-title-text">Text Box</span>
           </div>
-          <button className="delete-button text-error" onClick={handleDeleteTextBox} title="Delete text box">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              <line x1="10" y1="11" x2="10" y2="17"></line>
-              <line x1="14" y1="11" x2="14" y2="17"></line>
-            </svg>
-          </button>
+          <div className="properties-actions">
+            <button
+              className="duplicate-button"
+              onClick={handleDuplicate}
+              title="Dupliquer"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+            <button className="delete-button text-error" onClick={handleDeleteTextBox} title="Delete text box">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="properties-body">
@@ -592,14 +653,26 @@ export const PropertiesPanel = () => {
             </button>
             <span className="properties-title-text">Properties</span>
           </div>
-          <button className="delete-button text-error" onClick={handleDeleteNode} title="Supprimer le nœud">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              <line x1="10" y1="11" x2="10" y2="17"></line>
-              <line x1="14" y1="11" x2="14" y2="17"></line>
-            </svg>
-          </button>
+          <div className="properties-actions">
+            <button
+              className="duplicate-button"
+              onClick={handleDuplicate}
+              title="Dupliquer"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+            <button className="delete-button text-error" onClick={handleDeleteNode} title="Supprimer le nœud">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="properties-body">
@@ -899,14 +972,26 @@ export const PropertiesPanel = () => {
             </button>
             <span className="properties-title-text">Properties</span>
           </div>
-          <button className="delete-button text-error" onClick={handleDeleteEdge} title="Supprimer la liaison">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              <line x1="10" y1="11" x2="10" y2="17"></line>
-              <line x1="14" y1="11" x2="14" y2="17"></line>
-            </svg>
-          </button>
+          <div className="properties-actions">
+            <button
+              className="duplicate-button"
+              onClick={handleDuplicate}
+              title="Dupliquer"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+            <button className="delete-button text-error" onClick={handleDeleteEdge} title="Supprimer la liaison">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="properties-body">

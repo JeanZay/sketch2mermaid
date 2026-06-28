@@ -17,6 +17,8 @@ import type {
 } from '../core/types';
 import { isReservedCanvasId } from '../core/types';
 import { NODE_SIZE_DEFAULTS } from '../core/nodeSizeConfig';
+import type { CopiedSelectionSnapshot } from './duplicateHelpers';
+import { buildCopiedSelectionSnapshot, createDuplicatesFromSnapshot } from './duplicateHelpers';
 import { getShapeCapabilities } from '../core/shapeRegistry';
 import {
   DEFAULT_GROUP_WIDTH,
@@ -551,6 +553,12 @@ export interface DiagramState {
   // Pending edge selection — set by Toolbar when creating a free arrow
   pendingEdgeSelect: string | null;
   clearPendingEdgeSelect: () => void;
+
+  // Copy / Paste / Duplicate selection
+  copiedSelection: CopiedSelectionSnapshot | null;
+  copySelection: (input: { nodeIds: string[]; edgeIds: string[]; textBoxIds: string[] }) => void;
+  pasteSelection: () => { nodeIds: string[]; edgeIds: string[]; textBoxIds: string[] } | null;
+  duplicateSelection: (input: { nodeIds: string[]; edgeIds: string[]; textBoxIds: string[] }) => { nodeIds: string[]; edgeIds: string[]; textBoxIds: string[] } | null;
 }
 
 export const useDiagramStore = create<DiagramState>((set, get) => ({
@@ -561,6 +569,75 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   setActiveTool: (tool) => set({ activeTool: tool }),
   pendingEdgeSelect: null,
   clearPendingEdgeSelect: () => set({ pendingEdgeSelect: null }),
+
+  copiedSelection: null,
+
+  copySelection: (input) => {
+    const diagram = get().diagram;
+    const snapshot = buildCopiedSelectionSnapshot(diagram, input);
+    set({ copiedSelection: snapshot });
+  },
+
+  pasteSelection: () => {
+    const { copiedSelection, diagram } = get();
+    if (!copiedSelection) return null;
+    if (copiedSelection.nodes.length === 0 && copiedSelection.textBoxes.length === 0 && copiedSelection.edges.length === 0) {
+      return null;
+    }
+
+    get().startTransaction();
+    const result = createDuplicatesFromSnapshot(copiedSelection, diagram);
+
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        nodes: [...state.diagram.nodes, ...result.nodes],
+        textBoxes: [...state.diagram.textBoxes, ...result.textBoxes],
+        edges: [...state.diagram.edges, ...result.edges],
+      },
+      copiedSelection: {
+        nodes: result.nodes,
+        textBoxes: result.textBoxes,
+        edges: result.edges,
+      },
+    }));
+
+    get().commitTransaction();
+
+    return {
+      nodeIds: result.nodeIds,
+      edgeIds: result.edgeIds,
+      textBoxIds: result.textBoxIds,
+    };
+  },
+
+  duplicateSelection: (input) => {
+    const diagram = get().diagram;
+    const snapshot = buildCopiedSelectionSnapshot(diagram, input);
+    if (snapshot.nodes.length === 0 && snapshot.textBoxes.length === 0 && snapshot.edges.length === 0) {
+      return null;
+    }
+
+    get().startTransaction();
+    const result = createDuplicatesFromSnapshot(snapshot, diagram);
+
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        nodes: [...state.diagram.nodes, ...result.nodes],
+        textBoxes: [...state.diagram.textBoxes, ...result.textBoxes],
+        edges: [...state.diagram.edges, ...result.edges],
+      },
+    }));
+
+    get().commitTransaction();
+
+    return {
+      nodeIds: result.nodeIds,
+      edgeIds: result.edgeIds,
+      textBoxIds: result.textBoxIds,
+    };
+  },
 
   // History state
   past: [],

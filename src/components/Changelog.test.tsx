@@ -75,9 +75,9 @@ describe('Changelog UI Components', () => {
       });
 
       expect(container.textContent).toContain("What's New in Sketch2Mermaid");
-      expect(container.textContent).toContain('v0.8.0');
-      // Should NOT contain v0.7.0 in auto mode with only v0.8.0 unseen
-      expect(container.textContent).not.toContain('v0.7.0');
+      expect(container.textContent).toContain('v0.9.0');
+      // Should NOT contain v0.8.0 in auto mode with only v0.9.0 unseen
+      expect(container.textContent).not.toContain('v0.8.0');
 
       const closeButton = container.querySelector('.modal-btn--confirm');
       expect(closeButton).not.toBeNull();

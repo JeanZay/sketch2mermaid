@@ -20,6 +20,26 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.9.0',
+    date: '2026-06-28',
+    title: 'Duplicate and Copy-Paste',
+    importance: 'major',
+    items: [
+      {
+        type: 'feature',
+        text: 'Added a Duplicate action in the properties panel to clone selected nodes, textboxes, and edges.',
+      },
+      {
+        type: 'feature',
+        text: 'Added support for Ctrl+C and Ctrl+V keyboard shortcuts to copy and paste canvas selections.',
+      },
+      {
+        type: 'improvement',
+        text: 'Implemented edge-only duplication creating detached ghost edges on the canvas.',
+      },
+    ],
+  },
+  {
     version: '0.8.0',
     date: '2026-06-28',
     title: 'In-app update awareness',

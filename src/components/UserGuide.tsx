@@ -112,6 +112,14 @@ export const UserGuide: React.FC = () => {
               <span className="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Y</kbd></span>
               <span className="shortcut-desc">Rétablir l'action annulée</span>
             </li>
+             <li>
+              <span className="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>C</kbd></span>
+              <span className="shortcut-desc">Copier la sélection (formes, annotations, flèches)</span>
+            </li>
+            <li>
+              <span className="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>V</kbd></span>
+              <span className="shortcut-desc">Coller la sélection (avec décalage cumulatif)</span>
+            </li>
             <li>
               <span className="shortcut-keys"><kbd>Suppr</kbd> / <kbd>Backspace</kbd></span>
               <span className="shortcut-desc">Supprimer l'élément sélectionné</span>
