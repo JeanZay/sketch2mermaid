@@ -381,12 +381,18 @@ describe('Mermaid Flowchart Import Tests', () => {
     expect(res.diagram.nodes.length).toBe(2);
   });
 
-  // 25. subgraph imports contents flat and emits unsupportedSubgraph
-  test('25. subgraph imports contents flat and emits unsupportedSubgraph', () => {
-    const code = `graph TD\n  subgraph "Group A"\n    A --> B\n  end`;
-    const res = importMermaidFlowchart(code);
-    expect(res.diagram.nodes.length).toBe(2);
-    expect(res.warnings.some(w => w.type === 'unsupportedSubgraph')).toBe(true);
+  // 25. subgraph imports contents and preserves groups without warning if flat, but warns if nested
+  test('25. subgraph imports contents and preserves groups without warning if flat, but warns if nested', () => {
+    const codeFlat = `graph TD\n  subgraph "Group A"\n    A --> B\n  end`;
+    const resFlat = importMermaidFlowchart(codeFlat);
+    expect(resFlat.diagram.nodes.length).toBe(2);
+    expect(resFlat.diagram.groups?.length).toBe(1);
+    expect(resFlat.warnings.some(w => w.type === 'unsupportedSubgraph')).toBe(false);
+
+    const codeNested = `graph TD\n  subgraph Parent\n    subgraph Child\n      A --> B\n    end\n  end`;
+    const resNested = importMermaidFlowchart(codeNested);
+    expect(resNested.diagram.groups?.length).toBe(2);
+    expect(resNested.warnings.some(w => w.type === 'unsupportedSubgraph')).toBe(true);
   });
 
   // 26. end only closes subgraph when in subgraph
@@ -424,7 +430,6 @@ describe('Mermaid Flowchart Import Tests', () => {
   // 30. imported diagram matches expected structure
   test('30. imported diagram matches expected structure', () => {
     const res = importMermaidFlowchart('graph TD\n  A --> B');
-    expect(res.diagram.schemaVersion).toBe(1);
     expect(res.diagram.diagramType).toBe('flowchart');
     expect(res.diagram.nodes.length).toBe(2);
     expect(res.diagram.edges.length).toBe(1);

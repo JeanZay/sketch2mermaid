@@ -7,6 +7,7 @@ import { ShapePaletteIcon } from './ShapePaletteIcon';
 import { FontSizeControl } from './properties/FontSizeControl';
 import { ConfirmModal } from './ConfirmModal';
 import { useVirtualEdgeAnchors } from '../hooks/useVirtualEdgeAnchors';
+import { USE_GROUPS_AND_SWIMLANES } from '../core/config';
 
 export const PropertiesPanel = () => {
   const nodes = useNodes();
@@ -14,6 +15,7 @@ export const PropertiesPanel = () => {
   const { setNodes, setEdges } = useReactFlow();
 
   const selectedNode = nodes.find((n) => n.selected);
+  const selectedNodes = nodes.filter((n) => n.selected);
   const selectedEdge = edges.find((e) => e.selected);
 
   const diagram = useDiagramStore((state) => state.diagram);
@@ -31,6 +33,8 @@ export const PropertiesPanel = () => {
   const startTransaction = useDiagramStore((state) => state.startTransaction);
   const commitTransaction = useDiagramStore((state) => state.commitTransaction);
   const deleteSelectedElements = useDiagramStore((state) => state.deleteSelectedElements);
+  const assignNodeToGroup = useDiagramStore((state) => state.assignNodeToGroup);
+  const groupSelection = useDiagramStore((state) => state.groupSelection);
 
   const virtualAnchors = useVirtualEdgeAnchors();
 
@@ -78,10 +82,13 @@ export const PropertiesPanel = () => {
     }
   }, [virtualAnchors, diagram]);
 
-  // Pending delete confirmation state for node with connected edges
   const [pendingDeleteNode, setPendingDeleteNode] = useState<{
     nodeId: string;
     edgeCount: number;
+  } | null>(null);
+
+  const [pendingDeleteGroup, setPendingDeleteGroup] = useState<{
+    id: string;
   } | null>(null);
 
   const handleDeleteNode = () => {
@@ -115,6 +122,242 @@ export const PropertiesPanel = () => {
       deleteTextBox(selectedNode.id);
     }
   };
+
+  // ------ MULTI SELECTION properties ------
+  if (selectedNodes.length > 1 && USE_GROUPS_AND_SWIMLANES) {
+    const customNodeIds = selectedNodes
+      .filter((n) => n.type === 'customNode')
+      .map((n) => n.id);
+
+    return (
+      <div className="properties-panel-content">
+        <div className="properties-header">
+          <div className="properties-header-title">
+            <button className="back-button" onClick={handleDeselect} title="Back">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+              </svg>
+            </button>
+            <span className="properties-title-text">Sélection multiple</span>
+          </div>
+        </div>
+
+        <div className="properties-body">
+          <p className="property-text-val" style={{ marginBottom: '16px' }}>
+            {selectedNodes.length} éléments sélectionnés.
+          </p>
+
+          {customNodeIds.length > 0 && (
+            <div className="property-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label className="property-label">Créer un groupe</label>
+              <button
+                className="modal-btn modal-btn--confirm"
+                style={{ width: '100%', padding: '8px', fontSize: '13px' }}
+                onClick={() => {
+                  const newGroupId = groupSelection(customNodeIds, 'subgraph');
+                  if (newGroupId) {
+                    handleDeselect();
+                  }
+                }}
+              >
+                Créer un Groupe (Subgraph)
+              </button>
+              <button
+                className="modal-btn modal-btn--middle"
+                style={{ width: '100%', padding: '8px', fontSize: '13px', margin: 0 }}
+                onClick={() => {
+                  const newGroupId = groupSelection(customNodeIds, 'lane');
+                  if (newGroupId) {
+                    handleDeselect();
+                  }
+                }}
+              >
+                Créer une Ligne d'eau (Swimlane)
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ------ GROUP NODE properties ------
+  if (selectedNode && selectedNode.type === 'groupNode' && USE_GROUPS_AND_SWIMLANES) {
+    const groupData = diagram.groups?.find((g) => g.id === selectedNode.id);
+    if (!groupData) return null;
+
+    const updateGroupLabel = useDiagramStore.getState().updateGroupLabel;
+    const updateGroupKind = useDiagramStore.getState().updateGroupKind;
+    const updateGroupDirection = useDiagramStore.getState().updateGroupDirection;
+    const updateGroupStyle = useDiagramStore.getState().updateGroupStyle;
+    const deleteGroup = useDiagramStore.getState().deleteGroup;
+
+    const handleGroupStyleChange = (updates: Partial<import('../core/types').GroupStyle>) => {
+      updateGroupStyle(selectedNode.id, updates);
+    };
+
+    return (
+      <div className="properties-panel-content">
+        <div className="properties-header">
+          <div className="properties-header-title">
+            <button className="back-button" onClick={handleDeselect} title="Back">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+              </svg>
+            </button>
+            <span className="properties-title-text">{groupData.kind === 'lane' ? 'Swimlane' : 'Group'}</span>
+          </div>
+          <button
+            className="delete-button text-error"
+            onClick={() => {
+              const hasChildren = diagram.nodes.some((n) => n.parentGroupId === groupData.id);
+              if (!hasChildren) {
+                deleteGroup(groupData.id, { deleteChildren: false });
+                handleDeselect();
+              } else {
+                setPendingDeleteGroup({ id: groupData.id });
+              }
+            }}
+            title="Delete group"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              <line x1="10" y1="11" x2="10" y2="17"></line>
+              <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div className="properties-body">
+          <div className="property-group">
+            <label className="property-label">Label</label>
+            <input
+              type="text"
+              value={groupData.label}
+              onChange={(e) => updateGroupLabel(groupData.id, e.target.value)}
+              onFocus={startTransaction}
+              onBlur={commitTransaction}
+              className="property-input"
+            />
+          </div>
+
+          <div className="property-group">
+            <label className="property-label">Type</label>
+            <div className="style-segmented-control">
+              <button
+                className={`segment-btn ${groupData.kind === 'subgraph' ? 'active' : ''}`}
+                onClick={() => updateGroupKind(groupData.id, 'subgraph')}
+              >
+                Subgraph
+              </button>
+              <button
+                className={`segment-btn ${groupData.kind === 'lane' ? 'active' : ''}`}
+                onClick={() => updateGroupKind(groupData.id, 'lane')}
+              >
+                Swimlane
+              </button>
+            </div>
+          </div>
+
+          <div className="property-group">
+            <label className="property-label">Direction (subgraph only)</label>
+            <div className="style-segmented-control">
+              <button
+                className={`segment-btn ${groupData.direction === 'TD' || !groupData.direction ? 'active' : ''}`}
+                onClick={() => updateGroupDirection(groupData.id, 'TD')}
+              >
+                Vertical (TD)
+              </button>
+              <button
+                className={`segment-btn ${groupData.direction === 'LR' ? 'active' : ''}`}
+                onClick={() => updateGroupDirection(groupData.id, 'LR')}
+              >
+                Horizontal (LR)
+              </button>
+            </div>
+          </div>
+
+          <div className="property-group">
+            <label className="property-label">Background Color</label>
+            <div className="color-input-row">
+              <input
+                type="color"
+                value={groupData.style?.backgroundColor || '#f9fafb'}
+                onChange={(e) => handleGroupStyleChange({ backgroundColor: e.target.value })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
+                className="color-picker"
+              />
+              <input
+                type="text"
+                value={groupData.style?.backgroundColor || ''}
+                placeholder="#f9fafb"
+                onChange={(e) => handleGroupStyleChange({ backgroundColor: e.target.value })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
+                className="property-input color-text-input"
+              />
+            </div>
+          </div>
+
+          <div className="property-group">
+            <label className="property-label">Border Color</label>
+            <div className="color-input-row">
+              <input
+                type="color"
+                value={groupData.style?.borderColor || '#e5e7eb'}
+                onChange={(e) => handleGroupStyleChange({ borderColor: e.target.value })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
+                className="color-picker"
+              />
+              <input
+                type="text"
+                value={groupData.style?.borderColor || ''}
+                placeholder="#e5e7eb"
+                onChange={(e) => handleGroupStyleChange({ borderColor: e.target.value })}
+                onFocus={startTransaction}
+                onBlur={commitTransaction}
+                className="property-input color-text-input"
+              />
+            </div>
+          </div>
+
+          <div className="property-divider"></div>
+
+          <div className="property-group-row">
+            <span className="property-label-inline">Mermaid ID</span>
+            <span className="property-badge">{groupData.id}</span>
+          </div>
+        </div>
+
+        {pendingDeleteGroup && (
+          <ConfirmModal
+            title="Supprimer le groupe"
+            message="Ce groupe contient des nœuds. Souhaitez-vous supprimer aussi les nœuds enfants ?"
+            confirmLabel="Supprimer le groupe et ses nœuds"
+            cancelLabel="Annuler"
+            middleLabel="Supprimer uniquement le groupe"
+            variant="danger"
+            onConfirm={() => {
+              deleteGroup(pendingDeleteGroup.id, { deleteChildren: true });
+              setPendingDeleteGroup(null);
+              handleDeselect();
+            }}
+            onMiddle={() => {
+              deleteGroup(pendingDeleteGroup.id, { deleteChildren: false });
+              setPendingDeleteGroup(null);
+              handleDeselect();
+            }}
+            onCancel={() => setPendingDeleteGroup(null)}
+          />
+        )}
+      </div>
+    );
+  }
 
   // ------ TEXT BOX properties (refinement #2: distinguish by node type, not ID prefix) ------
   if (selectedNode && selectedNode.type === 'textBox') {
@@ -316,7 +559,7 @@ export const PropertiesPanel = () => {
   }
 
   // ------ DIAGRAM NODE properties ------
-  if (selectedNode) {
+  if (selectedNode && selectedNode.type === 'customNode') {
     const nodeData = diagram.nodes.find((n) => n.id === selectedNode.id);
     if (!nodeData) return null;
 
@@ -537,6 +780,27 @@ export const PropertiesPanel = () => {
               {inEdges} in · {outEdges} out
             </span>
           </div>
+
+          {USE_GROUPS_AND_SWIMLANES && (
+            <div className="property-group">
+              <label className="property-label">Parent Group</label>
+              <select
+                value={nodeData.parentGroupId || ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  assignNodeToGroup(nodeData.id, val ? val : undefined);
+                }}
+                className="property-input"
+              >
+                <option value="">(None)</option>
+                {(diagram.groups || []).map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.label} ({g.id})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="property-divider"></div>
 

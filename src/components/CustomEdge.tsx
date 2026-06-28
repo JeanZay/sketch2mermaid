@@ -77,9 +77,12 @@ export const CustomEdge = ({
   };
 
   // Derive rendering from the store — the single source of truth
+  const isGhost = storeEdge?.connectionStatus === 'detached' || id === 'draft-edge-preview';
   const direction = storeEdge?.direction || 'directed';
   const isDotted = storeEdge?.style === 'dotted';
-  const color = selected ? '#8b5cf6' : '#4b5563';
+  
+  const color = selected ? '#8b5cf6' : (isGhost ? '#9ca3af' : '#4b5563');
+  const opacity = isGhost ? 0.6 : 1.0;
 
   const strokeWidth = USE_MERMAID_LIKE_EDGE_RENDERING
     ? (selected ? 2 : 1.5)
@@ -87,10 +90,11 @@ export const CustomEdge = ({
 
   const edgeStyle: React.CSSProperties = {
     ...style,
-    strokeDasharray: isDotted ? '5,5' : undefined,
+    strokeDasharray: isDotted ? '5,5' : (isGhost ? '4,4' : undefined),
     strokeWidth,
     stroke: color,
-    transition: 'stroke 0.2s, stroke-width 0.2s',
+    opacity,
+    transition: 'stroke 0.2s, stroke-width 0.2s, opacity 0.2s',
   };
 
   // Self-managed marker IDs scoped to this edge instance
@@ -108,7 +112,7 @@ export const CustomEdge = ({
     fontSize: `${textStyleObj.fontSize}px`,
     fontWeight: textStyleObj.bold ? 'bold' : 'normal',
     fontStyle: textStyleObj.italic ? 'italic' : 'normal',
-    color: textStyleObj.color ?? '#4b5563',
+    color: textStyleObj.color ?? (isGhost ? '#9ca3af' : '#4b5563'),
   };
 
   useEffect(() => {
@@ -166,6 +170,7 @@ export const CustomEdge = ({
             position: 'absolute',
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             pointerEvents: 'all',
+            opacity,
             ...edgeTextStyle,
           }}
           onDoubleClick={handleStartEditing}

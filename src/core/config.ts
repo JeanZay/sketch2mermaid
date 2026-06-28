@@ -10,6 +10,14 @@
 export const USE_MERMAID_GENERATED_SHAPE_ICONS = true;
 
 /**
+ * When true, enables the subgraphs and swim-lanes visual grouping system.
+ */
+export let USE_GROUPS_AND_SWIMLANES = true;
+export function setUseGroupsAndSwimlanes(val: boolean) {
+  USE_GROUPS_AND_SWIMLANES = val;
+}
+
+/**
  * When true, the canvas uses thin orthogonal edge routing and smaller arrowheads.
  * When false, it falls back immediately to the legacy curved Bézier paths and styling.
  */
@@ -52,4 +60,23 @@ export const MERMAID_LIKE_SAME_RANK_THRESHOLD = MERMAID_LIKE_RANK_SEP / 2;
  * to select multiple nodes. When false, click-dragging on the pane pans the viewport.
  */
 export const USE_LASSO_SELECTION = true;
+
+// ---------------------------------------------------------------------------
+// Visual Groups and Swimlanes layout constants
+// ---------------------------------------------------------------------------
+export const DEFAULT_GROUP_WIDTH = 420;
+export const DEFAULT_GROUP_HEIGHT = 260;
+export const DEFAULT_LANE_WIDTH_LR = 900;
+export const DEFAULT_LANE_HEIGHT_LR = 220;
+export const DEFAULT_LANE_WIDTH_TD = 320;
+export const DEFAULT_LANE_HEIGHT_TD = 700;
+export const GROUP_PADDING = 40;
+export const GROUP_MEMBERSHIP_TOLERANCE = 15;
+export const MIN_GROUP_WIDTH = 240;
+export const MIN_GROUP_HEIGHT = 140;
+
+/** Snapping distance in pixels for edge endpoints */
+export const SNAP_THRESHOLD = 25;
+
+
 

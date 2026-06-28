@@ -1,4 +1,4 @@
-import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, EdgeDirection, DiagramDirection, NodeStyle } from './types';
+import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, EdgeDirection, DiagramDirection, NodeStyle, DiagramGroup } from './types';
 import { NODE_SIZE_DEFAULTS } from './nodeSizeConfig';
 import { findDefinitionByMermaidName, getShapeCapabilities } from './shapeRegistry';
 import { layoutImportedDiagram, selectHandlesDirectionAware } from './layout/mermaidLayout';
@@ -87,6 +87,7 @@ interface ParsedNode {
   label?: string;
   style?: NodeStyle;
   line?: number;
+  parentGroupId?: string;
 }
 
 interface ParsedEdge {
@@ -220,6 +221,36 @@ const NON_FLOWCHART_TYPES = [
   'C4Context',
 ];
 
+function parseSubgraphHeader(rest: string, generatedCount: number): { id: string; label: string } {
+  const trimmed = rest.trim();
+  if (trimmed === '') {
+    return { id: `g_imported_${generatedCount}`, label: `Group ${generatedCount}` };
+  }
+
+  // Quoted label only, e.g. subgraph "My Group"
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    const label = trimmed.slice(1, -1);
+    return { id: `g_imported_${generatedCount}`, label };
+  }
+  if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
+    const label = trimmed.slice(1, -1);
+    return { id: `g_imported_${generatedCount}`, label };
+  }
+
+  // Check for id["Label"] or id[Label] or id("Label") or id(Label)
+  // E.g. lane_sales["Sales"] or Finance
+  const match = trimmed.match(/^([a-zA-Z0-9_-]+)\s*(?:\[|\(|{)\s*["']?(.*?)["']?\s*(?:\]|\)|})\s*$/);
+  if (match) {
+    const id = match[1];
+    const label = match[2];
+    return { id, label };
+  }
+
+  // Just a single word, e.g. subgraph Sales
+  // Use it for both ID and label
+  return { id: trimmed, label: trimmed };
+}
+
 export function importMermaidFlowchart(code: string): MermaidImportResult {
   // Phase 1 - Size and Empty Checks
   if (code.length > 100 * 1024) {
@@ -300,7 +331,9 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
   const parsedNodes: ParsedNode[] = [];
   const parsedEdges: ParsedEdge[] = [];
   
-  const subgraphStack: string[] = [];
+  const importedGroups: DiagramGroup[] = [];
+  const subgraphStack: DiagramGroup[] = [];
+  let generatedGroupCount = 1;
 
   // Phase 2 - Line-by-line Parsing
   for (const lineObj of lineObjects) {
@@ -317,23 +350,63 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
       continue;
     }
 
-
     // Subgraph match
     const subgraphMatch = text.match(/^subgraph\b\s*(.*)$/i);
     if (subgraphMatch) {
-      subgraphStack.push(subgraphMatch[1] || 'subgraph');
-      warnings.push({
-        type: 'unsupportedSubgraph',
-        line: lineObj.index,
-        message: `Le regroupement visuel des sous-graphes n'est pas supporté. Son contenu sera importé à plat.`,
-        raw: text,
-      });
+      const rest = subgraphMatch[1] || '';
+      const parsed = parseSubgraphHeader(rest, generatedGroupCount++);
+      
+      const parentGroupId = subgraphStack.length > 0 ? subgraphStack[subgraphStack.length - 1].id : undefined;
+      
+      if (subgraphStack.length > 0) {
+        warnings.push({
+          type: 'unsupportedSubgraph',
+          line: lineObj.index,
+          message: `Sketch2Mermaid préserve la hiérarchie des sous-graphes imbriqués dans le modèle, mais leur rendu visuel sur le canvas peut être simplifié.`,
+          raw: text,
+        });
+      }
+
+      const newGroup: DiagramGroup = {
+        id: parsed.id,
+        kind: 'subgraph',
+        label: parsed.label,
+        parentGroupId,
+        position: { x: 0, y: 0 },
+        width: 300,
+        height: 200,
+      };
+
+      // Ensure group ID is unique
+      let finalId = newGroup.id;
+      let suffix = 1;
+      while (importedGroups.some((g) => g.id === finalId)) {
+        finalId = `${newGroup.id}_dup_${suffix++}`;
+      }
+      newGroup.id = finalId;
+
+      importedGroups.push(newGroup);
+      subgraphStack.push(newGroup);
       continue;
     }
 
     // End match (only closes subgraph if stack is not empty)
     if (text.toLowerCase() === 'end' && subgraphStack.length > 0) {
       subgraphStack.pop();
+      continue;
+    }
+
+    const activeGroupId = subgraphStack.length > 0 ? subgraphStack[subgraphStack.length - 1].id : undefined;
+
+    // Direction match inside a subgraph
+    const dirMatch = text.match(/^(?:direction|dir)\s+(TD|TB|LR|BT|RL)$/i);
+    if (dirMatch && activeGroupId) {
+      const groupInList = importedGroups.find((g) => g.id === activeGroupId);
+      if (groupInList) {
+        let dir = dirMatch[1].toUpperCase();
+        if (dir === 'TB') dir = 'TD';
+        groupInList.direction = dir as ('TB' | 'TD' | 'BT' | 'LR' | 'RL');
+      }
       continue;
     }
 
@@ -395,6 +468,7 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
           id: nodeId,
           style: nodeStyle,
           line: lineObj.index,
+          parentGroupId: activeGroupId,
         });
       }
       
@@ -457,6 +531,7 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
       if (j % 2 === 0) {
         const nodeGroup = (chainElements[j] as { kind: 'nodeGroup'; nodes: ParsedNode[] }).nodes;
         for (const node of nodeGroup) {
+          node.parentGroupId = activeGroupId;
           parsedNodes.push(node);
         }
       } else {
@@ -532,6 +607,10 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
         existing.isExplicit = true;
       }
       
+      if (pNode.parentGroupId !== undefined) {
+        existing.parentGroupId = pNode.parentGroupId;
+      }
+      
       // Merge styles
       if (nodeStylePatch) {
         existing.style = {
@@ -552,6 +631,7 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
         position: { x: 0, y: 0 },
         isExplicit: isExplicitDefinition,
         style: nodeStylePatch,
+        parentGroupId: pNode.parentGroupId,
       });
     }
   }
@@ -593,6 +673,7 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
       width: size.width,
       height: size.height,
       style: node.style,
+      parentGroupId: node.parentGroupId,
     };
   });
 
@@ -657,13 +738,26 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
   }
 
   // Layout Computation — Dagre (same engine as Mermaid.js)
-  const layoutResult = layoutImportedDiagram(finalNodes, finalEdges, direction, orderOfAppearance);
+  const layoutResult = layoutImportedDiagram(finalNodes, finalEdges, direction, orderOfAppearance, importedGroups);
 
   // Apply positions
   for (const node of finalNodes) {
     const pos = layoutResult.positions.get(node.id);
     if (pos) {
       node.position = pos;
+    }
+  }
+
+  // Apply positions and sizes to groups
+  for (const group of importedGroups) {
+    const pos = layoutResult.groupPositions?.get(group.id);
+    if (pos) {
+      group.position = pos;
+    }
+    const size = layoutResult.groupSizes?.get(group.id);
+    if (size) {
+      group.width = size.width;
+      group.height = size.height;
     }
   }
 
@@ -697,12 +791,12 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
   }
 
   const diagram: CanonicalDiagram = {
-    schemaVersion: 1,
     diagramType: 'flowchart',
     direction,
     nodes: finalNodes,
     edges: finalEdges,
     textBoxes: [],
+    groups: importedGroups,
   };
 
   return { diagram, warnings: uniqueWarnings };

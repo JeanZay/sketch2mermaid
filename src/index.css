@@ -2875,6 +2875,100 @@ details:not([open]) .sidebar-category-summary::before {
   font-size: 11px;
 }
 
+/* ========================================== */
+/* Visual Groups and Swimlanes Styles         */
+/* ========================================== */
+.group-node {
+  box-sizing: border-box;
+  background-color: rgba(249, 250, 251, 0.4);
+  border: 1.5px dashed #c4c5d7;
+  border-radius: 8px;
+  position: relative;
+  display: flex;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  pointer-events: all;
+}
+
+.group-node-selected {
+  border-color: var(--accent-color, #4f6ef7) !important;
+  border-style: solid !important;
+  box-shadow: 0 0 0 3px rgba(79, 110, 247, 0.15);
+}
+
+.group-node-vertical {
+  flex-direction: column;
+}
+
+.group-node-horizontal-lane {
+  flex-direction: row;
+}
+
+.group-node-title-area {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  user-select: none;
+}
+
+.group-node-vertical .group-node-title-area {
+  width: 100%;
+  border-bottom: 1px solid rgba(196, 197, 215, 0.3);
+  background-color: rgba(243, 244, 246, 0.6);
+  border-top-left-radius: 7px;
+  border-top-right-radius: 7px;
+}
+
+.group-node-horizontal-lane .group-node-title-area {
+  height: 100%;
+  width: 40px;
+  border-right: 1px solid rgba(196, 197, 215, 0.3);
+  background-color: rgba(243, 244, 246, 0.6);
+  border-top-left-radius: 7px;
+  border-bottom-left-radius: 7px;
+  justify-content: center;
+  padding: 12px 4px;
+}
+
+.group-node-label {
+  font-family: var(--font-sans, sans-serif);
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.group-node-horizontal-lane .group-node-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+}
+
+.group-node-input {
+  width: 100%;
+  border: 1px solid var(--accent-color, #4f6ef7);
+  background: white;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  outline: none;
+}
+
+.group-node-horizontal-lane .group-node-input {
+  width: 32px;
+  text-align: center;
+}
+
+.group-node-body-area {
+  flex: 1;
+  position: relative;
+  pointer-events: none;
+}
+
 
 
 

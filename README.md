@@ -27,6 +27,8 @@ Unlike generic diagramming tools, Sketch2Mermaid is explicitly constrained to wh
 
 - **Pure Visual Editing:** Drag-and-drop nodes, draw connections, and edit labels seamlessly.
 - **Strictly Flowcharts:** Implements 6 core Mermaid flowchart shapes (`process`, `rounded`, `stadium`, `decision`, `event`, `endEvent`) and 2 edge styles (`solid`, `dotted`).
+- **Flexible Ghost Arrows:** Create free-standing connections on the canvas with draggable endpoints that automatically snap to nearby node handles when released.
+- **Visual Containers (Groups & Swimlanes):** Organize your nodes into logical containers (Subgraphs or BPMN Swimlanes). Customize their labels, background/border colors, and layout direction (vertical TD or horizontal LR) which export natively to Mermaid flowchart groupings.
 - **Deterministic Export:** Generates character-by-character accurate Mermaid.js code with proper escaping to avoid parse errors.
 - **Mermaid Import (Beta):** Import standard Mermaid flowchart markup back into the visual canvas.
 - **Save/Load Projects:** Export and import your visual diagrams natively using the `.s2m` format.

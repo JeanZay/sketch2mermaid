@@ -11,21 +11,34 @@ import type {
   DiagramDirection,
   NodeStyle,
   DiagramEdgeEndpoint,
-  TextStyle
+  TextStyle,
+  DiagramGroup,
+  GroupStyle
 } from '../core/types';
+import { isReservedCanvasId } from '../core/types';
 import { NODE_SIZE_DEFAULTS } from '../core/nodeSizeConfig';
 import { getShapeCapabilities } from '../core/shapeRegistry';
+import {
+  DEFAULT_GROUP_WIDTH,
+  DEFAULT_GROUP_HEIGHT,
+  DEFAULT_LANE_WIDTH_LR,
+  DEFAULT_LANE_HEIGHT_LR,
+  DEFAULT_LANE_WIDTH_TD,
+  DEFAULT_LANE_HEIGHT_TD,
+  GROUP_PADDING,
+  MIN_GROUP_WIDTH,
+  MIN_GROUP_HEIGHT,
+} from '../core/config';
 
-const SCHEMA_VERSION = 1;
 const STORAGE_KEY = 'sketch2mermaid_diagram_v1';
 
 export const defaultDiagram: CanonicalDiagram = {
-  schemaVersion: SCHEMA_VERSION,
   diagramType: 'flowchart',
   direction: 'TD',
   nodes: [],
   edges: [],
   textBoxes: [],
+  groups: [],
 };
 
 // Simple debounce function for autosave
@@ -76,6 +89,18 @@ export function getNextTextBoxId(textBoxes: TextBox[]): string {
   return `tb${max + 1}`;
 }
 
+export function getNextGroupId(groups: DiagramGroup[]): string {
+  let max = 0;
+  for (const group of groups) {
+    const match = group.id.match(/^g(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > max) max = num;
+    }
+  }
+  return `g${max + 1}`;
+}
+
 export const DEFAULT_NODE_TEXT_STYLE: import('../core/types').TextStyle = {
   // fontSize is left undefined intentionally to trigger auto-fit fallback `computeNodeFontSize`
   bold: false,
@@ -123,6 +148,67 @@ export const normalizeEdgeStyle = (style: unknown): EdgeStyle =>
  * are present with correct defaults. Called at load and import boundaries.
  */
 export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
+  const rawGroups = Array.isArray(raw.groups) ? raw.groups : [];
+  const seenGroupIds = new Set<string>();
+  const normalizedGroups: DiagramGroup[] = rawGroups
+    .map((g) => {
+      // Drop null/non-object entries and entries with reserved canvas ID prefixes
+      if (!g || typeof g !== 'object' || !g.id || isReservedCanvasId(g.id)) return null;
+      let kind: import('../core/types').DiagramGroupKind = 'subgraph';
+      if (g.kind === 'lane' || g.kind === 'pool') {
+        kind = 'lane';
+      }
+      return {
+        id: g.id,
+        kind,
+        label: typeof g.label === 'string' ? g.label : 'Group',
+        parentGroupId: typeof g.parentGroupId === 'string' ? g.parentGroupId : undefined,
+        position: {
+          x: typeof g.position?.x === 'number' && Number.isFinite(g.position.x) ? g.position.x : 0,
+          y: typeof g.position?.y === 'number' && Number.isFinite(g.position.y) ? g.position.y : 0,
+        },
+        width: typeof g.width === 'number' && Number.isFinite(g.width) ? g.width : 300,
+        height: typeof g.height === 'number' && Number.isFinite(g.height) ? g.height : 200,
+        direction: (g.direction === 'TB' || g.direction === 'TD' || g.direction === 'BT' || g.direction === 'LR' || g.direction === 'RL') ? g.direction : undefined,
+        style: g.style ? {
+          backgroundColor: typeof g.style.backgroundColor === 'string' ? g.style.backgroundColor : undefined,
+          borderColor: typeof g.style.borderColor === 'string' ? g.style.borderColor : undefined,
+          textColor: typeof g.style.textColor === 'string' ? g.style.textColor : (g.style.text?.color || undefined),
+        } : undefined,
+      };
+    })
+    .filter((g): g is DiagramGroup => {
+      if (g === null) return false;
+      if (seenGroupIds.has(g.id)) return false;
+      seenGroupIds.add(g.id);
+      return true;
+    });
+
+  const validGroupIds = new Set(normalizedGroups.map((g) => g.id));
+
+  // Break potential parentGroupId cycles of any length, or invalid references
+  for (const group of normalizedGroups) {
+    let current = group;
+    const visited = new Set<string>([current.id]);
+    while (current.parentGroupId) {
+      if (!validGroupIds.has(current.parentGroupId)) {
+        current.parentGroupId = undefined;
+        break;
+      }
+      if (visited.has(current.parentGroupId)) {
+        current.parentGroupId = undefined;
+        break;
+      }
+      visited.add(current.parentGroupId);
+      const parent = normalizedGroups.find(g => g.id === current.parentGroupId);
+      if (!parent) {
+        current.parentGroupId = undefined;
+        break;
+      }
+      current = parent;
+    }
+  }
+
   const textBoxes = Array.isArray(raw.textBoxes)
     ? raw.textBoxes.map((tb) => {
         const style = tb.style || {};
@@ -139,8 +225,11 @@ export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
       })
     : [];
   const nodes = Array.isArray(raw.nodes)
-    ? raw.nodes.map((node) => {
-        let normalized = node;
+    ? raw.nodes.flatMap((node) => {
+        // Drop null/non-object entries and nodes with reserved canvas ID prefixes
+        if (node == null || typeof node !== 'object' || Array.isArray(node)) return [];
+        if (isReservedCanvasId((node as DiagramNode).id)) return [];
+        let normalized = node as DiagramNode;
         // @ts-expect-error - legacy field migration
         if (node.textStyle) {
           const { textStyle, ...rest } = node as { textStyle?: unknown } & DiagramNode;
@@ -170,7 +259,18 @@ export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
             label: '',
           };
         }
-        return normalized;
+
+        // Normalize parentGroupId
+        const parentGroupId = (normalized.parentGroupId && validGroupIds.has(normalized.parentGroupId))
+          ? normalized.parentGroupId
+          : undefined;
+
+        return [
+          {
+            ...normalized,
+            parentGroupId,
+          },
+        ];
       })
     : [];
 
@@ -190,8 +290,16 @@ export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
   }
 
   const edges = Array.isArray(raw.edges)
-    ? raw.edges.map((rawEdge: unknown) => {
+    ? raw.edges.flatMap((rawEdge: unknown) => {
+        // Drop null, undefined, or non-object entries rather than crashing.
+        if (rawEdge == null || typeof rawEdge !== 'object' || Array.isArray(rawEdge)) {
+          return [];
+        }
         const edge = rawEdge as LegacyDiagramEdge;
+        // Drop entries with a reserved canvas ID — they should never be in canonical state.
+        if (typeof edge.id === 'string' && isReservedCanvasId(edge.id)) {
+          return [];
+        }
         let fromEndpoint: DiagramEdgeEndpoint;
         if (typeof edge.from === 'string') {
           if (nodeSet.has(edge.from)) {
@@ -304,10 +412,12 @@ export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
     : [];
 
   return {
-    ...raw,
+    diagramType: 'flowchart',
+    direction: raw.direction || 'TD',
     nodes,
     edges,
     textBoxes,
+    groups: normalizedGroups,
   };
 }
 
@@ -329,7 +439,7 @@ export function loadInitialDiagram(): CanonicalDiagram {
     const parsed = JSON.parse(stored);
 
     // AC14: Schema version validation
-    if (parsed.schemaVersion !== SCHEMA_VERSION) {
+    if (parsed.schemaVersion !== 1) {
       console.warn(`Unrecognized schemaVersion "${parsed.schemaVersion}". Fallback to empty diagram.`);
       return defaultDiagram;
     }
@@ -344,7 +454,9 @@ export function loadInitialDiagram(): CanonicalDiagram {
       return defaultDiagram;
     }
 
-    return normalizeDiagram(parsed as CanonicalDiagram);
+    const diagramWithoutSchema = { ...parsed };
+    delete diagramWithoutSchema.schemaVersion;
+    return normalizeDiagram(diagramWithoutSchema as CanonicalDiagram);
   } catch (e) {
     console.error('Error loading diagram from localStorage. Fallback to empty diagram.', e);
     return defaultDiagram;
@@ -414,18 +526,41 @@ export interface DiagramState {
   updateTextBoxSize: (id: string, width: number, height: number) => void;
   updateTextBoxPosition: (id: string, x: number, y: number) => void;
   deleteTextBox: (id: string) => void;
+  addGroup: (kind: import('../core/types').DiagramGroupKind, x: number, y: number, label?: string) => string;
+  deleteGroup: (id: string, options: { deleteChildren: boolean }) => void;
+  updateGroupLabel: (id: string, label: string) => void;
+  updateGroupPosition: (id: string, x: number, y: number) => void;
+  updateGroupSize: (id: string, w: number, h: number) => void;
+  updateGroupStyle: (id: string, style: Partial<GroupStyle>) => void;
+  updateGroupKind: (id: string, kind: import('../core/types').DiagramGroupKind) => void;
+  updateGroupDirection: (id: string, direction?: 'TB' | 'TD' | 'BT' | 'LR' | 'RL') => void;
+  assignNodeToGroup: (nodeId: string, groupId: string | undefined) => void;
+  groupSelection: (nodeIds: string[], kind: import('../core/types').DiagramGroupKind) => string;
+
   resetDiagram: () => void;
   loadDiagram: (diagram: CanonicalDiagram, options: { resetHistory: boolean }) => void;
 
   // UI State for right panel
   rightPanelTab: 'export' | 'guide';
   setRightPanelTab: (tab: 'export' | 'guide') => void;
+
+  // Active Tool Mode
+  activeTool: 'select' | 'arrow';
+  setActiveTool: (tool: 'select' | 'arrow') => void;
+
+  // Pending edge selection — set by Toolbar when creating a free arrow
+  pendingEdgeSelect: string | null;
+  clearPendingEdgeSelect: () => void;
 }
 
 export const useDiagramStore = create<DiagramState>((set, get) => ({
   diagram: loadInitialDiagram(),
   rightPanelTab: 'export',
   setRightPanelTab: (tab) => set({ rightPanelTab: tab }),
+  activeTool: 'select',
+  setActiveTool: (tool) => set({ activeTool: tool }),
+  pendingEdgeSelect: null,
+  clearPendingEdgeSelect: () => set({ pendingEdgeSelect: null }),
 
   // History state
   past: [],
@@ -713,14 +848,22 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     return newId;
   },
 
-  deleteSelectedElements: ({ nodeIds, edgeIds, textBoxIds, connectedEdgeBehavior, endpointPositions }) => {
+  deleteSelectedElements: ({ nodeIds, edgeIds, textBoxIds, groupIds = [], connectedEdgeBehavior, endpointPositions }) => {
     get().takeSnapshot();
     const nodeIdSet = new Set(nodeIds);
     const edgeIdSet = new Set(edgeIds);
     const textBoxIdSet = new Set(textBoxIds);
+    const groupIdSet = new Set(groupIds);
 
     set((state) => {
-      const nextNodes = state.diagram.nodes.filter((node) => !nodeIdSet.has(node.id));
+      // 1. Delete groups and clear subgroup parents
+      const nextGroups = (state.diagram.groups || []).filter((g) => !groupIdSet.has(g.id))
+        .map((g) => g.parentGroupId && groupIdSet.has(g.parentGroupId) ? { ...g, parentGroupId: undefined } : g);
+
+      // 2. Delete nodes and clear parentGroupId if their group was deleted but they weren't
+      const nextNodes = state.diagram.nodes.filter((node) => !nodeIdSet.has(node.id))
+        .map((node) => node.parentGroupId && groupIdSet.has(node.parentGroupId) ? { ...node, parentGroupId: undefined } : node);
+
       const nextTextBoxes = state.diagram.textBoxes.filter((tb) => !textBoxIdSet.has(tb.id));
 
       let nextEdges: DiagramEdge[];
@@ -784,6 +927,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
           nodes: nextNodes,
           textBoxes: nextTextBoxes,
           edges: nextEdges,
+          groups: nextGroups,
         },
       };
     });
@@ -1036,6 +1180,317 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     }));
   },
 
+  addGroup: (kind, x, y, label) => {
+    get().takeSnapshot();
+    const direction = get().diagram.direction;
+    const newId = getNextGroupId(get().diagram.groups || []);
+    
+    let width = DEFAULT_GROUP_WIDTH;
+    let height = DEFAULT_GROUP_HEIGHT;
+    
+    if (kind === 'lane') {
+      if (direction === 'LR' || direction === 'RL') {
+        width = DEFAULT_LANE_WIDTH_LR;
+        height = DEFAULT_LANE_HEIGHT_LR;
+      } else {
+        width = DEFAULT_LANE_WIDTH_TD;
+        height = DEFAULT_LANE_HEIGHT_TD;
+      }
+    }
+
+    const newGroup: DiagramGroup = {
+      id: newId,
+      kind,
+      label: label || (kind === 'lane' ? 'Swimlane' : 'Group'),
+      position: { x, y },
+      width,
+      height,
+    };
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        groups: [...(state.diagram.groups || []), newGroup],
+      },
+    }));
+    return newId;
+  },
+
+  deleteGroup: (id, options) => {
+    get().takeSnapshot();
+    const deleteChildren = options.deleteChildren;
+    set((state) => {
+      const groupsToDelete = new Set<string>();
+      const nodesToDelete = new Set<string>();
+
+      const collectDescendantsForDelete = (gId: string) => {
+        groupsToDelete.add(gId);
+        for (const n of state.diagram.nodes) {
+          if (n.parentGroupId === gId) {
+            nodesToDelete.add(n.id);
+          }
+        }
+        const subgroups = (state.diagram.groups || []).filter((g) => g.parentGroupId === gId);
+        for (const sub of subgroups) {
+          collectDescendantsForDelete(sub.id);
+        }
+      };
+
+      if (deleteChildren) {
+        collectDescendantsForDelete(id);
+      } else {
+        groupsToDelete.add(id);
+      }
+
+      const nextGroups = (state.diagram.groups || []).filter((g) => !groupsToDelete.has(g.id));
+      const updatedGroups = nextGroups.map((g) =>
+        g.parentGroupId && groupsToDelete.has(g.parentGroupId)
+          ? { ...g, parentGroupId: undefined }
+          : g
+      );
+
+      let nextNodes: DiagramNode[];
+      let nextEdges = state.diagram.edges;
+
+      if (deleteChildren) {
+        nextNodes = state.diagram.nodes.filter((n) => !nodesToDelete.has(n.id));
+        nextEdges = state.diagram.edges.filter((edge) => {
+          const fromId = edge.from.kind === 'connected' ? edge.from.nodeId : null;
+          const toId = edge.to.kind === 'connected' ? edge.to.nodeId : null;
+          return !(fromId && nodesToDelete.has(fromId)) && !(toId && nodesToDelete.has(toId));
+        });
+      } else {
+        nextNodes = state.diagram.nodes.map((n) =>
+          n.parentGroupId && groupsToDelete.has(n.parentGroupId)
+            ? { ...n, parentGroupId: undefined }
+            : n
+        );
+      }
+
+      return {
+        diagram: {
+          ...state.diagram,
+          nodes: nextNodes,
+          edges: nextEdges,
+          groups: updatedGroups,
+        },
+      };
+    });
+  },
+
+  updateGroupLabel: (id, label) => {
+    get().takeSnapshot();
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        groups: (state.diagram.groups || []).map((g) =>
+          g.id === id ? { ...g, label } : g
+        ),
+      },
+    }));
+  },
+
+  updateGroupPosition: (id, x, y) => {
+    get().takeSnapshot();
+    set((state) => {
+      const groups = state.diagram.groups || [];
+      const group = groups.find((g) => g.id === id);
+      if (!group) return {};
+
+      const dx = x - group.position.x;
+      const dy = y - group.position.y;
+
+      const groupsToShift = new Set<string>();
+      const nodesToShift = new Set<string>();
+
+      const collectAllDescendants = (gId: string) => {
+        groupsToShift.add(gId);
+        for (const n of state.diagram.nodes) {
+          if (n.parentGroupId === gId) {
+            nodesToShift.add(n.id);
+          }
+        }
+        for (const g of groups) {
+          if (g.parentGroupId === gId) {
+            collectAllDescendants(g.id);
+          }
+        }
+      };
+
+      collectAllDescendants(id);
+
+      const nextGroups = groups.map((g) =>
+        groupsToShift.has(g.id)
+          ? { ...g, position: { x: g.position.x + dx, y: g.position.y + dy } }
+          : g
+      );
+
+      const nextNodes = state.diagram.nodes.map((n) =>
+        nodesToShift.has(n.id)
+          ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } }
+          : n
+      );
+
+      return {
+        diagram: {
+          ...state.diagram,
+          nodes: nextNodes,
+          groups: nextGroups,
+        },
+      };
+    });
+  },
+
+  updateGroupSize: (id, width, height) => {
+    get().takeSnapshot();
+    set((state) => {
+      const group = (state.diagram.groups || []).find((g) => g.id === id);
+      if (!group) return {};
+
+      const childrenNodes = state.diagram.nodes.filter((n) => n.parentGroupId === id);
+      const childrenGroups = (state.diagram.groups || []).filter((g) => g.parentGroupId === id);
+
+      let maxChildRight = -Infinity;
+      let maxChildBottom = -Infinity;
+
+      for (const node of childrenNodes) {
+        const w = node.width ?? 100;
+        const h = node.height ?? 40;
+        const right = node.position.x - group.position.x + w;
+        const bottom = node.position.y - group.position.y + h;
+        if (right > maxChildRight) maxChildRight = right;
+        if (bottom > maxChildBottom) maxChildBottom = bottom;
+      }
+
+      for (const subgroup of childrenGroups) {
+        const right = subgroup.position.x - group.position.x + subgroup.width;
+        const bottom = subgroup.position.y - group.position.y + subgroup.height;
+        if (right > maxChildRight) maxChildRight = right;
+        if (bottom > maxChildBottom) maxChildBottom = bottom;
+      }
+
+      const minW = maxChildRight === -Infinity ? MIN_GROUP_WIDTH : Math.max(MIN_GROUP_WIDTH, maxChildRight + GROUP_PADDING);
+      const minH = maxChildBottom === -Infinity ? MIN_GROUP_HEIGHT : Math.max(MIN_GROUP_HEIGHT, maxChildBottom + GROUP_PADDING);
+
+      const finalWidth = Math.max(minW, Math.round(width));
+      const finalHeight = Math.max(minH, Math.round(height));
+
+      return {
+        diagram: {
+          ...state.diagram,
+          groups: (state.diagram.groups || []).map((g) =>
+            g.id === id ? { ...g, width: finalWidth, height: finalHeight } : g
+          ),
+        },
+      };
+    });
+  },
+
+  updateGroupStyle: (id, stylePatch) => {
+    get().takeSnapshot();
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        groups: (state.diagram.groups || []).map((g) =>
+          g.id === id ? { ...g, style: { ...g.style, ...stylePatch } } : g
+        ),
+      },
+    }));
+  },
+
+  updateGroupKind: (id, kind) => {
+    get().takeSnapshot();
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        groups: (state.diagram.groups || []).map((g) =>
+          g.id === id ? { ...g, kind } : g
+        ),
+      },
+    }));
+  },
+
+  updateGroupDirection: (id, direction) => {
+    get().takeSnapshot();
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        groups: (state.diagram.groups || []).map((g) =>
+          g.id === id ? { ...g, direction } : g
+        ),
+      },
+    }));
+  },
+
+  assignNodeToGroup: (nodeId, groupId) => {
+    get().takeSnapshot();
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        nodes: state.diagram.nodes.map((n) =>
+          n.id === nodeId ? { ...n, parentGroupId: groupId } : n
+        ),
+      },
+    }));
+  },
+
+  groupSelection: (nodeIds, kind) => {
+    get().takeSnapshot();
+    if (nodeIds.length === 0) return '';
+    const state = get();
+    const selectedNodes = state.diagram.nodes.filter((n) => nodeIds.includes(n.id));
+    if (selectedNodes.length === 0) return '';
+
+    const defaultWidth = 100;
+    const defaultHeight = 40;
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+
+    for (const node of selectedNodes) {
+      const w = node.width ?? defaultWidth;
+      const h = node.height ?? defaultHeight;
+      if (node.position.x < minX) minX = node.position.x;
+      if (node.position.x + w > maxX) maxX = node.position.x + w;
+      if (node.position.y < minY) minY = node.position.y;
+      if (node.position.y + h > maxY) maxY = node.position.y + h;
+    }
+
+    const boxW = maxX - minX;
+    const boxH = maxY - minY;
+    const padding = GROUP_PADDING;
+    const minWidth = MIN_GROUP_WIDTH;
+    const minHeight = MIN_GROUP_HEIGHT;
+
+    const width = Math.max(minWidth, boxW + 2 * padding);
+    const height = Math.max(minHeight, boxH + 2 * padding);
+
+    const x = minX - padding;
+    const y = minY - padding;
+
+    const newId = getNextGroupId(state.diagram.groups || []);
+    const newGroup: DiagramGroup = {
+      id: newId,
+      kind,
+      label: kind === 'lane' ? 'Swimlane' : 'Group',
+      position: { x, y },
+      width,
+      height,
+    };
+
+    set((state) => ({
+      diagram: {
+        ...state.diagram,
+        groups: [...(state.diagram.groups || []), newGroup],
+        nodes: state.diagram.nodes.map((n) =>
+          nodeIds.includes(n.id) ? { ...n, parentGroupId: newId } : n
+        ),
+      },
+    }));
+    return newId;
+  },
+
   resetDiagram: () => {
     get().takeSnapshot();
     set({ diagram: { ...defaultDiagram } });
@@ -1058,7 +1513,10 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 if (typeof window !== 'undefined') {
   const saveToLocalStorage = debounce((diagram: CanonicalDiagram) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(diagram));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        ...diagram,
+        schemaVersion: 1,
+      }));
     } catch (e) {
       console.error('Failed to save diagram to localStorage', e);
     }

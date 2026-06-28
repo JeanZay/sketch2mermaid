@@ -665,4 +665,51 @@ describe('Mermaid Node Styling tests', () => {
     expect(output).toContain(`n4@{ shape: ${summaryShape} }`);
     expect(output).not.toContain('Summary label');
   });
+
+  test('toMermaid completely excludes detached / ghost edges', () => {
+    const diagram: CanonicalDiagram = {
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        { id: 'n1', label: 'Node 1', shape: 'process', position: { x: 0, y: 0 } },
+        { id: 'n2', label: 'Node 2', shape: 'process', position: { x: 100, y: 100 } }
+      ],
+      edges: [
+        {
+          id: 'e1',
+          from: { kind: 'connected', nodeId: 'n1', handleId: 'r-source' },
+          to: { kind: 'connected', nodeId: 'n2', handleId: 'l-target' },
+          connectionStatus: 'connected',
+          exportMode: 'mermaid',
+          label: 'E1',
+          style: 'solid'
+        },
+        {
+          id: 'e2',
+          from: { kind: 'detached', point: { x: 50, y: 50 } },
+          to: { kind: 'connected', nodeId: 'n2', handleId: 'l-target' },
+          connectionStatus: 'detached',
+          exportMode: 'mermaid',
+          label: 'E2',
+          style: 'solid'
+        },
+        {
+          id: 'e3',
+          from: { kind: 'connected', nodeId: 'n1', handleId: 'r-source' },
+          to: { kind: 'detached', point: { x: 150, y: 150 } },
+          connectionStatus: 'detached',
+          exportMode: 'mermaid',
+          label: 'E3',
+          style: 'solid'
+        }
+      ],
+      textBoxes: []
+    };
+
+    const output = toMermaid(diagram);
+    expect(output).toContain('n1 -->|"E1"| n2');
+    expect(output).not.toContain('E2');
+    expect(output).not.toContain('E3');
+  });
 });

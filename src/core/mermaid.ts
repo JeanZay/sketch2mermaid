@@ -1,6 +1,7 @@
-import type { CanonicalDiagram, MermaidExportFormat, DiagramNode, EdgeStyle, EdgeDirection, ConnectedEdgeEndpoint } from './types';
+import type { CanonicalDiagram, MermaidExportFormat, DiagramNode, EdgeStyle, EdgeDirection, ConnectedEdgeEndpoint, DiagramGroup } from './types';
 import { isExportableEdge } from './types';
 import { findDefinitionByShape, shapeSupportsLabel } from './shapeRegistry';
+import { USE_GROUPS_AND_SWIMLANES } from './config';
 
 /**
  * Helper to sort IDs numerically by their numeric suffix (e.g., n1, n2, n10).
@@ -22,13 +23,6 @@ export function sortById(a: string, b: string): number {
 /**
  * Escapes special characters character-by-character to prevent double-escaping,
  * returning a secure entity string for Mermaid compatibility.
- * 
- * DESIGN DECISION & RENDERING PROOF:
- * Mermaid under securityLevel: 'strict' scans for the `#...;` sequence for escaping.
- * Double quotes must be escaped as `#quot;` and hashes as `#35;`.
- * Standard HTML entities like `&#35;` are corrupted because Mermaid's post-parser
- * will see the `#35;` inside `&#35;` and replace it with `#`, yielding `&#` (rendering error).
- * Hence, Mermaid-native `#quot;` and `#35;` escapes are mandatory.
  */
 export function escapeLabel(label: string): string {
   let result = '';
@@ -80,6 +74,38 @@ function getMermaidNodeStyleLine(node: DiagramNode): string | null {
   return null;
 }
 
+function getMermaidGroupStyleLine(group: DiagramGroup): string | null {
+  const parts: string[] = [];
+  const style = group.style;
+  if (!style) return null;
+
+  const isValidColor = (val: string | undefined): boolean => {
+    if (!val) return false;
+    return /^[#a-zA-Z0-9(),.\s-]+$/.test(val);
+  };
+
+  if (isValidColor(style.backgroundColor)) {
+    parts.push(`fill:${style.backgroundColor}`);
+  }
+  if (isValidColor(style.borderColor)) {
+    parts.push(`stroke:${style.borderColor}`);
+  }
+  if (style.text) {
+    if (isValidColor(style.text.color)) {
+      parts.push(`color:${style.text.color}`);
+    }
+    const fontSize = style.text.fontSize;
+    if (typeof fontSize === 'number' && !isNaN(fontSize) && fontSize > 0 && fontSize < 100) {
+      parts.push(`font-size:${Math.round(fontSize)}px`);
+    }
+  }
+
+  if (parts.length > 0) {
+    return `  style ${group.id} ${parts.join(',')}`;
+  }
+  return null;
+}
+
 export function getMermaidEdgeOperator(style: EdgeStyle, direction: EdgeDirection): string {
   if (style === 'dotted') {
     if (direction === 'undirected') return '-.-';
@@ -93,6 +119,38 @@ export function getMermaidEdgeOperator(style: EdgeStyle, direction: EdgeDirectio
   return '-->';
 }
 
+function renderNodeLine(node: DiagramNode, indent: string): string {
+  const definition = findDefinitionByShape(node.shape);
+  const shapeName = definition?.mermaidShape || 'rect';
+  const supportsLabel = shapeSupportsLabel(node.shape);
+
+  if (!supportsLabel) {
+    return `${indent}${node.id}@{ shape: ${shapeName} }`;
+  }
+
+  const escaped = escapeLabel(node.label);
+
+  let finalLabel = escaped;
+  if (node.style?.text?.bold || node.style?.text?.italic) {
+    let markdownLabel = escaped;
+    if (node.style.text.bold && node.style.text.italic) {
+      markdownLabel = `**_${escaped}_**`;
+    } else if (node.style.text.bold) {
+      markdownLabel = `**${escaped}**`;
+    } else if (node.style.text.italic) {
+      markdownLabel = `_${escaped}_`;
+    }
+    finalLabel = `\`${markdownLabel}\``;
+  }
+
+  if (definition?.legacySyntax) {
+    const { open, close } = definition.legacySyntax;
+    return `${indent}${node.id}${open}"${finalLabel}"${close}`;
+  } else {
+    return `${indent}${node.id}@{ shape: ${shapeName}, label: "${finalLabel}" }`;
+  }
+}
+
 /**
  * Serializes the canonical JSON diagram model to deterministic Mermaid markup.
  * Order of nodes and edges is guaranteed to be stable (sorted by ID).
@@ -101,47 +159,65 @@ export function toMermaid(diagram: CanonicalDiagram): string {
   const lines: string[] = [];
   lines.push(`flowchart ${diagram.direction}`);
 
-  // Sort nodes by ID ascending (numerically on the numeric suffix)
   const sortedNodes = [...diagram.nodes].sort((a, b) => sortById(a.id, b.id));
+  const activeGroups = USE_GROUPS_AND_SWIMLANES && diagram.groups && diagram.groups.length > 0
+    ? [...diagram.groups].sort((a, b) => sortById(a.id, b.id))
+    : [];
 
-  for (const node of sortedNodes) {
-    const definition = findDefinitionByShape(node.shape);
-    const shapeName = definition?.mermaidShape || 'rect';
-    const supportsLabel = shapeSupportsLabel(node.shape);
+  const groupedNodeIds = new Set<string>();
 
-    if (!supportsLabel) {
-      lines.push(`  ${node.id}@{ shape: ${shapeName} }`);
-      continue;
-    }
+  // 1. Output Subgraphs / Groups
+  if (activeGroups.length > 0) {
+    const validGroupIds = new Set(activeGroups.map(g => g.id));
+    const renderedGroupIds = new Set<string>();
+    
+    const renderGroup = (group: DiagramGroup, indent: string) => {
+      if (renderedGroupIds.has(group.id)) return;
+      renderedGroupIds.add(group.id);
 
-    const escaped = escapeLabel(node.label);
-
-    let finalLabel = escaped;
-    if (node.style?.text?.bold || node.style?.text?.italic) {
-      let markdownLabel = escaped;
-      if (node.style.text.bold && node.style.text.italic) {
-        markdownLabel = `**_${escaped}_**`;
-      } else if (node.style.text.bold) {
-        markdownLabel = `**${escaped}**`;
-      } else if (node.style.text.italic) {
-        markdownLabel = `_${escaped}_`;
+      lines.push(`${indent}subgraph ${group.id}["${escapeLabel(group.label)}"]`);
+      if (group.direction) {
+        lines.push(`${indent}  direction ${group.direction}`);
       }
-      finalLabel = `\`${markdownLabel}\``;
+
+      // Output nested groups
+      const nestedGroups = activeGroups.filter(g => g.parentGroupId === group.id);
+      for (const nested of nestedGroups) {
+        renderGroup(nested, indent + '  ');
+      }
+
+      // Output contained nodes
+      const groupNodes = sortedNodes.filter(n => n.parentGroupId === group.id);
+      for (const node of groupNodes) {
+        lines.push(renderNodeLine(node, indent + '  '));
+        groupedNodeIds.add(node.id);
+      }
+
+      lines.push(`${indent}end`);
+    };
+
+    // Render top-level groups first
+    const topLevelGroups = activeGroups.filter(g => !g.parentGroupId || !validGroupIds.has(g.parentGroupId));
+    for (const group of topLevelGroups) {
+      renderGroup(group, '  ');
     }
 
-    if (definition?.legacySyntax) {
-      const { open, close } = definition.legacySyntax;
-      lines.push(`  ${node.id}${open}"${finalLabel}"${close}`);
-    } else {
-      // DESIGN NOTE: escapeLabel() uses Mermaid entity escaping (#quot;, &amp;, etc.)
-      // even inside generic @{ } metadata labels. This is intentional — Mermaid's
-      // strict security post-processor decodes these entities globally, including
-      // inside metadata label strings. Empirically verified by mermaid-render.test.ts.
-      lines.push(`  ${node.id}@{ shape: ${shapeName}, label: "${finalLabel}" }`);
+    // Fallback for any unrendered groups
+    for (const group of activeGroups) {
+      if (!renderedGroupIds.has(group.id)) {
+        renderGroup(group, '  ');
+      }
     }
   }
 
-  // Sort edges by ID ascending (numerically on the numeric suffix)
+  // 2. Output remaining ungrouped nodes
+  for (const node of sortedNodes) {
+    if (!groupedNodeIds.has(node.id)) {
+      lines.push(renderNodeLine(node, '  '));
+    }
+  }
+
+  // 3. Sort edges by ID ascending and output
   const sortedEdges = [...diagram.edges]
     .filter(isExportableEdge)
     .sort((a, b) => sortById(a.id, b.id));
@@ -158,10 +234,17 @@ export function toMermaid(diagram: CanonicalDiagram): string {
     }
   }
 
-  // Append style declarations
+  // 4. Append style declarations
   const styleLines: string[] = [];
   for (const node of sortedNodes) {
     const styleLine = getMermaidNodeStyleLine(node);
+    if (styleLine) {
+      styleLines.push(styleLine);
+    }
+  }
+
+  for (const group of activeGroups) {
+    const styleLine = getMermaidGroupStyleLine(group);
     if (styleLine) {
       styleLines.push(styleLine);
     }

@@ -29,7 +29,7 @@ export const UserGuide: React.FC = () => {
             <h4>2. Relier les éléments</h4>
           </div>
           <p>
-            Pour créer des flèches, glissez un lien depuis l'un des points d'ancrage (les petits cercles de couleur jaune/bleu) d'un nœud vers un autre nœud.
+            Pour relier deux nœuds, glissez un lien depuis l'un des points d'ancrage (les petits cercles) d'un nœud vers un autre nœud. Vous pouvez aussi créer une <strong>flèche libre</strong> en cliquant sur l'icône de flèche dans la section <i>Connection</i> du panneau de gauche, puis faire glisser ses extrémités séparément. Relâchez une extrémité près d'un point d'ancrage de nœud pour l'y <strong>aimanter (snapping)</strong>.
           </p>
         </section>
 
@@ -55,11 +55,39 @@ export const UserGuide: React.FC = () => {
           </p>
         </section>
 
-        {/* Section 5: Annotations */}
+        {/* Section 5: Conteneurs visuels */}
+        <section className="user-guide-section">
+          <div className="section-header-with-icon">
+            <span className="section-icon">📦</span>
+            <h4>5. Conteneurs visuels (Groupes & Couloirs)</h4>
+          </div>
+          <p>
+            Ajoutez des conteneurs pour organiser vos nœuds via la section <i>Containers</i> du panneau de gauche :
+          </p>
+          <ul className="actions-guide-list">
+            <li>
+              <strong>Group (Subgraph)</strong> : Crée un conteneur rectangulaire standard.
+            </li>
+            <li>
+              <strong>Swimlane (Couloir)</strong> : Crée une ligne d'eau (verticale ou horizontale).
+            </li>
+          </ul>
+          <p>
+            Vous pouvez également sélectionner plusieurs nœuds sur le canvas et cliquer sur <strong>Créer un Groupe (Subgraph)</strong> ou <strong>Créer une Ligne d'eau (Swimlane)</strong> dans le panneau de droite.
+          </p>
+          <p>
+            Sélectionnez un conteneur pour modifier son <strong>label</strong>, son type, sa direction de rendu (Verticale TD / Horizontale LR, uniquement pour les Subgraphs), sa couleur de fond ou de bordure.
+          </p>
+          <div className="guide-note">
+            ℹ️ Lors de la suppression d'un conteneur contenant des nœuds, une invite vous propose soit de supprimer le groupe et ses nœuds enfants, soit de supprimer uniquement le groupe en conservant les nœuds.
+          </div>
+        </section>
+
+        {/* Section 6: Annotations */}
         <section className="user-guide-section">
           <div className="section-header-with-icon">
             <span className="section-icon">📝</span>
-            <h4>5. Annotations textuelles</h4>
+            <h4>6. Annotations textuelles</h4>
           </div>
           <p>
             Ajoutez des annotations libres grâce au bouton <strong>Text</strong> dans la section <i>Annotations</i> du panneau de gauche.
@@ -69,11 +97,11 @@ export const UserGuide: React.FC = () => {
           </div>
         </section>
 
-        {/* Section 6: Raccourcis clavier */}
+        {/* Section 7: Raccourcis clavier */}
         <section className="user-guide-section">
           <div className="section-header-with-icon">
             <span className="section-icon">⌨️</span>
-            <h4>6. Raccourcis clavier</h4>
+            <h4>7. Raccourcis clavier</h4>
           </div>
           <ul className="shortcuts-list">
             <li>
@@ -91,11 +119,11 @@ export const UserGuide: React.FC = () => {
           </ul>
         </section>
 
-        {/* Section 7: Sauvegarde, Export et Import */}
+        {/* Section 8: Sauvegarde, Export et Import */}
         <section className="user-guide-section">
           <div className="section-header-with-icon">
             <span className="section-icon">💾</span>
-            <h4>7. Import, Export & Sauvegarde</h4>
+            <h4>8. Import, Export & Sauvegarde</h4>
           </div>
           <p>
             Utilisez les boutons de la barre supérieure :

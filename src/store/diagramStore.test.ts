@@ -190,8 +190,6 @@ describe('Zustand diagram store tests', () => {
     // Call loadInitialDiagram directly to test localStorage loading logic
     const loaded = loadInitialDiagram();
 
-    // Verify fallback to default empty diagram
-    expect(loaded.schemaVersion).toBe(1);
     expect(loaded.nodes).toHaveLength(0);
     
     // Check warning was logged
@@ -872,6 +870,145 @@ describe('Zustand diagram store tests', () => {
         nodes: [{ id: 'n1', label: 'B', shape: 'process' as const, position: { x: 0, y: 0 } }],
       };
       expect(areDiagramsEqual(a, b)).toBe(false);
+    });
+  });
+
+  describe('Flexible / Ghost Arrows System', () => {
+    test('activeTool toggles between select and arrow', () => {
+      expect(useDiagramStore.getState().activeTool).toBe('select');
+      useDiagramStore.getState().setActiveTool('arrow');
+      expect(useDiagramStore.getState().activeTool).toBe('arrow');
+      useDiagramStore.getState().setActiveTool('select');
+      expect(useDiagramStore.getState().activeTool).toBe('select');
+    });
+
+    test('normalizeDiagram recalculates connectionStatus correctly', () => {
+      const raw = {
+        diagramType: 'flowchart' as const,
+        direction: 'TD' as const,
+        nodes: [
+          { id: 'n1', label: 'A', shape: 'process' as const, position: { x: 0, y: 0 } },
+          { id: 'n2', label: 'B', shape: 'process' as const, position: { x: 100, y: 100 } }
+        ],
+        edges: [
+          {
+            id: 'e1',
+            from: { kind: 'connected', nodeId: 'n1', handleId: 'r-source' },
+            to: { kind: 'connected', nodeId: 'n2', handleId: 'l-target' },
+            connectionStatus: 'detached' as const, // Incorrect in raw data
+            exportMode: 'mermaid' as const,
+            label: '',
+            style: 'solid' as const,
+            direction: 'directed' as const
+          },
+          {
+            id: 'e2',
+            from: { kind: 'detached', point: { x: 50, y: 50 } },
+            to: { kind: 'connected', nodeId: 'n2', handleId: 'l-target' },
+            connectionStatus: 'connected' as const, // Incorrect in raw data
+            exportMode: 'mermaid' as const,
+            label: '',
+            style: 'solid' as const,
+            direction: 'directed' as const
+          }
+        ],
+        textBoxes: []
+      };
+
+      const normalized = normalizeDiagram(raw);
+      expect(normalized.edges[0].connectionStatus).toBe('connected');
+      expect(normalized.edges[1].connectionStatus).toBe('detached');
+    });
+
+    test('addEdge allows adding edges with detached/ghost endpoints', () => {
+      const store = useDiagramStore.getState();
+      store.resetDiagram();
+      store.addNode('process', 0, 0); // created with ID 'n1'
+
+      const e1Id = store.addEdge(
+        { kind: 'connected', nodeId: 'n1', handleId: 'r-source' },
+        { kind: 'detached', point: { x: 300, y: 300 } }
+      );
+      const e2Id = store.addEdge(
+        { kind: 'detached', point: { x: 10, y: 10 } },
+        { kind: 'detached', point: { x: 50, y: 50 } }
+      );
+
+      const edges = useDiagramStore.getState().diagram.edges;
+      const e1 = edges.find(e => e.id === e1Id)!;
+      const e2 = edges.find(e => e.id === e2Id)!;
+
+      expect(e1.connectionStatus).toBe('detached');
+      expect(e1.to.kind).toBe('detached');
+      if (e1.to.kind === 'detached') {
+        expect(e1.to.point).toEqual({ x: 300, y: 300 });
+      } else {
+        throw new Error('expected detached target endpoint');
+      }
+
+      expect(e2.connectionStatus).toBe('detached');
+      expect(e2.from.kind).toBe('detached');
+      expect(e2.to.kind).toBe('detached');
+    });
+
+    test('surgical deletion of node detaches edge endpoints and can be undo/redo round-tripped', () => {
+      const store = useDiagramStore.getState();
+      store.resetDiagram();
+      store.addNode('process', 0, 0);   // 'n1'
+      store.addNode('process', 100, 100); // 'n2'
+      const edgeId = store.addEdge(
+        { kind: 'connected', nodeId: 'n1', handleId: 'r-source' },
+        { kind: 'connected', nodeId: 'n2', handleId: 'l-target' }
+      );
+
+      // Perform surgical deletion of n2, detaching the edge endpoint
+      store.deleteSelectedElements({
+        nodeIds: ['n2'],
+        edgeIds: [],
+        textBoxIds: [],
+        connectedEdgeBehavior: 'detach',
+        endpointPositions: {
+          [edgeId]: { to: { x: 150, y: 150 } }
+        }
+      });
+
+      let state = useDiagramStore.getState().diagram;
+      expect(state.nodes.find(n => n.id === 'n2')).toBeUndefined();
+      
+      let edge = state.edges.find(e => e.id === edgeId)!;
+      expect(edge.to.kind).toBe('detached');
+      if (edge.to.kind === 'detached') {
+        expect(edge.to.point).toEqual({ x: 150, y: 150 });
+      } else {
+        throw new Error('expected detached target endpoint');
+      }
+      expect(edge.connectionStatus).toBe('detached');
+
+      // Undo deletion
+      store.undo();
+      state = useDiagramStore.getState().diagram;
+      expect(state.nodes.find(n => n.id === 'n2')).toBeDefined();
+      edge = state.edges.find(e => e.id === edgeId)!;
+      expect(edge.to.kind).toBe('connected');
+      if (edge.to.kind === 'connected') {
+        expect(edge.to.nodeId).toBe('n2');
+      } else {
+        throw new Error('expected connected target endpoint');
+      }
+      expect(edge.connectionStatus).toBe('connected');
+
+      // Redo deletion
+      store.redo();
+      state = useDiagramStore.getState().diagram;
+      expect(state.nodes.find(n => n.id === 'n2')).toBeUndefined();
+      edge = state.edges.find(e => e.id === edgeId)!;
+      expect(edge.to.kind).toBe('detached');
+      if (edge.to.kind === 'detached') {
+        expect(edge.to.point).toEqual({ x: 150, y: 150 });
+      } else {
+        throw new Error('expected detached target endpoint');
+      }
+      expect(edge.connectionStatus).toBe('detached');
     });
   });
 });

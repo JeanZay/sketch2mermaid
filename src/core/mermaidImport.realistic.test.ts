@@ -245,8 +245,9 @@ describe('Mermaid Import Realistic & Hardening Tests', () => {
       expect(res.diagram.nodes.some(n => n.id === 'end')).toBe(false);
 
       // Warnings check
+      expect(res.diagram.groups?.length).toBe(2);
       const subgraphWarnings = res.warnings.filter(w => w.type === 'unsupportedSubgraph');
-      expect(subgraphWarnings.length).toBe(2);
+      expect(subgraphWarnings.length).toBe(0);
 
       // Export & render validation
       const exported = toMermaid(res.diagram);
@@ -654,9 +655,7 @@ flowchart TD
     test('importMermaidFlowchartAsync falls back gracefully to local layout on render failure', async () => {
       const code = 'flowchart TD\n  A --> B';
       const renderId = `test-temp-${Math.floor(Math.random() * 100000)}`;
-      const { svg } = await mermaid.render(renderId, code);
-      const fs = await import('fs');
-      fs.writeFileSync('rendered_svg.xml', svg);
+      await mermaid.render(renderId, code);
       
       const res = await importMermaidFlowchartAsync(code);
       expect(res.diagram.nodes.length).toBe(2);

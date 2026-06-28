@@ -4,11 +4,11 @@
  */
 import type {
   CanonicalDiagram,
-  Sketch2MermaidFile,
   S2mViewport,
   NodeShape,
   DiagramEdgeEndpoint,
 } from './types';
+import { isReservedCanvasId } from './types';
 import { SHAPE_DEFINITIONS } from './shapeRegistry';
 import { normalizeDiagram } from '../store/diagramStore';
 
@@ -52,12 +52,49 @@ export function serializeSketch2MermaidFile(
   diagram: CanonicalDiagram,
   viewport?: S2mViewport,
 ): string {
-  const file: Sketch2MermaidFile = {
+  const hasGroups = (diagram.groups && diagram.groups.length > 0) || diagram.nodes.some(n => n.parentGroupId);
+  const fileVersion = hasGroups ? 2 : 1;
+
+  let serializedDiagram: Record<string, unknown>;
+  if (fileVersion === 2) {
+    serializedDiagram = {
+      diagramType: diagram.diagramType,
+      direction: diagram.direction,
+      nodes: diagram.nodes.map(n => ({
+        id: n.id,
+        label: n.label,
+        shape: n.shape,
+        position: n.position,
+        width: n.width,
+        height: n.height,
+        style: n.style,
+        parentGroupId: n.parentGroupId,
+      })),
+      edges: diagram.edges,
+      textBoxes: diagram.textBoxes,
+      groups: diagram.groups || [],
+    };
+  } else {
+    serializedDiagram = {
+      diagramType: diagram.diagramType,
+      direction: diagram.direction,
+      nodes: diagram.nodes.map(n => {
+        const copy = { ...n };
+        delete copy.parentGroupId;
+        return copy;
+      }),
+      edges: diagram.edges,
+      textBoxes: diagram.textBoxes,
+      schemaVersion: 1,
+    };
+  }
+
+  const file = {
     fileType: S2M_FILE_TYPE,
-    fileVersion: S2M_FILE_VERSION,
+    fileVersion,
     appVersion: APP_VERSION,
     exportedAt: new Date().toISOString(),
-    diagram,
+    diagram: serializedDiagram,
     ...(viewport ? { viewport } : {}),
   };
   return JSON.stringify(file, null, 2);
@@ -140,9 +177,9 @@ export function parseSketch2MermaidFile(raw: string): ParseResult {
     return { ok: false, error: 'This is not a Sketch2Mermaid file.' };
   }
 
-  // File version
-  if (file.fileVersion !== S2M_FILE_VERSION) {
-    return { ok: false, error: `Unsupported Sketch2Mermaid file version (got ${String(file.fileVersion)}, expected ${S2M_FILE_VERSION}).` };
+  // File version (supports both 1 and 2)
+  if (file.fileVersion !== 1 && file.fileVersion !== 2) {
+    return { ok: false, error: `Unsupported Sketch2Mermaid file version (got ${String(file.fileVersion)}, expected 1 or 2).` };
   }
 
   // Diagram presence
@@ -153,7 +190,7 @@ export function parseSketch2MermaidFile(raw: string): ParseResult {
   const diagram = file.diagram as Record<string, unknown>;
 
   // Diagram structural validation
-  if (diagram.schemaVersion !== 1) {
+  if (file.fileVersion === 1 && diagram.schemaVersion !== 1) {
     return { ok: false, error: `Unsupported diagram schema version (got ${String(diagram.schemaVersion)}, expected 1).` };
   }
 
@@ -179,9 +216,16 @@ export function parseSketch2MermaidFile(raw: string): ParseResult {
   // ---- Node validation ----
   const nodeIds = new Set<string>();
   for (let i = 0; i < diagram.nodes.length; i++) {
+    // Guard: entry must be a non-null, non-array object
+    if (diagram.nodes[i] == null || typeof diagram.nodes[i] !== 'object' || Array.isArray(diagram.nodes[i])) {
+      return { ok: false, error: `Node at index ${i} is not a valid object.` };
+    }
     const node = diagram.nodes[i] as Record<string, unknown>;
     if (!isNonEmptyString(node.id)) {
       return { ok: false, error: `Node at index ${i} has an invalid or missing ID.` };
+    }
+    if (isReservedCanvasId(node.id as string)) {
+      return { ok: false, error: `Node "${node.id as string}" uses a reserved internal ID prefix and cannot be loaded.` };
     }
     if (nodeIds.has(node.id as string)) {
       return { ok: false, error: `Duplicate node ID "${node.id as string}".` };
@@ -213,6 +257,10 @@ export function parseSketch2MermaidFile(raw: string): ParseResult {
   // ---- Edge validation ----
   const edgeIds = new Set<string>();
   for (let i = 0; i < diagram.edges.length; i++) {
+    // Guard: entry must be a non-null, non-array object
+    if (diagram.edges[i] == null || typeof diagram.edges[i] !== 'object' || Array.isArray(diagram.edges[i])) {
+      return { ok: false, error: `Edge at index ${i} is not a valid object.` };
+    }
     const edge = diagram.edges[i] as Record<string, unknown>;
     if (!isNonEmptyString(edge.id)) {
       return { ok: false, error: `Edge at index ${i} has an invalid or missing ID.` };
@@ -251,6 +299,9 @@ export function parseSketch2MermaidFile(raw: string): ParseResult {
     const isFromConnected = typeof edge.from === 'string' || (edge.from && (edge.from as DiagramEdgeEndpoint).kind === 'connected');
     if (isFromConnected) {
       const fromNodeId = getFromNodeId(edge.from);
+      if (isReservedCanvasId(fromNodeId)) {
+        return { ok: false, error: `Edge "${edge.id as string}" source references reserved internal node ID "${fromNodeId}".` };
+      }
       if (!nodeIds.has(fromNodeId)) {
         return { ok: false, error: `Edge "${edge.id as string}" references a missing source node "${String(fromNodeId)}".` };
       }
@@ -260,6 +311,9 @@ export function parseSketch2MermaidFile(raw: string): ParseResult {
     const isToConnected = typeof edge.to === 'string' || (edge.to && (edge.to as DiagramEdgeEndpoint).kind === 'connected');
     if (isToConnected) {
       const toNodeId = getToNodeId(edge.to);
+      if (isReservedCanvasId(toNodeId)) {
+        return { ok: false, error: `Edge "${edge.id as string}" target references reserved internal node ID "${toNodeId}".` };
+      }
       if (!nodeIds.has(toNodeId)) {
         return { ok: false, error: `Edge "${edge.id as string}" references a missing target node "${String(toNodeId)}".` };
       }
@@ -273,6 +327,10 @@ export function parseSketch2MermaidFile(raw: string): ParseResult {
   // ---- TextBox validation ----
   const textBoxIds = new Set<string>();
   for (let i = 0; i < textBoxes.length; i++) {
+    // Guard: entry must be a non-null, non-array object
+    if (textBoxes[i] == null || typeof textBoxes[i] !== 'object' || Array.isArray(textBoxes[i])) {
+      return { ok: false, error: `TextBox at index ${i} is not a valid object.` };
+    }
     const tb = textBoxes[i] as Record<string, unknown>;
     if (!isNonEmptyString(tb.id)) {
       return { ok: false, error: `TextBox at index ${i} has an invalid or missing ID.` };
@@ -291,6 +349,28 @@ export function parseSketch2MermaidFile(raw: string): ParseResult {
     }
   }
 
+  // ---- Groups validation (optional field, version 2 files) ----
+  // groups may be absent (version 1 files) — that's fine, normalizeDiagram handles it.
+  const groups = Array.isArray(diagram.groups) ? diagram.groups : [];
+  const groupIds = new Set<string>();
+  for (let i = 0; i < groups.length; i++) {
+    // Guard: entry must be a non-null, non-array object
+    if (groups[i] == null || typeof groups[i] !== 'object' || Array.isArray(groups[i])) {
+      return { ok: false, error: `Group at index ${i} is not a valid object.` };
+    }
+    const group = groups[i] as Record<string, unknown>;
+    if (!isNonEmptyString(group.id)) {
+      return { ok: false, error: `Group at index ${i} has an invalid or missing ID.` };
+    }
+    if (isReservedCanvasId(group.id as string)) {
+      return { ok: false, error: `Group "${group.id as string}" uses a reserved internal ID prefix and cannot be loaded.` };
+    }
+    if (groupIds.has(group.id as string)) {
+      return { ok: false, error: `Duplicate group ID "${group.id as string}".` };
+    }
+    groupIds.add(group.id as string);
+  }
+
   // ---- Viewport (non-blocking) ----
   const warnings: string[] = [];
   let viewport: S2mViewport | undefined;
@@ -305,7 +385,10 @@ export function parseSketch2MermaidFile(raw: string): ParseResult {
   }
 
   // Build the validated CanonicalDiagram and normalize
-  const validatedDiagram = normalizeDiagram(diagram as unknown as CanonicalDiagram);
+  const diagramWithoutSchema = { ...diagram };
+  // @ts-expect-error - schemaVersion is present in serialized file diagrams but not runtime
+  delete diagramWithoutSchema.schemaVersion;
+  const validatedDiagram = normalizeDiagram(diagramWithoutSchema as unknown as CanonicalDiagram);
 
   return {
     ok: true,

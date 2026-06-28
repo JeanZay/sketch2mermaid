@@ -3,14 +3,20 @@ import { useEdges, useReactFlow } from '@xyflow/react';
 import { useDiagramStore } from '../store/diagramStore';
 import type { NodeShape } from '../core/types';
 import { SHAPE_DEFINITIONS, SHAPE_CATEGORIES } from '../core/shapeRegistry';
+import { USE_GROUPS_AND_SWIMLANES } from '../core/config';
 import { ShapePaletteIcon } from './ShapePaletteIcon';
 import { SettingsModal } from './SettingsModal';
 
 export const Toolbar = () => {
   const addNode = useDiagramStore((state) => state.addNode);
+  const addEdge = useDiagramStore((state) => state.addEdge);
   const toggleEdgeStyle = useDiagramStore((state) => state.toggleEdgeStyle);
   const diagram = useDiagramStore((state) => state.diagram);
   const addTextBox = useDiagramStore((state) => state.addTextBox);
+  const addGroup = useDiagramStore((state) => state.addGroup);
+
+  const activeTool = useDiagramStore((state) => state.activeTool);
+  const setActiveTool = useDiagramStore((state) => state.setActiveTool);
 
   const edges = useEdges();
   const { screenToFlowPosition } = useReactFlow();
@@ -42,6 +48,11 @@ export const Toolbar = () => {
   const handleAddTextBox = () => {
     const coords = getCenterCoordinates();
     addTextBox(coords.x, coords.y);
+  };
+
+  const handleAddGroupClick = (kind: import('../core/types').DiagramGroupKind) => {
+    const coords = getCenterCoordinates();
+    addGroup(kind, coords.x, coords.y);
   };
 
   const handleToggleStyle = (targetDotted: boolean) => {
@@ -89,9 +100,22 @@ export const Toolbar = () => {
         <h3 className="sidebar-section-title">Connection</h3>
         <div className="connection-section-controls">
           <button
-            className="palette-shape-btn static-btn"
-            title="Reliez les nœuds en glissant depuis leurs points d'ancrage (Handles)"
-            disabled
+            className={`palette-shape-btn ${activeTool === 'arrow' ? 'active' : ''}`}
+            title="Créer une flèche libre sur le canvas"
+            onClick={() => {
+              if (activeTool === 'arrow') {
+                setActiveTool('select');
+                return;
+              }
+              const center = getCenterCoordinates();
+              const ARROW_HALF_LEN = 50;
+              const edgeId = addEdge(
+                { kind: 'detached' as const, point: { x: center.x - ARROW_HALF_LEN, y: center.y } },
+                { kind: 'detached' as const, point: { x: center.x + ARROW_HALF_LEN, y: center.y } },
+              );
+              // Request Canvas to select this edge
+              useDiagramStore.setState({ pendingEdgeSelect: edgeId });
+            }}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M5 12h14m-7-7l7 7-7 7"></path>
@@ -135,6 +159,37 @@ export const Toolbar = () => {
             <span className="palette-shape-btn-text">Text</span>
           </button>
         </div>
+        {USE_GROUPS_AND_SWIMLANES && (
+          <>
+            <div className="sidebar-divider"></div>
+            <h3 className="sidebar-section-title">Containers</h3>
+            <div className="shapes-list">
+              <button
+                onClick={() => handleAddGroupClick('subgraph')}
+                title="Add a visual container group (subgraph)"
+                className="palette-shape-btn"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="3 3"></rect>
+                  <text x="6" y="14" fontSize="10" fontWeight="bold" fill="currentColor" stroke="none">GRP</text>
+                </svg>
+                <span className="palette-shape-btn-text">Group</span>
+              </button>
+              <button
+                onClick={() => handleAddGroupClick('lane')}
+                title="Add a swim-lane container (BPMN lane)"
+                className="palette-shape-btn"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                  <line x1="3" y1="17" x2="21" y2="17"></line>
+                </svg>
+                <span className="palette-shape-btn-text">Swimlane</span>
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="sidebar-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '8px 16px', boxSizing: 'border-box' }}>

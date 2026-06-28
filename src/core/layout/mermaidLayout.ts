@@ -10,7 +10,7 @@
  * implementation without touching the rest of the codebase.
  */
 import { Graph, layout } from '@dagrejs/dagre';
-import type { DiagramNode, DiagramEdge, DiagramDirection, ConnectedEdgeEndpoint, DiagramEdgeEndpoint } from '../types';
+import type { DiagramNode, DiagramEdge, DiagramDirection, ConnectedEdgeEndpoint, DiagramEdgeEndpoint, DiagramGroup } from '../types';
 import { isStructurallyConnectedEdge } from '../types';
 import { NODE_SIZE_DEFAULTS } from '../nodeSizeConfig';
 import {
@@ -22,6 +22,7 @@ import {
   MERMAID_LIKE_MARGIN_Y,
   MERMAID_LIKE_LABEL_PADDING,
   MERMAID_LIKE_SAME_RANK_THRESHOLD,
+  GROUP_PADDING,
 } from '../config';
 
 // ---------------------------------------------------------------------------
@@ -74,6 +75,10 @@ export interface LayoutResult {
   handles: Map<string, HandlePair>;
   /** Dagre's computed center coordinates for edge labels, keyed by edge id. */
   edgeLabelPositions?: Map<string, { x: number; y: number }>;
+  /** Top-left positions for groups, keyed by group id. */
+  groupPositions?: Map<string, { x: number; y: number }>;
+  /** Sizes for groups, keyed by group id. */
+  groupSizes?: Map<string, { width: number; height: number }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -365,18 +370,279 @@ function normalizeLayoutEdges(edges: DiagramEdge[]): DiagramEdge[] {
   });
 }
 
+function runTwoPassLayout(
+  nodes: DiagramNode[],
+  edges: DiagramEdge[],
+  direction: DiagramDirection,
+  orderOfAppearance: string[],
+  groups: DiagramGroup[]
+): LayoutResult {
+  // Pass 1: Flat Dagre layout of all nodes
+  const flatResult = dagreLayout(nodes, edges, direction, orderOfAppearance);
+  
+  const positions = new Map<string, { x: number; y: number }>(flatResult.positions);
+  const groupPositions = new Map<string, { x: number; y: number }>();
+  const groupSizes = new Map<string, { width: number; height: number }>();
+
+  if (!groups || groups.length === 0) {
+    return {
+      positions,
+      handles: flatResult.handles,
+      edgeLabelPositions: flatResult.edgeLabelPositions,
+      groupPositions,
+      groupSizes
+    };
+  }
+
+  // 1. Separate lanes and subgraphs
+  const lanes = groups.filter(g => g.kind === 'lane' || g.kind === 'pool');
+  const subgraphs = groups.filter(g => g.kind === 'subgraph');
+
+  const padding = GROUP_PADDING;
+  const laneSpacing = 50;
+  const defaultWidth = 100;
+  const defaultHeight = 40;
+
+  // 2. Handle Swim-lanes first (if any)
+  if (lanes.length > 0) {
+    const getAvgCoord = (laneId: string, dim: 'x' | 'y') => {
+      const children = nodes.filter(n => n.parentGroupId === laneId);
+      if (children.length === 0) return 0;
+      const sum = children.reduce((acc, n) => {
+        const pos = positions.get(n.id) || { x: 0, y: 0 };
+        return acc + pos[dim];
+      }, 0);
+      return sum / children.length;
+    };
+
+    if (direction === 'LR' || direction === 'RL') {
+      lanes.sort((a, b) => getAvgCoord(a.id, 'y') - getAvgCoord(b.id, 'y'));
+
+      const laneNodeIds = new Set(nodes.filter(n => n.parentGroupId && lanes.some(l => l.id === n.parentGroupId)).map(n => n.id));
+      let minX = Infinity;
+      let maxX = -Infinity;
+      for (const n of nodes) {
+        if (laneNodeIds.has(n.id)) {
+          const pos = positions.get(n.id) || { x: 0, y: 0 };
+          const w = n.width ?? defaultWidth;
+          if (pos.x < minX) minX = pos.x;
+          if (pos.x + w > maxX) maxX = pos.x + w;
+        }
+      }
+      if (minX === Infinity) { minX = 0; maxX = 300; }
+
+      const laneWidth = (maxX - minX) + 2 * padding;
+      let currentY = 0;
+
+      for (const lane of lanes) {
+        const laneChildren = nodes.filter(n => n.parentGroupId === lane.id);
+        if (laneChildren.length > 0) {
+          const childYCoords = laneChildren.map(c => (positions.get(c.id)?.y ?? 0));
+          const childMinY = Math.min(...childYCoords);
+          const childMaxY = Math.max(...laneChildren.map(c => (positions.get(c.id)?.y ?? 0) + (c.height ?? defaultHeight)));
+          const laneHeight = (childMaxY - childMinY) + 2 * padding;
+
+          const laneX = minX - padding;
+          const laneY = currentY;
+          groupPositions.set(lane.id, { x: laneX, y: laneY });
+          groupSizes.set(lane.id, { width: laneWidth, height: laneHeight });
+
+          const deltaY = laneY + padding - childMinY;
+          for (const child of laneChildren) {
+            const currentPos = positions.get(child.id) || { x: 0, y: 0 };
+            positions.set(child.id, { x: currentPos.x, y: currentPos.y + deltaY });
+          }
+
+          currentY += laneHeight + laneSpacing;
+        } else {
+          groupPositions.set(lane.id, { x: minX - padding, y: currentY });
+          groupSizes.set(lane.id, { width: laneWidth, height: 200 });
+          currentY += 200 + laneSpacing;
+        }
+      }
+    } else {
+      lanes.sort((a, b) => getAvgCoord(a.id, 'x') - getAvgCoord(b.id, 'x'));
+
+      const laneNodeIds = new Set(nodes.filter(n => n.parentGroupId && lanes.some(l => l.id === n.parentGroupId)).map(n => n.id));
+      let minY = Infinity;
+      let maxY = -Infinity;
+      for (const n of nodes) {
+        if (laneNodeIds.has(n.id)) {
+          const pos = positions.get(n.id) || { x: 0, y: 0 };
+          const h = n.height ?? defaultHeight;
+          if (pos.y < minY) minY = pos.y;
+          if (pos.y + h > maxY) maxY = pos.y + h;
+        }
+      }
+      if (minY === Infinity) { minY = 0; maxY = 200; }
+
+      const laneHeight = (maxY - minY) + 2 * padding;
+      let currentX = 0;
+
+      for (const lane of lanes) {
+        const laneChildren = nodes.filter(n => n.parentGroupId === lane.id);
+        if (laneChildren.length > 0) {
+          const childXCoords = laneChildren.map(c => (positions.get(c.id)?.x ?? 0));
+          const childMinX = Math.min(...childXCoords);
+          const childMaxX = Math.max(...laneChildren.map(c => (positions.get(c.id)?.x ?? 0) + (c.width ?? defaultWidth)));
+          const laneWidth = (childMaxX - childMinX) + 2 * padding;
+
+          const laneX = currentX;
+          const laneY = minY - padding;
+          groupPositions.set(lane.id, { x: laneX, y: laneY });
+          groupSizes.set(lane.id, { width: laneWidth, height: laneHeight });
+
+          const deltaX = laneX + padding - childMinX;
+          for (const child of laneChildren) {
+            const currentPos = positions.get(child.id) || { x: 0, y: 0 };
+            positions.set(child.id, { x: currentPos.x + deltaX, y: currentPos.y });
+          }
+
+          currentX += laneWidth + laneSpacing;
+        } else {
+          groupPositions.set(lane.id, { x: currentX, y: minY - padding });
+          groupSizes.set(lane.id, { width: 300, height: laneHeight });
+          currentX += 300 + laneSpacing;
+        }
+      }
+    }
+  }
+
+  // 3. Handle General Subgraphs
+  if (subgraphs.length > 0) {
+    const computedBoxes = subgraphs.map(sub => {
+      const children = nodes.filter(n => n.parentGroupId === sub.id);
+      if (children.length > 0) {
+        const xs = children.map(c => positions.get(c.id)!.x);
+        const ys = children.map(c => positions.get(c.id)!.y);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...children.map(c => positions.get(c.id)!.x + (c.width ?? defaultWidth)));
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...children.map(c => positions.get(c.id)!.y + (c.height ?? defaultHeight)));
+
+        return {
+          id: sub.id,
+          x: minX - padding,
+          y: minY - padding,
+          width: (maxX - minX) + 2 * padding,
+          height: (maxY - minY) + 2 * padding,
+          hasChildren: true
+        };
+      } else {
+        return {
+          id: sub.id,
+          x: 100,
+          y: 100,
+          width: 300,
+          height: 200,
+          hasChildren: false
+        };
+      }
+    });
+
+    const isHorizontal = direction === 'LR' || direction === 'RL';
+    computedBoxes.sort((a, b) => isHorizontal ? a.x - b.x : a.y - b.y);
+
+    for (let i = 0; i < computedBoxes.length; i++) {
+      const boxA = computedBoxes[i];
+      for (let j = i + 1; j < computedBoxes.length; j++) {
+        const boxB = computedBoxes[j];
+        
+        const overlapsX = boxA.x < boxB.x + boxB.width && boxA.x + boxA.width > boxB.x;
+        const overlapsY = boxA.y < boxB.y + boxB.height && boxA.y + boxA.height > boxB.y;
+
+        if (overlapsX && overlapsY) {
+          if (isHorizontal) {
+            const shiftX = (boxA.x + boxA.width + 40) - boxB.x;
+            boxB.x += shiftX;
+            const bChildren = nodes.filter(n => n.parentGroupId === boxB.id);
+            for (const child of bChildren) {
+              const pos = positions.get(child.id)!;
+              positions.set(child.id, { x: pos.x + shiftX, y: pos.y });
+            }
+          } else {
+            const shiftY = (boxA.y + boxA.height + 40) - boxB.y;
+            boxB.y += shiftY;
+            const bChildren = nodes.filter(n => n.parentGroupId === boxB.id);
+            for (const child of bChildren) {
+              const pos = positions.get(child.id)!;
+              positions.set(child.id, { x: pos.x, y: pos.y + shiftY });
+            }
+          }
+        }
+      }
+    }
+
+    for (const box of computedBoxes) {
+      groupPositions.set(box.id, { x: box.x, y: box.y });
+      groupSizes.set(box.id, { width: box.width, height: box.height });
+    }
+  }
+
+  // Pass 3: Re-evaluate edge handles using direction aware layout
+  const handles = new Map<string, HandlePair>();
+  const defaultHandles = defaultHandlesForDirection(direction);
+
+  const centerPositions = new Map<string, { x: number; y: number }>();
+  for (const node of nodes) {
+    const pos = positions.get(node.id)!;
+    const w = node.width ?? defaultWidth;
+    const h = node.height ?? defaultHeight;
+    centerPositions.set(node.id, {
+      x: pos.x + w / 2,
+      y: pos.y + h / 2,
+    });
+  }
+
+  for (const edge of edges) {
+    if (edge.from.kind === 'connected' && edge.to.kind === 'connected') {
+      const fromId = edge.from.nodeId;
+      const toId = edge.to.nodeId;
+      const sourceCenter = centerPositions.get(fromId);
+      const targetCenter = centerPositions.get(toId);
+
+      if (sourceCenter && targetCenter) {
+        if (fromId === toId) {
+          handles.set(edge.id, { ...defaultHandles });
+        } else {
+          const handlePair = USE_MERMAID_LIKE_IMPORTED_LAYOUT
+            ? selectHandlesDirectionAware(sourceCenter, targetCenter, direction)
+            : selectHandlesGeometrically(sourceCenter, targetCenter);
+          handles.set(edge.id, handlePair);
+        }
+      } else {
+        handles.set(edge.id, { ...defaultHandles });
+      }
+    } else {
+      handles.set(edge.id, { ...defaultHandles });
+    }
+  }
+
+  return {
+    positions,
+    handles,
+    edgeLabelPositions: flatResult.edgeLabelPositions,
+    groupPositions,
+    groupSizes
+  };
+}
+
 export function layoutImportedDiagram(
   nodes: DiagramNode[],
   edges: DiagramEdge[],
   direction: DiagramDirection,
   orderOfAppearance: string[],
+  groups?: DiagramGroup[]
 ): LayoutResult {
   const normalizedEdges = normalizeLayoutEdges(edges);
   if (nodes.length === 0) {
-    return { positions: new Map(), handles: new Map(), edgeLabelPositions: new Map() };
+    return { positions: new Map(), handles: new Map(), edgeLabelPositions: new Map(), groupPositions: new Map(), groupSizes: new Map() };
   }
 
   try {
+    if (groups && groups.length > 0) {
+      return runTwoPassLayout(nodes, normalizedEdges, direction, orderOfAppearance, groups);
+    }
     return dagreLayout(nodes, normalizedEdges, direction, orderOfAppearance);
   } catch (err) {
     console.error('[mermaidLayout] Dagre layout failed, falling back to grid:', err);

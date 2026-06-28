@@ -206,6 +206,19 @@ export const PreviewPanel = () => {
                 </div>
               )}
 
+              {diagram.edges.filter(e => e.connectionStatus === 'detached').length > 0 && (
+                <div className="annotation-info-text">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                  </svg>
+                  <span>
+                    {diagram.edges.filter(e => e.connectionStatus === 'detached').length} detached arrow(s) are visible on the canvas but are not exported to Mermaid.
+                  </span>
+                </div>
+              )}
+
               {/* Preview header */}
               <div className="panel-header" style={{ marginTop: '16px' }}>
                 <span className="panel-title">Prévisualisation SVG</span>

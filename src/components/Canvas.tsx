@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useEffect, useState } from 'react';
+import React, { useCallback, useMemo, useEffect, useState, useRef } from 'react';
 import { ConfirmModal } from './ConfirmModal';
 import { 
   ReactFlow, 
@@ -20,12 +20,16 @@ import TextBoxNode from './TextBoxNode';
 import { useVirtualEdgeAnchors } from '../hooks/useVirtualEdgeAnchors';
 import { VirtualAnchorsContext } from './VirtualAnchorsContext';
 import GhostAnchorNode from './GhostAnchorNode';
-import { USE_LASSO_SELECTION } from '../core/config';
+import { USE_LASSO_SELECTION, USE_GROUPS_AND_SWIMLANES, GROUP_MEMBERSHIP_TOLERANCE, SNAP_THRESHOLD } from '../core/config';
+import { findNearestHandle, getEdgeEndpointPosition } from '../utils/edgeSnapping';
+import GroupNode from './GroupNode';
+import type { DiagramGroup } from '../core/types';
 
 const nodeTypes = {
   customNode: CustomNode,
   textBox: TextBoxNode,
   ghostAnchor: GhostAnchorNode,
+  groupNode: GroupNode,
 };
 
 const edgeTypes = {
@@ -47,6 +51,11 @@ function FlowInner() {
   const deleteSelectedElements = useDiagramStore((state) => state.deleteSelectedElements);
   const moveDetachedEdgeEndpoint = useDiagramStore((state) => state.moveDetachedEdgeEndpoint);
   const reconnectDetachedEdgeEndpoint = useDiagramStore((state) => state.reconnectDetachedEdgeEndpoint);
+  const updateGroupPosition = useDiagramStore((state) => state.updateGroupPosition);
+  const assignNodeToGroup = useDiagramStore((state) => state.assignNodeToGroup);
+
+  const activeTool = useDiagramStore((state) => state.activeTool);
+  const setActiveTool = useDiagramStore((state) => state.setActiveTool);
 
   const { screenToFlowPosition } = useReactFlow();
 
@@ -56,17 +65,57 @@ function FlowInner() {
   // Selection state — updated only from event handler callbacks (not effects)
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
   const [selectedEdgeIds, setSelectedEdgeIds] = useState<Set<string>>(new Set());
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Track ghost anchor connection drags for detach-on-drop-in-empty-space
+  const ghostConnectRef = useRef<{
+    edgeId: string;
+    endpoint: 'from' | 'to';
+    connected: boolean; // set to true if onConnect fires for this drag
+  } | null>(null);
+
+  // Transient arrow creation state
+  const [draftStart, setDraftStart] = useState<{
+    x: number;
+    y: number;
+    endpoint: import('../core/types').DiagramEdgeEndpoint;
+  } | null>(null);
+  const [draftMousePos, setDraftMousePos] = useState<{ x: number; y: number } | null>(null);
 
   // Pending delete confirmation state for nodes with connected edges
   const [pendingDelete, setPendingDelete] = useState<{
     nodeIds: string[];
     textBoxIds: string[];
     edgeIds: string[];       // edges explicitly selected by the user
+    groupIds?: string[];
     cascadeEdgeCount: number; // additional edges connected to selected nodes
+  } | null>(null);
+
+  // Pending delete confirmation state for visual groups
+  const [pendingGroupDelete, setPendingGroupDelete] = useState<{
+    groupIds: string[];
+    nodeIds: string[];
+    textBoxIds: string[];
+    edgeIds: string[];
   } | null>(null);
 
   // Derive React Flow nodes from diagram store + selection state
   const rfNodes = useMemo(() => {
+    const groupNodes = USE_GROUPS_AND_SWIMLANES && diagram.groups
+      ? diagram.groups.map((group) => ({
+          id: group.id,
+          type: 'groupNode' as const,
+          position: group.position,
+          data: {
+            label: group.label,
+            kind: group.kind,
+            width: group.width,
+            height: group.height,
+          },
+          selected: selectedNodeIds.has(group.id),
+        }))
+      : [];
+
     const diagramNodes = diagram.nodes.map((node) => ({
       id: node.id,
       type: 'customNode' as const,
@@ -99,45 +148,91 @@ function FlowInner() {
 
     const ghostNodes: Node[] = [];
     for (const edge of diagram.edges) {
-      if (edge.from.kind === 'detached') {
+      const isEdgeSelected = selectedEdgeIds.has(edge.id);
+
+      if (edge.from.kind === 'detached' || isEdgeSelected) {
+        const position = edge.from.kind === 'connected'
+          ? getEdgeEndpointPosition(edge.id, 'from', diagram)
+          : edge.from.point;
         ghostNodes.push({
           id: `ghostAnchor__${edge.id}__from`,
           type: 'ghostAnchor' as const,
-          position: edge.from.point,
+          position: position,
           data: {
             endpointType: 'from' as const,
             edgeId: edge.id,
+            edgeSelected: isEdgeSelected,
           },
           selected: selectedNodeIds.has(`ghostAnchor__${edge.id}__from`),
         });
       }
-      if (edge.to.kind === 'detached') {
+
+      if (edge.to.kind === 'detached' || isEdgeSelected) {
+        const position = edge.to.kind === 'connected'
+          ? getEdgeEndpointPosition(edge.id, 'to', diagram)
+          : edge.to.point;
         ghostNodes.push({
           id: `ghostAnchor__${edge.id}__to`,
           type: 'ghostAnchor' as const,
-          position: edge.to.point,
+          position: position,
           data: {
             endpointType: 'to' as const,
             edgeId: edge.id,
+            edgeSelected: isEdgeSelected,
           },
           selected: selectedNodeIds.has(`ghostAnchor__${edge.id}__to`),
         });
       }
     }
 
-    return [...diagramNodes, ...textBoxNodes, ...ghostNodes];
-  }, [diagram.nodes, diagram.textBoxes, diagram.edges, selectedNodeIds, updateNodeSize, updateTextBoxSize]);
+    if (draftStart && draftMousePos) {
+      if (draftStart.endpoint.kind === 'detached') {
+        ghostNodes.push({
+          id: 'draft-start-temp-node',
+          type: 'ghostAnchor' as const,
+          position: draftStart.endpoint.point,
+          data: {
+            endpointType: 'from' as const,
+            edgeId: 'draft-preview',
+            edgeSelected: true,
+          },
+          selected: false,
+        });
+      }
+      ghostNodes.push({
+        id: 'draft-end-temp-node',
+        type: 'ghostAnchor' as const,
+        position: draftMousePos,
+        data: {
+          endpointType: 'to' as const,
+          edgeId: 'draft-preview',
+          edgeSelected: true,
+        },
+        selected: false,
+      });
+    }
+
+    return [...groupNodes, ...diagramNodes, ...textBoxNodes, ...ghostNodes];
+  }, [diagram, selectedNodeIds, selectedEdgeIds, updateNodeSize, updateTextBoxSize, draftStart, draftMousePos]);
 
   // Derive React Flow edges from diagram store + selection state
   // Note: markers are rendered by CustomEdge directly from the Zustand store,
   // bypassing React Flow's marker resolution which has issues with undefined values.
   const rfEdges = useMemo(() => {
-    return diagram.edges.map((edge) => {
+    const list = diagram.edges.map((edge) => {
       const isSelected = selectedEdgeIds.has(edge.id);
-      const source = edge.from.kind === 'connected' ? edge.from.nodeId : `ghostAnchor__${edge.id}__from`;
-      const target = edge.to.kind === 'connected' ? edge.to.nodeId : `ghostAnchor__${edge.id}__to`;
-      const sourceHandle = edge.from.kind === 'connected' ? edge.from.handleId : undefined;
-      const targetHandle = edge.to.kind === 'connected' ? edge.to.handleId : undefined;
+      const source = (edge.from.kind === 'connected' && !isSelected)
+        ? edge.from.nodeId
+        : `ghostAnchor__${edge.id}__from`;
+      const target = (edge.to.kind === 'connected' && !isSelected)
+        ? edge.to.nodeId
+        : `ghostAnchor__${edge.id}__to`;
+      const sourceHandle = (edge.from.kind === 'connected' && !isSelected)
+        ? edge.from.handleId ?? undefined
+        : undefined;
+      const targetHandle = (edge.to.kind === 'connected' && !isSelected)
+        ? edge.to.handleId ?? undefined
+        : undefined;
 
       return {
         id: edge.id,
@@ -150,7 +245,24 @@ function FlowInner() {
         selected: isSelected,
       };
     });
-  }, [diagram.edges, selectedEdgeIds]);
+
+    if (draftStart && draftMousePos) {
+      const source = draftStart.endpoint.kind === 'connected' ? draftStart.endpoint.nodeId : 'draft-start-temp-node';
+      const sourceHandle = draftStart.endpoint.kind === 'connected' ? draftStart.endpoint.handleId ?? undefined : undefined;
+      list.push({
+        id: 'draft-edge-preview',
+        source,
+        target: 'draft-end-temp-node',
+        sourceHandle,
+        targetHandle: undefined,
+        label: '',
+        type: 'customEdge',
+        selected: false,
+      });
+    }
+
+    return list;
+  }, [diagram.edges, selectedEdgeIds, draftStart, draftMousePos]);
 
   // Access React Flow's internal node list for keyboard nudging
   const nodes = useNodes();
@@ -165,69 +277,43 @@ function FlowInner() {
     return map;
   }, [rfNodes]);
 
-  // Helper to capture actual rendered endpoint positions before deletion
-  const getEdgeEndpointPosition = useCallback((edgeId: string, endpoint: 'from' | 'to') => {
-    const anchor = virtualAnchors[edgeId];
-    if (anchor) {
-      return endpoint === 'from'
-        ? { x: anchor.sourceX, y: anchor.sourceY }
-        : { x: anchor.targetX, y: anchor.targetY };
-    }
 
-    const edge = diagram.edges.find((e) => e.id === edgeId);
-    if (!edge) return { x: 0, y: 0 };
-
-    const ep = endpoint === 'from' ? edge.from : edge.to;
-    if (ep.kind !== 'connected') {
-      return ep.point;
-    }
-
-    const node = diagram.nodes.find((n) => n.id === ep.nodeId);
-    if (!node) return { x: 0, y: 0 };
-
-    const width = node.width ?? 100;
-    const height = node.height ?? 40;
-    const handleId = ep.handleId;
-
-    let side: 'top' | 'bottom' | 'left' | 'right' = 'bottom';
-    if (handleId) {
-      if (handleId.startsWith('t-')) side = 'top';
-      else if (handleId.startsWith('b-')) side = 'bottom';
-      else if (handleId.startsWith('l-')) side = 'left';
-      else if (handleId.startsWith('r-')) side = 'right';
-    }
-
-    switch (side) {
-      case 'top': return { x: node.position.x + width / 2, y: node.position.y };
-      case 'bottom': return { x: node.position.x + width / 2, y: node.position.y + height };
-      case 'left': return { x: node.position.x, y: node.position.y + height / 2 };
-      case 'right': return { x: node.position.x + width, y: node.position.y + height / 2 };
-    }
-  }, [virtualAnchors, diagram]);
-
-  // Centralized delete handler: collects all selected elements, checks for
-  // connected edges on selected nodes, and either deletes directly or shows
-  // a confirmation dialog. Handles mixed selection atomically.
-  const handleDeleteSelected = useCallback(() => {
-    // Partition selected nodes into diagram nodes vs text boxes
-    const selNodeIds: string[] = [];
-    const selTextBoxIds: string[] = [];
-    for (const id of selectedNodeIds) {
-      const nType = nodeTypeById.get(id);
-      if (nType === 'textBox') {
-        selTextBoxIds.push(id);
-      } else if (nType === 'customNode') {
-        selNodeIds.push(id);
+  const proceedWithDeletion = useCallback(({
+    groupIds,
+    nodeIds,
+    textBoxIds,
+    edgeIds,
+    deleteChildren
+  }: {
+    groupIds: string[];
+    nodeIds: string[];
+    textBoxIds: string[];
+    edgeIds: string[];
+    deleteChildren: boolean;
+  }) => {
+    let targetNodeIds = [...nodeIds];
+    if (deleteChildren && USE_GROUPS_AND_SWIMLANES) {
+      const childrenIds: string[] = [];
+      const collectDescendants = (gId: string) => {
+        for (const n of diagram.nodes) {
+          if (n.parentGroupId === gId) {
+            childrenIds.push(n.id);
+          }
+        }
+        const subgroups = (diagram.groups || []).filter((g) => g.parentGroupId === gId);
+        for (const sub of subgroups) {
+          collectDescendants(sub.id);
+        }
+      };
+      for (const gId of groupIds) {
+        collectDescendants(gId);
       }
+      targetNodeIds = Array.from(new Set([...targetNodeIds, ...childrenIds]));
     }
-    const selEdgeIds = Array.from(selectedEdgeIds);
 
-    // Nothing selected — bail
-    if (selNodeIds.length === 0 && selTextBoxIds.length === 0 && selEdgeIds.length === 0) return;
-
-    // Count edges connected to the selected nodes (unique, excluding already-selected edges)
-    const selNodeIdSet = new Set(selNodeIds);
-    const selEdgeIdSet = new Set(selEdgeIds);
+    const selNodeIdSet = new Set(targetNodeIds);
+    const selEdgeIdSet = new Set(edgeIds);
+    
     const cascadeEdges = diagram.edges.filter((e) => {
       const fromId = e.from.kind === 'connected' ? e.from.nodeId : null;
       const toId = e.to.kind === 'connected' ? e.to.nodeId : null;
@@ -238,23 +324,75 @@ function FlowInner() {
     });
 
     if (cascadeEdges.length === 0) {
-      // No cascade edges — delete everything directly
       deleteSelectedElements({
-        nodeIds: selNodeIds,
-        edgeIds: selEdgeIds,
-        textBoxIds: selTextBoxIds,
+        nodeIds: targetNodeIds,
+        edgeIds,
+        textBoxIds,
+        groupIds,
         connectedEdgeBehavior: 'delete',
       });
     } else {
-      // At least one selected node has connected edges — ask for confirmation
       setPendingDelete({
-        nodeIds: selNodeIds,
-        textBoxIds: selTextBoxIds,
-        edgeIds: selEdgeIds,
+        nodeIds: targetNodeIds,
+        textBoxIds,
+        edgeIds,
+        groupIds,
         cascadeEdgeCount: cascadeEdges.length,
       });
     }
-  }, [selectedNodeIds, selectedEdgeIds, nodeTypeById, diagram.edges, deleteSelectedElements]);
+  }, [diagram.nodes, diagram.edges, diagram.groups, deleteSelectedElements]);
+
+  const handleDeleteSelected = useCallback(() => {
+    const selNodeIds: string[] = [];
+    const selTextBoxIds: string[] = [];
+    const selGroupIds: string[] = [];
+    for (const id of selectedNodeIds) {
+      const nType = nodeTypeById.get(id);
+      if (nType === 'textBox') {
+        selTextBoxIds.push(id);
+      } else if (nType === 'customNode') {
+        selNodeIds.push(id);
+      } else if (nType === 'groupNode') {
+        selGroupIds.push(id);
+      }
+    }
+    const selEdgeIds = Array.from(selectedEdgeIds);
+
+    if (selNodeIds.length === 0 && selTextBoxIds.length === 0 && selEdgeIds.length === 0 && selGroupIds.length === 0) return;
+
+    const hasNonEmptyGroup = USE_GROUPS_AND_SWIMLANES && selGroupIds.some((gId) => 
+      diagram.nodes.some((n) => n.parentGroupId === gId)
+    );
+
+    if (hasNonEmptyGroup) {
+      setPendingGroupDelete({
+        groupIds: selGroupIds,
+        nodeIds: selNodeIds,
+        textBoxIds: selTextBoxIds,
+        edgeIds: selEdgeIds,
+      });
+    } else {
+      proceedWithDeletion({
+        groupIds: selGroupIds,
+        nodeIds: selNodeIds,
+        textBoxIds: selTextBoxIds,
+        edgeIds: selEdgeIds,
+        deleteChildren: false
+      });
+    }
+  }, [selectedNodeIds, selectedEdgeIds, nodeTypeById, diagram.nodes, proceedWithDeletion]);
+
+  // Subscribe to pending edge selection requests from Toolbar
+  useEffect(() => {
+    return useDiagramStore.subscribe((state, prevState) => {
+      if (state.pendingEdgeSelect && state.pendingEdgeSelect !== prevState.pendingEdgeSelect) {
+        const edgeId = state.pendingEdgeSelect;
+        setSelectedEdgeIds(new Set([edgeId]));
+        setSelectedNodeIds(new Set());
+        state.clearPendingEdgeSelect();
+      }
+    });
+  }, []);
 
   // Handle keyboard nudging and undo/redo shortcuts with safeguards
   useEffect(() => {
@@ -271,6 +409,14 @@ function FlowInner() {
         ) {
           return;
         }
+      }
+
+      if (event.key === 'Escape' && activeTool === 'arrow') {
+        event.preventDefault();
+        setDraftStart(null);
+        setDraftMousePos(null);
+        setActiveTool('select');
+        return;
       }
 
       // Undo/Redo shortcuts
@@ -323,7 +469,7 @@ function FlowInner() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [nodes, updateNodePosition, undo, redo, handleDeleteSelected]);
+  }, [nodes, updateNodePosition, undo, redo, handleDeleteSelected, activeTool, setActiveTool]);
 
 
   // Handle ALL node changes — selection tracked in state, position updated continuously
@@ -364,9 +510,13 @@ function FlowInner() {
           updateTextBoxPosition(change.id, change.position.x, change.position.y);
         } else if (nType === 'ghostAnchor') {
           const parts = change.id.split('__');
-          const edgeId = parts[1];
-          const endpoint = parts[2] as 'from' | 'to';
-          moveDetachedEdgeEndpoint({ edgeId, endpoint, point: change.position });
+          if (parts.length >= 3) {
+            const edgeId = parts[1];
+            const endpoint = parts[2] as 'from' | 'to';
+            moveDetachedEdgeEndpoint({ edgeId, endpoint, point: change.position });
+          }
+        } else if (nType === 'groupNode') {
+          updateGroupPosition(change.id, change.position.x, change.position.y);
         } else {
           updateNodePosition(change.id, change.position.x, change.position.y);
         }
@@ -378,7 +528,7 @@ function FlowInner() {
     if (edgeSelectionChanged && nextEdgeSelected) {
       setSelectedEdgeIds(nextEdgeSelected);
     }
-  }, [selectedNodeIds, selectedEdgeIds, updateNodePosition, updateTextBoxPosition, moveDetachedEdgeEndpoint, nodeTypeById]);
+  }, [selectedNodeIds, selectedEdgeIds, updateNodePosition, updateTextBoxPosition, moveDetachedEdgeEndpoint, updateGroupPosition, nodeTypeById]);
 
   // Handle ALL edge changes — selection tracked in state
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
@@ -423,6 +573,8 @@ function FlowInner() {
       }
 
       if (isSourceGhost || isTargetGhost) {
+        // Mark as connected so onConnectEnd won't detach
+        if (ghostConnectRef.current) ghostConnectRef.current.connected = true;
         if (isSourceGhost && !isTargetGhost) {
           const parts = connection.source.split('__');
           const edgeId = parts[1];
@@ -456,8 +608,121 @@ function FlowInner() {
     }
   }, [addEdge, reconnectDetachedEdgeEndpoint, normalizeHandle]);
 
+  // Track connection starts from ghost anchor handles
+  const onConnectStart = useCallback((_event: React.MouseEvent | React.TouchEvent, params: { nodeId: string | null; handleId: string | null; handleType: 'source' | 'target' | null }) => {
+    const nodeId = params.nodeId;
+    if (!nodeId || !nodeId.startsWith('ghostAnchor__')) return;
+    const parts = nodeId.split('__');
+    if (parts.length < 3) return;
+    const edgeId = parts[1];
+    const endpoint = parts[2] as 'from' | 'to';
+    // Only track if the endpoint is currently connected (so we can detach it)
+    const edge = diagram.edges.find((e) => e.id === edgeId);
+    if (!edge) return;
+    const ep = endpoint === 'from' ? edge.from : edge.to;
+    if (ep.kind !== 'connected') return;
+    ghostConnectRef.current = { edgeId, endpoint, connected: false };
+    // Start undo transaction for the potential detach
+    startTransaction();
+  }, [diagram.edges, startTransaction]);
+
+  // When a connection from a ghost anchor ends without connecting, detach the endpoint
+  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent) => {
+    const tracked = ghostConnectRef.current;
+    ghostConnectRef.current = null;
+    if (!tracked) return;
+    if (tracked.connected) {
+      // Successfully reconnected via onConnect — commit the transaction
+      commitTransaction();
+      return;
+    }
+    // Dropped in empty space — detach the endpoint
+    const clientX = 'touches' in event ? event.changedTouches[0].clientX : event.clientX;
+    const clientY = 'touches' in event ? event.changedTouches[0].clientY : event.clientY;
+    const flowPos = screenToFlowPosition({ x: clientX, y: clientY });
+
+    // First detach from the node, then snap if near another node
+    moveDetachedEdgeEndpoint({ edgeId: tracked.edgeId, endpoint: tracked.endpoint, point: flowPos });
+
+    const closest = findNearestHandle(flowPos, diagram.nodes);
+    if (closest && closest.distance < SNAP_THRESHOLD) {
+      const side = closest.handleId.split('-')[0];
+      const targetHandle = tracked.endpoint === 'from' ? `${side}-source` : `${side}-target`;
+      reconnectDetachedEdgeEndpoint({
+        edgeId: tracked.edgeId,
+        endpoint: tracked.endpoint,
+        nodeId: closest.nodeId,
+        handleId: targetHandle,
+      });
+    }
+    commitTransaction();
+  }, [screenToFlowPosition, moveDetachedEdgeEndpoint, reconnectDetachedEdgeEndpoint, commitTransaction, diagram.nodes]);
+
+  const handleCanvasClick = useCallback((event: React.MouseEvent) => {
+    if (activeTool !== 'arrow') return;
+
+    const flowPos = screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY,
+    });
+
+    if (!draftStart) {
+      const closest = findNearestHandle(flowPos, diagram.nodes);
+      let endpoint: import('../core/types').DiagramEdgeEndpoint;
+      if (closest && closest.distance < SNAP_THRESHOLD) {
+        const side = closest.handleId.split('-')[0];
+        endpoint = {
+          kind: 'connected',
+          nodeId: closest.nodeId,
+          handleId: `${side}-source`,
+        };
+        setDraftStart({ x: closest.x, y: closest.y, endpoint });
+      } else {
+        endpoint = {
+          kind: 'detached',
+          point: flowPos,
+        };
+        setDraftStart({ x: flowPos.x, y: flowPos.y, endpoint });
+      }
+      setDraftMousePos(flowPos);
+    } else {
+      const closest = findNearestHandle(flowPos, diagram.nodes);
+      let targetEndpoint: import('../core/types').DiagramEdgeEndpoint;
+      if (closest && closest.distance < SNAP_THRESHOLD) {
+        const side = closest.handleId.split('-')[0];
+        targetEndpoint = {
+          kind: 'connected',
+          nodeId: closest.nodeId,
+          handleId: `${side}-target`,
+        };
+      } else {
+        targetEndpoint = {
+          kind: 'detached',
+          point: flowPos,
+        };
+      }
+
+      addEdge(draftStart.endpoint, targetEndpoint);
+
+      setDraftStart(null);
+      setDraftMousePos(null);
+      setActiveTool('select');
+    }
+  }, [activeTool, draftStart, diagram, addEdge, screenToFlowPosition, setActiveTool]);
+
+  const onPointerMove = useCallback((event: React.PointerEvent) => {
+    if (activeTool === 'arrow' && draftStart) {
+      const flowPos = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      setDraftMousePos(flowPos);
+    }
+  }, [activeTool, draftStart, screenToFlowPosition]);
+
   // Double-clicking the background pane creates a new process node
   const onPaneDoubleClick = useCallback((event: React.MouseEvent) => {
+    if (activeTool === 'arrow') return;
     const target = event.target as HTMLElement;
     if (target.classList.contains('react-flow__pane')) {
       const position = screenToFlowPosition({
@@ -466,7 +731,7 @@ function FlowInner() {
       });
       addNode('process', position.x, position.y);
     }
-  }, [addNode, screenToFlowPosition]);
+  }, [addNode, screenToFlowPosition, activeTool]);
 
   // Build the confirmation message based on the pending delete state
   const pendingDeleteMessage = useMemo(() => {
@@ -477,6 +742,106 @@ function FlowInner() {
     }
     return `Ces ${nodeIds.length} nœuds sont connectés à ${cascadeEdgeCount} liaison(s) au total. Supprimer ces nœuds supprimera aussi ces liaisons.`;
   }, [pendingDelete]);
+
+  const handleNodeDragStart = useCallback((event: React.MouseEvent, node: Node) => {
+    startTransaction();
+
+    if (node.type === 'ghostAnchor') {
+      const parts = node.id.split('__');
+      if (parts.length >= 3) {
+        const edgeId = parts[1];
+        const endpoint = parts[2] as 'from' | 'to';
+        const edge = diagram.edges.find((e) => e.id === edgeId);
+        if (edge) {
+          const ep = endpoint === 'from' ? edge.from : edge.to;
+          if (ep.kind === 'connected') {
+            const currentPos = getEdgeEndpointPosition(edgeId, endpoint, diagram, virtualAnchors);
+            moveDetachedEdgeEndpoint({ edgeId, endpoint, point: currentPos });
+          }
+        }
+      }
+    }
+
+    if (node && node.position) {
+      dragStartPosRef.current = { x: node.position.x, y: node.position.y };
+    }
+  }, [startTransaction, diagram, moveDetachedEdgeEndpoint, virtualAnchors]);
+
+  const handleNodeDragStop = useCallback((event: React.MouseEvent, node: Node) => {
+    if (node.type === 'ghostAnchor') {
+      const parts = node.id.split('__');
+      if (parts.length >= 3) {
+        const edgeId = parts[1];
+        const endpoint = parts[2] as 'from' | 'to';
+
+        const closest = findNearestHandle(node.position, diagram.nodes);
+        if (closest && closest.distance < SNAP_THRESHOLD) {
+          const side = closest.handleId.split('-')[0];
+          const targetHandle = endpoint === 'from' ? `${side}-source` : `${side}-target`;
+
+          reconnectDetachedEdgeEndpoint({
+            edgeId,
+            endpoint,
+            nodeId: closest.nodeId,
+            handleId: targetHandle,
+          });
+        }
+      }
+      commitTransaction();
+      return;
+    }
+
+    commitTransaction();
+    if (!USE_GROUPS_AND_SWIMLANES) return;
+    if (node.type !== 'customNode') return;
+
+    const startPos = dragStartPosRef.current;
+    if (!startPos) return;
+    dragStartPosRef.current = null;
+
+    const dx = node.position.x - startPos.x;
+    const dy = node.position.y - startPos.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 10) return;
+
+    const w = node.measured?.width ?? node.data?.width ?? 100;
+    const h = node.measured?.height ?? node.data?.height ?? 40;
+    const nodeCenterX = node.position.x + w / 2;
+    const nodeCenterY = node.position.y + h / 2;
+
+    const groups = diagram.groups || [];
+    let matchedGroup: DiagramGroup | null = null;
+    let minArea = Infinity;
+    const tolerance = GROUP_MEMBERSHIP_TOLERANCE;
+
+    for (const group of groups) {
+      const gX = group.position.x;
+      const gY = group.position.y;
+      const gW = group.width;
+      const gH = group.height;
+
+      const isInside =
+        nodeCenterX >= gX - tolerance &&
+        nodeCenterX <= gX + gW + tolerance &&
+        nodeCenterY >= gY - tolerance &&
+        nodeCenterY <= gY + gH + tolerance;
+
+      if (isInside) {
+        const area = gW * gH;
+        if (area < minArea) {
+          minArea = area;
+          matchedGroup = group;
+        }
+      }
+    }
+
+    const currentParentGroupId = diagram.nodes.find((n) => n.id === node.id)?.parentGroupId;
+    const newParentGroupId = matchedGroup ? matchedGroup.id : undefined;
+
+    if (currentParentGroupId !== newParentGroupId) {
+      assignNodeToGroup(node.id, newParentGroupId);
+    }
+  }, [commitTransaction, diagram.groups, diagram.nodes, assignNodeToGroup, reconnectDetachedEdgeEndpoint]);
 
   const lassoSelectionProps = USE_LASSO_SELECTION
     ? {
@@ -490,7 +855,11 @@ function FlowInner() {
 
   return (
     <VirtualAnchorsContext.Provider value={virtualAnchors}>
-      <div className="canvas-container" style={{ width: '100%', height: '100%' }}>
+      <div 
+        className={`canvas-container ${activeTool === 'arrow' ? 'cursor-crosshair' : ''}`} 
+        style={{ width: '100%', height: '100%' }}
+        onPointerMove={onPointerMove}
+      >
         <ReactFlow
           nodes={rfNodes}
           edges={rfEdges}
@@ -499,9 +868,17 @@ function FlowInner() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onConnectStart={onConnectStart}
+          onConnectEnd={onConnectEnd}
+          onPaneClick={handleCanvasClick}
+          onNodeClick={(event) => handleCanvasClick(event)}
           onPaneDoubleClick={onPaneDoubleClick}
-          onNodeDragStart={startTransaction}
-          onNodeDragStop={commitTransaction}
+          onNodeDragStart={handleNodeDragStart}
+          onNodeDragStop={handleNodeDragStop}
+          nodesSelectable={activeTool !== 'arrow'}
+          nodesDraggable={activeTool !== 'arrow'}
+          edgesFocusable={activeTool !== 'arrow'}
+          elementsSelectable={activeTool !== 'arrow'}
           // Neutralized: all deletion is handled by our custom keydown handler
           // to enforce the confirmation dialog for nodes with connected edges.
           onNodesDelete={() => {}}
@@ -539,6 +916,7 @@ function FlowInner() {
                 nodeIds: pendingDelete.nodeIds,
                 edgeIds: pendingDelete.edgeIds,
                 textBoxIds: pendingDelete.textBoxIds,
+                groupIds: pendingDelete.groupIds,
                 connectedEdgeBehavior: 'delete',
               });
               setPendingDelete(null);
@@ -566,10 +944,10 @@ function FlowInner() {
                 
                 endpointPositions[edge.id] = {};
                 if (fromId && selNodeIdSet.has(fromId)) {
-                  endpointPositions[edge.id].from = getEdgeEndpointPosition(edge.id, 'from');
+                  endpointPositions[edge.id].from = getEdgeEndpointPosition(edge.id, 'from', diagram, virtualAnchors);
                 }
                 if (toId && selNodeIdSet.has(toId)) {
-                  endpointPositions[edge.id].to = getEdgeEndpointPosition(edge.id, 'to');
+                  endpointPositions[edge.id].to = getEdgeEndpointPosition(edge.id, 'to', diagram, virtualAnchors);
                 }
               }
 
@@ -577,12 +955,47 @@ function FlowInner() {
                 nodeIds: pendingDelete.nodeIds,
                 edgeIds: pendingDelete.edgeIds,
                 textBoxIds: pendingDelete.textBoxIds,
+                groupIds: pendingDelete.groupIds,
                 connectedEdgeBehavior: 'detach',
                 endpointPositions,
               });
               setPendingDelete(null);
             }}
             onCancel={() => setPendingDelete(null)}
+          />
+        )}
+
+        {pendingGroupDelete && (
+          <ConfirmModal
+            title="Supprimer le(s) groupe(s)"
+            message="Ce(s) groupe(s) contien(nen)t des nœuds. Souhaitez-vous supprimer aussi les nœuds enfants ?"
+            confirmLabel="Supprimer le(s) groupe(s) et les nœuds enfants"
+            cancelLabel="Annuler"
+            middleLabel="Supprimer uniquement le(s) groupe(s)"
+            variant="danger"
+            onConfirm={() => {
+              const { groupIds, nodeIds, textBoxIds, edgeIds } = pendingGroupDelete;
+              setPendingGroupDelete(null);
+              proceedWithDeletion({
+                groupIds,
+                nodeIds,
+                textBoxIds,
+                edgeIds,
+                deleteChildren: true,
+              });
+            }}
+            onMiddle={() => {
+              const { groupIds, nodeIds, textBoxIds, edgeIds } = pendingGroupDelete;
+              setPendingGroupDelete(null);
+              proceedWithDeletion({
+                groupIds,
+                nodeIds,
+                textBoxIds,
+                edgeIds,
+                deleteChildren: false,
+              });
+            }}
+            onCancel={() => setPendingGroupDelete(null)}
           />
         )}
       </div>

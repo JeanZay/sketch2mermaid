@@ -42,6 +42,7 @@ export interface DiagramNode {
   textStyle?: TextStyle;
 
   style?: NodeStyle;
+  parentGroupId?: string;
 }
 
 export interface ConnectedEdgeEndpoint {
@@ -114,13 +115,33 @@ export interface TextBox {
   height?: number;
 }
 
+export type DiagramGroupKind = 'subgraph' | 'lane';
+
+export interface GroupStyle {
+  backgroundColor?: string;
+  borderColor?: string;
+  textColor?: string;
+}
+
+export interface DiagramGroup {
+  id: string;
+  kind: DiagramGroupKind;
+  label: string;
+  parentGroupId?: string;
+  position: { x: number; y: number };
+  width: number;
+  height: number;
+  direction?: 'TB' | 'TD' | 'BT' | 'LR' | 'RL';
+  style?: GroupStyle;
+}
+
 export interface CanonicalDiagram {
-  schemaVersion: number;
   diagramType: 'flowchart';
   direction: DiagramDirection;
   nodes: DiagramNode[];
   edges: DiagramEdge[];
   textBoxes: TextBox[];
+  groups?: DiagramGroup[];
 }
 
 export type MermaidExportFormat = 'markdown' | 'html' | 'raw';
@@ -135,7 +156,7 @@ export interface S2mViewport {
 /** Root structure of a .s2m file (JSON UTF-8) */
 export interface Sketch2MermaidFile {
   fileType: 'sketch2mermaid';
-  fileVersion: 1;
+  fileVersion: 1 | 2;
   appVersion: string;
   exportedAt: string; // ISO 8601
   diagram: CanonicalDiagram;
@@ -164,3 +185,21 @@ export function isExportableEdge(edge: DiagramEdge): boolean {
   return isStructurallyConnectedEdge(edge) && edge.exportMode !== 'canvasOnly';
 }
 
+/**
+ * Node/edge ID prefixes that are reserved for internal React Flow view-model
+ * nodes (ghost anchors, draft previews). These must never appear in the
+ * canonical diagram model, .s2m files, or Mermaid output.
+ */
+export const RESERVED_CANVAS_ID_PREFIXES: readonly string[] = [
+  'ghostAnchor__',
+  'draft-',
+  'temp-',
+] as const;
+
+/**
+ * Returns true if the given ID starts with a reserved canvas prefix.
+ * Used by the parser and normalizer to reject adversarial or corrupted IDs.
+ */
+export function isReservedCanvasId(id: string): boolean {
+  return RESERVED_CANVAS_ID_PREFIXES.some((prefix) => id.startsWith(prefix));
+}
