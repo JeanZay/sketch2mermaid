@@ -20,6 +20,22 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.9.2',
+    date: '2026-06-29',
+    title: 'Selection and Duplication Offset Fix',
+    importance: 'normal',
+    items: [
+      {
+        type: 'fix',
+        text: 'Fixed duplication button behavior to apply a sequential offset instead of stacking duplicates in the same position.',
+      },
+      {
+        type: 'improvement',
+        text: 'Centralized the canvas selection state in the Zustand store for cleaner architectural state management.',
+      },
+    ],
+  },
+  {
     version: '0.9.1',
     date: '2026-06-29',
     title: 'Duplicate and Copy-Paste Refinements',

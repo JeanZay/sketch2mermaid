@@ -542,6 +542,13 @@ export interface DiagramState {
   resetDiagram: () => void;
   loadDiagram: (diagram: CanonicalDiagram, options: { resetHistory: boolean }) => void;
 
+  // Selection state
+  selectedNodeIds: string[];
+  selectedEdgeIds: string[];
+  setSelectedNodeIds: (ids: string[]) => void;
+  setSelectedEdgeIds: (ids: string[]) => void;
+  clearSelection: () => void;
+
   // UI State for right panel
   rightPanelTab: 'export' | 'guide';
   setRightPanelTab: (tab: 'export' | 'guide') => void;
@@ -563,6 +570,12 @@ export interface DiagramState {
 
 export const useDiagramStore = create<DiagramState>((set, get) => ({
   diagram: loadInitialDiagram(),
+  selectedNodeIds: [],
+  selectedEdgeIds: [],
+  setSelectedNodeIds: (ids) => set({ selectedNodeIds: Array.from(new Set(ids)) }),
+  setSelectedEdgeIds: (ids) => set({ selectedEdgeIds: Array.from(new Set(ids)) }),
+  clearSelection: () => set({ selectedNodeIds: [], selectedEdgeIds: [] }),
+
   rightPanelTab: 'export',
   setRightPanelTab: (tab) => set({ rightPanelTab: tab }),
   activeTool: 'select',
@@ -591,6 +604,9 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     get().startTransaction();
     const result = createDuplicatesFromSnapshot(copiedSelection, diagram);
 
+    const newSelectedNodeIds = [...result.nodeIds, ...result.textBoxIds];
+    const newSelectedEdgeIds = result.edgeIds;
+
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -603,6 +619,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
         textBoxes: result.textBoxes,
         edges: result.edges,
       },
+      selectedNodeIds: newSelectedNodeIds,
+      selectedEdgeIds: newSelectedEdgeIds,
     }));
 
     get().commitTransaction();
@@ -624,6 +642,9 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     get().startTransaction();
     const result = createDuplicatesFromSnapshot(snapshot, diagram);
 
+    const newSelectedNodeIds = [...result.nodeIds, ...result.textBoxIds];
+    const newSelectedEdgeIds = result.edgeIds;
+
     set((state) => ({
       diagram: {
         ...state.diagram,
@@ -631,6 +652,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
         textBoxes: [...state.diagram.textBoxes, ...result.textBoxes],
         edges: [...state.diagram.edges, ...result.edges],
       },
+      selectedNodeIds: newSelectedNodeIds,
+      selectedEdgeIds: newSelectedEdgeIds,
     }));
 
     get().commitTransaction();
@@ -1001,6 +1024,16 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
         }).filter((e): e is DiagramEdge => e !== null);
       }
 
+      const nextNodeIdsSet = new Set([
+        ...nextNodes.map((n) => n.id),
+        ...nextTextBoxes.map((tb) => tb.id),
+        ...(nextGroups || []).map((g) => g.id),
+      ]);
+      const nextEdgeIdsSet = new Set(nextEdges.map((e) => e.id));
+
+      const nextSelectedNodeIds = state.selectedNodeIds.filter((id) => nextNodeIdsSet.has(id));
+      const nextSelectedEdgeIds = state.selectedEdgeIds.filter((id) => nextEdgeIdsSet.has(id));
+
       return {
         diagram: {
           ...state.diagram,
@@ -1009,6 +1042,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
           edges: nextEdges,
           groups: nextGroups,
         },
+        selectedNodeIds: nextSelectedNodeIds,
+        selectedEdgeIds: nextSelectedEdgeIds,
       };
     });
   },
@@ -1573,7 +1608,11 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   resetDiagram: () => {
     get().takeSnapshot();
-    set({ diagram: { ...defaultDiagram } });
+    set({
+      diagram: { ...defaultDiagram },
+      selectedNodeIds: [],
+      selectedEdgeIds: [],
+    });
   },
 
   loadDiagram: (diagram, options) => {
@@ -1581,10 +1620,22 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     const normalizedDiagram = normalizeDiagram(diagram);
     // Clear checkpoint to prevent stale transactions
     if (options.resetHistory) {
-      set({ diagram: normalizedDiagram, past: [], future: [], checkpoint: null });
+      set({
+        diagram: normalizedDiagram,
+        past: [],
+        future: [],
+        checkpoint: null,
+        selectedNodeIds: [],
+        selectedEdgeIds: [],
+      });
     } else {
       get().takeSnapshot(); // Snapshot previous state BEFORE updating diagram
-      set({ diagram: normalizedDiagram, checkpoint: null });
+      set({
+        diagram: normalizedDiagram,
+        checkpoint: null,
+        selectedNodeIds: [],
+        selectedEdgeIds: [],
+      });
     }
   },
 }));

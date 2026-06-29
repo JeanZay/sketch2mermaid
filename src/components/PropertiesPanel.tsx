@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { useNodes, useEdges, useReactFlow } from '@xyflow/react';
+import { useNodes, useEdges } from '@xyflow/react';
 import { useDiagramStore, DEFAULT_NODE_TEXT_STYLE, DEFAULT_EDGE_TEXT_STYLE, DEFAULT_TEXT_BOX_STYLE } from '../store/diagramStore';
 import type { TextStyle, TextBoxStyle } from '../core/types';
 import { SHAPE_DEFINITIONS, SHAPE_CATEGORIES, shapeSupportsLabel } from '../core/shapeRegistry';
@@ -13,7 +13,6 @@ import { collectSelectionInput } from '../utils/selectionHelpers';
 export const PropertiesPanel = () => {
   const nodes = useNodes();
   const edges = useEdges();
-  const { setNodes, setEdges } = useReactFlow();
 
   const selectedNode = nodes.find((n) => n.selected);
   const selectedNodes = nodes.filter((n) => n.selected);
@@ -37,41 +36,24 @@ export const PropertiesPanel = () => {
   const assignNodeToGroup = useDiagramStore((state) => state.assignNodeToGroup);
   const groupSelection = useDiagramStore((state) => state.groupSelection);
   const duplicateSelection = useDiagramStore((state) => state.duplicateSelection);
+  const clearSelection = useDiagramStore((state) => state.clearSelection);
 
   const virtualAnchors = useVirtualEdgeAnchors();
 
   const handleDeselect = () => {
-    setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
-    setEdges((eds) => eds.map((e) => ({ ...e, selected: false })));
+    clearSelection();
   };
 
   const handleDuplicate = useCallback(() => {
     const selectedEdgeIds = edges.filter((e) => e.selected).map((e) => e.id);
     const { nodeIds, edgeIds, textBoxIds } = collectSelectionInput(selectedNodes, selectedEdgeIds);
 
-    const result = duplicateSelection({
+    duplicateSelection({
       nodeIds,
       edgeIds,
       textBoxIds,
     });
-
-    if (result) {
-      const nextNodeIds = new Set([...result.nodeIds, ...result.textBoxIds]);
-      const nextEdgeIds = new Set(result.edgeIds);
-      setNodes((nds) =>
-        nds.map((n) => ({
-          ...n,
-          selected: nextNodeIds.has(n.id),
-        }))
-      );
-      setEdges((eds) =>
-        eds.map((e) => ({
-          ...e,
-          selected: nextEdgeIds.has(e.id),
-        }))
-      );
-    }
-  }, [selectedNodes, edges, duplicateSelection, setNodes, setEdges]);
+  }, [selectedNodes, edges, duplicateSelection]);
 
   const getEdgeEndpointPosition = useCallback((edgeId: string, endpoint: 'from' | 'to') => {
     const anchor = virtualAnchors[edgeId];

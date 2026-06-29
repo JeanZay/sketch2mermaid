@@ -2,6 +2,7 @@ export interface SelectionInput {
   nodeIds: string[];
   edgeIds: string[];
   textBoxIds: string[];
+  groupIds: string[];
 }
 
 export interface MinimalNode {
@@ -15,12 +16,15 @@ export function collectSelectionInput(
 ): SelectionInput {
   const nodeIds: string[] = [];
   const textBoxIds: string[] = [];
+  const groupIds: string[] = [];
   
   for (const node of selectedNodes) {
     if (node.type === 'textBox') {
       textBoxIds.push(node.id);
     } else if (node.type === 'customNode') {
       nodeIds.push(node.id);
+    } else if (node.type === 'groupNode') {
+      groupIds.push(node.id);
     }
   }
   
@@ -28,5 +32,6 @@ export function collectSelectionInput(
     nodeIds,
     edgeIds: selectedEdgeIds,
     textBoxIds,
+    groupIds,
   };
 }

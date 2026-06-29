@@ -6,6 +6,7 @@ import {
   DUPLICATE_OFFSET
 } from './duplicateHelpers';
 import { toMermaid } from '../core/mermaid';
+import { collectSelectionInput } from '../utils/selectionHelpers';
 
 // Mock localStorage for Node test environment
 const localStorageStore: Record<string, string> = {};
@@ -399,6 +400,232 @@ describe('Duplicate Helpers & Actions Tests', () => {
       
       expect(pastedNode).toBeDefined();
       expect(pastedNode!.parentGroupId).toBeUndefined(); // parentGroupId should be cleared
+    });
+  });
+
+  describe('Centralized Selection & Offset Hardening Tests', () => {
+    test('1. duplicateSelection called twice sequentially produces three positions with cumulative offsets', () => {
+      const store = useDiagramStore.getState();
+      
+      // Start with a clean diagram
+      store.resetDiagram();
+      const n1 = store.addNode('process', 10, 20);
+      
+      // Select n1
+      store.setSelectedNodeIds([n1]);
+      expect(useDiagramStore.getState().selectedNodeIds).toEqual([n1]);
+      
+      // First duplicate
+      const dup1 = store.duplicateSelection({
+        nodeIds: [n1],
+        edgeIds: [],
+        textBoxIds: []
+      });
+      expect(dup1).not.toBeNull();
+      const n2 = dup1!.nodeIds[0];
+      
+      // Verify selection shifted to the first duplicate (n2)
+      expect(useDiagramStore.getState().selectedNodeIds).toEqual([n2]);
+      
+      const node2 = useDiagramStore.getState().diagram.nodes.find(n => n.id === n2)!;
+      expect(node2.position).toEqual({ x: 10 + DUPLICATE_OFFSET.x, y: 20 + DUPLICATE_OFFSET.y });
+      
+      // Second duplicate (acts on the active selection n2)
+      const dup2 = store.duplicateSelection({
+        nodeIds: [n2],
+        edgeIds: [],
+        textBoxIds: []
+      });
+      expect(dup2).not.toBeNull();
+      const n3 = dup2!.nodeIds[0];
+      
+      // Verify selection shifted to the second duplicate (n3)
+      expect(useDiagramStore.getState().selectedNodeIds).toEqual([n3]);
+      
+      const node3 = useDiagramStore.getState().diagram.nodes.find(n => n.id === n3)!;
+      expect(node3.position).toEqual({ x: 10 + 2 * DUPLICATE_OFFSET.x, y: 20 + 2 * DUPLICATE_OFFSET.y });
+    });
+
+    test('2. pasteSelection called twice sequentially produces cumulative offsets and updates selection', () => {
+      const store = useDiagramStore.getState();
+      store.resetDiagram();
+      const n1 = store.addNode('process', 10, 20);
+      
+      // Copy n1
+      store.copySelection({
+        nodeIds: [n1],
+        edgeIds: [],
+        textBoxIds: []
+      });
+      
+      // First paste
+      const paste1 = store.pasteSelection();
+      expect(paste1).not.toBeNull();
+      const n2 = paste1!.nodeIds[0];
+      
+      // Selection should shift to n2
+      expect(useDiagramStore.getState().selectedNodeIds).toEqual([n2]);
+      
+      const node2 = useDiagramStore.getState().diagram.nodes.find(n => n.id === n2)!;
+      expect(node2.position).toEqual({ x: 10 + DUPLICATE_OFFSET.x, y: 20 + DUPLICATE_OFFSET.y });
+      
+      // Second paste (should paste with cumulative offset)
+      const paste2 = store.pasteSelection();
+      expect(paste2).not.toBeNull();
+      const n3 = paste2!.nodeIds[0];
+      
+      // Selection should shift to n3
+      expect(useDiagramStore.getState().selectedNodeIds).toEqual([n3]);
+      
+      const node3 = useDiagramStore.getState().diagram.nodes.find(n => n.id === n3)!;
+      expect(node3.position).toEqual({ x: 10 + 2 * DUPLICATE_OFFSET.x, y: 20 + 2 * DUPLICATE_OFFSET.y });
+    });
+
+    test('3. deletion cleans up selection state', () => {
+      const store = useDiagramStore.getState();
+      store.resetDiagram();
+      const n1 = store.addNode('process', 10, 20);
+      const n2 = store.addNode('decision', 100, 200);
+      const edgeId = store.addEdge(n1, n2);
+      
+      store.setSelectedNodeIds([n1, n2]);
+      store.setSelectedEdgeIds([edgeId]);
+      
+      // Delete n1
+      store.deleteSelectedElements({
+        nodeIds: [n1],
+        edgeIds: [],
+        textBoxIds: [],
+        groupIds: [],
+        connectedEdgeBehavior: 'delete'
+      });
+      
+      // n1 and edgeId (since it was connected to n1 and deleted) should be removed from selection
+      expect(useDiagramStore.getState().selectedNodeIds).toEqual([n2]);
+      expect(useDiagramStore.getState().selectedEdgeIds).toEqual([]);
+    });
+
+    test('4. loadDiagram and resetDiagram clear selection state', () => {
+      const store = useDiagramStore.getState();
+      store.resetDiagram();
+      const n1 = store.addNode('process', 10, 20);
+      
+      store.setSelectedNodeIds([n1]);
+      expect(useDiagramStore.getState().selectedNodeIds).toEqual([n1]);
+      
+      // Reset clears selection
+      store.resetDiagram();
+      expect(useDiagramStore.getState().selectedNodeIds).toEqual([]);
+      
+      // Load clears selection
+      store.setSelectedNodeIds([n1]);
+      store.loadDiagram({
+        nodes: [],
+        edges: [],
+        textBoxes: [],
+        groups: [],
+        direction: 'TB'
+      }, { resetHistory: true });
+      expect(useDiagramStore.getState().selectedNodeIds).toEqual([]);
+    });
+
+    test('5. mixed selection of node, edge, and textbox is correctly duplicated', () => {
+      const store = useDiagramStore.getState();
+      store.resetDiagram();
+      
+      const n1 = store.addNode('process', 10, 20);
+      const n2 = store.addNode('decision', 100, 200);
+      const edgeId = store.addEdge(n1, n2);
+      const tbId = store.addTextBox(50, 60);
+      
+      const dup = store.duplicateSelection({
+        nodeIds: [n1, n2],
+        edgeIds: [edgeId],
+        textBoxIds: [tbId]
+      });
+      
+      expect(dup).not.toBeNull();
+      expect(dup!.nodeIds).toHaveLength(2);
+      expect(dup!.edgeIds).toHaveLength(1);
+      expect(dup!.textBoxIds).toHaveLength(1);
+      
+      // Verify selection is set to the new duplicates
+      const expectedNodes = [...dup!.nodeIds, ...dup!.textBoxIds];
+      expect(useDiagramStore.getState().selectedNodeIds).toEqual(expect.arrayContaining(expectedNodes));
+      expect(useDiagramStore.getState().selectedEdgeIds).toEqual(dup!.edgeIds);
+    });
+
+    test('6. duplication of node in group/swimlane preserves parentGroupId', () => {
+      const store = useDiagramStore.getState();
+      store.resetDiagram();
+      
+      const groupId = store.addGroup('subgraph', 0, 0);
+      const n1 = store.addNode('process', 10, 20);
+      store.assignNodeToGroup(n1, groupId);
+      
+      const dup = store.duplicateSelection({
+        nodeIds: [n1],
+        edgeIds: [],
+        textBoxIds: []
+      });
+      
+      expect(dup).not.toBeNull();
+      const n2 = dup!.nodeIds[0];
+      const clonedNode = useDiagramStore.getState().diagram.nodes.find(n => n.id === n2)!;
+      expect(clonedNode.parentGroupId).toBe(groupId);
+    });
+
+    test('7. ghost anchors selected in React Flow do not become business nodes on duplication', () => {
+      const store = useDiagramStore.getState();
+      store.resetDiagram();
+      const n1 = store.addNode('process', 10, 20);
+      
+      // Simulate input having a ghost anchor ID
+      const dup = store.duplicateSelection({
+        nodeIds: [n1, 'ghostAnchor__e1__from'],
+        edgeIds: [],
+        textBoxIds: []
+      });
+      
+      expect(dup).not.toBeNull();
+      // Only n1 should be duplicated
+      expect(dup!.nodeIds).toHaveLength(1);
+      expect(dup!.nodeIds[0]).not.toContain('ghostAnchor');
+    });
+
+    test('8. deleteSelectedElements ignores ghost anchors', () => {
+      const store = useDiagramStore.getState();
+      store.resetDiagram();
+      const n1 = store.addNode('process', 10, 20);
+      
+      const nodesBefore = useDiagramStore.getState().diagram.nodes.length;
+      
+      store.deleteSelectedElements({
+        nodeIds: [n1, 'ghostAnchor__e1__from'],
+        edgeIds: [],
+        textBoxIds: [],
+        groupIds: [],
+        connectedEdgeBehavior: 'delete'
+      });
+      
+      // Should delete n1 and ignore the ghost anchor
+      expect(useDiagramStore.getState().diagram.nodes.length).toBe(nodesBefore - 1);
+    });
+
+    test('9. collectSelectionInput classifies entities correctly and ignores transient elements', () => {
+      const selectedNodes = [
+        { id: 'n1', type: 'customNode' },
+        { id: 'tb1', type: 'textBox' },
+        { id: 'g1', type: 'groupNode' },
+        { id: 'ghostAnchor__e1__from', type: 'ghostAnchor' }
+      ];
+      const selectedEdgeIds = ['e1'];
+      
+      const result = collectSelectionInput(selectedNodes, selectedEdgeIds);
+      expect(result.nodeIds).toEqual(['n1']);
+      expect(result.textBoxIds).toEqual(['tb1']);
+      expect(result.groupIds).toEqual(['g1']);
+      expect(result.edgeIds).toEqual(['e1']);
     });
   });
 });

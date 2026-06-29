@@ -61,14 +61,17 @@ function FlowInner() {
   const pasteSelection = useDiagramStore((state) => state.pasteSelection);
   const copiedSelection = useDiagramStore((state) => state.copiedSelection);
 
+  // Retrieve and update selection via Zustand store
+  const selectedNodeIds = useDiagramStore((state) => state.selectedNodeIds);
+  const selectedEdgeIds = useDiagramStore((state) => state.selectedEdgeIds);
+  const setSelectedNodeIds = useDiagramStore((state) => state.setSelectedNodeIds);
+  const setSelectedEdgeIds = useDiagramStore((state) => state.setSelectedEdgeIds);
+
   const { screenToFlowPosition } = useReactFlow();
 
   // Compute virtual anchor positions for edge distribution
   const virtualAnchors = useVirtualEdgeAnchors();
 
-  // Selection state — updated only from event handler callbacks (not effects)
-  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
-  const [selectedEdgeIds, setSelectedEdgeIds] = useState<Set<string>>(new Set());
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
   // Track ghost anchor connection drags for detach-on-drop-in-empty-space
@@ -105,6 +108,9 @@ function FlowInner() {
 
   // Derive React Flow nodes from diagram store + selection state
   const rfNodes = useMemo(() => {
+    const selectedNodesSet = new Set(selectedNodeIds);
+    const selectedEdgesSet = new Set(selectedEdgeIds);
+
     const groupNodes = USE_GROUPS_AND_SWIMLANES && diagram.groups
       ? diagram.groups.map((group) => ({
           id: group.id,
@@ -116,7 +122,7 @@ function FlowInner() {
             width: group.width,
             height: group.height,
           },
-          selected: selectedNodeIds.has(group.id),
+          selected: selectedNodesSet.has(group.id),
         }))
       : [];
 
@@ -132,7 +138,7 @@ function FlowInner() {
         style: node.style,
         updateNodeSize,
       },
-      selected: selectedNodeIds.has(node.id),
+      selected: selectedNodesSet.has(node.id),
     }));
 
     const textBoxNodes = diagram.textBoxes.map((tb) => ({
@@ -146,13 +152,13 @@ function FlowInner() {
         height: tb.height,
         updateTextBoxSize,
       },
-      selected: selectedNodeIds.has(tb.id),
+      selected: selectedNodesSet.has(tb.id),
       connectable: false,
     }));
 
     const ghostNodes: Node[] = [];
     for (const edge of diagram.edges) {
-      const isEdgeSelected = selectedEdgeIds.has(edge.id);
+      const isEdgeSelected = selectedEdgesSet.has(edge.id);
 
       if (edge.from.kind === 'detached' || isEdgeSelected) {
         const position = edge.from.kind === 'connected'
@@ -167,7 +173,7 @@ function FlowInner() {
             edgeId: edge.id,
             edgeSelected: isEdgeSelected,
           },
-          selected: selectedNodeIds.has(`ghostAnchor__${edge.id}__from`),
+          selected: selectedNodesSet.has(`ghostAnchor__${edge.id}__from`),
         });
       }
 
@@ -184,7 +190,7 @@ function FlowInner() {
             edgeId: edge.id,
             edgeSelected: isEdgeSelected,
           },
-          selected: selectedNodeIds.has(`ghostAnchor__${edge.id}__to`),
+          selected: selectedNodesSet.has(`ghostAnchor__${edge.id}__to`),
         });
       }
     }
@@ -223,8 +229,9 @@ function FlowInner() {
   // Note: markers are rendered by CustomEdge directly from the Zustand store,
   // bypassing React Flow's marker resolution which has issues with undefined values.
   const rfEdges = useMemo(() => {
+    const selectedEdgesSet = new Set(selectedEdgeIds);
     const list = diagram.edges.map((edge) => {
-      const isSelected = selectedEdgeIds.has(edge.id);
+      const isSelected = selectedEdgesSet.has(edge.id);
       const source = (edge.from.kind === 'connected' && !isSelected)
         ? edge.from.nodeId
         : `ghostAnchor__${edge.id}__from`;
@@ -391,12 +398,12 @@ function FlowInner() {
     return useDiagramStore.subscribe((state, prevState) => {
       if (state.pendingEdgeSelect && state.pendingEdgeSelect !== prevState.pendingEdgeSelect) {
         const edgeId = state.pendingEdgeSelect;
-        setSelectedEdgeIds(new Set([edgeId]));
-        setSelectedNodeIds(new Set());
+        setSelectedEdgeIds([edgeId]);
+        setSelectedNodeIds([]);
         state.clearPendingEdgeSelect();
       }
     });
-  }, []);
+  }, [setSelectedNodeIds, setSelectedEdgeIds]);
 
   // Handle keyboard nudging and undo/redo shortcuts with safeguards
   useEffect(() => {
@@ -464,13 +471,7 @@ function FlowInner() {
       if (isMod && event.key.toLowerCase() === 'v') {
         if (copiedSelection) {
           event.preventDefault();
-          const pasted = pasteSelection();
-          if (pasted) {
-            const newNodes = new Set([...pasted.nodeIds, ...pasted.textBoxIds]);
-            const newEdges = new Set(pasted.edgeIds);
-            setSelectedNodeIds(newNodes);
-            setSelectedEdgeIds(newEdges);
-          }
+          pasteSelection();
         }
         return;
       }
@@ -518,9 +519,8 @@ function FlowInner() {
 
     for (const change of changes) {
       if (change.type === 'select') {
-        const nType = nodeTypeById.get(change.id);
-        if (nType === 'ghostAnchor') {
-          if (change.selected) {
+        if (change.id.startsWith('ghostAnchor__') || change.id.startsWith('draft-')) {
+          if (change.id.startsWith('ghostAnchor__') && change.selected) {
             const parts = change.id.split('__');
             const edgeId = parts[1];
             if (!nextEdgeSelected) {
@@ -560,12 +560,12 @@ function FlowInner() {
       }
     }
     if (selectionChanged && nextSelected) {
-      setSelectedNodeIds(nextSelected);
+      setSelectedNodeIds(Array.from(nextSelected));
     }
     if (edgeSelectionChanged && nextEdgeSelected) {
-      setSelectedEdgeIds(nextEdgeSelected);
+      setSelectedEdgeIds(Array.from(nextEdgeSelected));
     }
-  }, [selectedNodeIds, selectedEdgeIds, updateNodePosition, updateTextBoxPosition, moveDetachedEdgeEndpoint, updateGroupPosition, nodeTypeById]);
+  }, [selectedNodeIds, selectedEdgeIds, updateNodePosition, updateTextBoxPosition, moveDetachedEdgeEndpoint, updateGroupPosition, nodeTypeById, setSelectedNodeIds, setSelectedEdgeIds]);
 
   // Handle ALL edge changes — selection tracked in state
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
@@ -585,9 +585,9 @@ function FlowInner() {
       }
     }
     if (selectionChanged && nextSelected) {
-      setSelectedEdgeIds(nextSelected);
+      setSelectedEdgeIds(Array.from(nextSelected));
     }
-  }, [selectedEdgeIds]);
+  }, [selectedEdgeIds, setSelectedEdgeIds]);
 
   // Helper to normalize the handle ID to the correct type for the endpoint
   const normalizeHandle = useCallback((endpoint: 'from' | 'to', handleId: string | null) => {
