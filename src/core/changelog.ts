@@ -20,6 +20,26 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.9.1',
+    date: '2026-06-29',
+    title: 'Duplicate and Copy-Paste Refinements',
+    importance: 'minor',
+    items: [
+      {
+        type: 'fix',
+        text: 'Prevented keyboard copy/paste shortcuts from hijacking events when focus is on text inputs or textareas.',
+      },
+      {
+        type: 'fix',
+        text: 'Ensured copy-paste commands do not clear the clipboard when nothing is selected.',
+      },
+      {
+        type: 'improvement',
+        text: 'Improved selection management architecture and replaced legacy JSON deep cloning with modern structuredClone.',
+      },
+    ],
+  },
+  {
     version: '0.9.0',
     date: '2026-06-28',
     title: 'Duplicate and Copy-Paste',

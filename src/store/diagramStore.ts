@@ -572,9 +572,12 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   copiedSelection: null,
 
-  copySelection: (input) => {
-    const diagram = get().diagram;
+  copySelection: (input: { nodeIds: string[]; edgeIds: string[]; textBoxIds: string[] }) => {
+    const { diagram } = get();
     const snapshot = buildCopiedSelectionSnapshot(diagram, input);
+    if (snapshot.nodes.length === 0 && snapshot.textBoxes.length === 0 && snapshot.edges.length === 0) {
+      return; // Do not overwrite with empty selection
+    }
     set({ copiedSelection: snapshot });
   },
 

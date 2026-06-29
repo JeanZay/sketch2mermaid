@@ -8,6 +8,7 @@ import { FontSizeControl } from './properties/FontSizeControl';
 import { ConfirmModal } from './ConfirmModal';
 import { useVirtualEdgeAnchors } from '../hooks/useVirtualEdgeAnchors';
 import { USE_GROUPS_AND_SWIMLANES } from '../core/config';
+import { collectSelectionInput } from '../utils/selectionHelpers';
 
 export const PropertiesPanel = () => {
   const nodes = useNodes();
@@ -45,21 +46,13 @@ export const PropertiesPanel = () => {
   };
 
   const handleDuplicate = useCallback(() => {
-    const selNodeIds: string[] = [];
-    const selTextBoxIds: string[] = [];
-    for (const node of selectedNodes) {
-      if (node.type === 'textBox') {
-        selTextBoxIds.push(node.id);
-      } else if (node.type === 'customNode') {
-        selNodeIds.push(node.id);
-      }
-    }
-    const selEdgeIds = edges.filter((e) => e.selected).map((e) => e.id);
+    const selectedEdgeIds = edges.filter((e) => e.selected).map((e) => e.id);
+    const { nodeIds, edgeIds, textBoxIds } = collectSelectionInput(selectedNodes, selectedEdgeIds);
 
     const result = duplicateSelection({
-      nodeIds: selNodeIds,
-      edgeIds: selEdgeIds,
-      textBoxIds: selTextBoxIds,
+      nodeIds,
+      edgeIds,
+      textBoxIds,
     });
 
     if (result) {

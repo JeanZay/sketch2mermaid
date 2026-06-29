@@ -1,6 +1,6 @@
 import type { CanonicalDiagram, DiagramNode, DiagramEdge, TextBox } from '../core/types';
 import { getNextNodeId, getNextEdgeId, getNextTextBoxId } from './diagramStore';
-
+import { deepClone } from '../utils/clone';
 export interface CopiedSelectionSnapshot {
   nodes: DiagramNode[];
   edges: DiagramEdge[];
@@ -60,11 +60,11 @@ export function buildCopiedSelectionSnapshot(
 
   const nodes = diagram.nodes
     .filter((n) => nodeIdsSet.has(n.id))
-    .map((n) => JSON.parse(JSON.stringify(n)));
+    .map((n) => deepClone(n));
 
   const textBoxes = diagram.textBoxes
     .filter((tb) => textBoxIdsSet.has(tb.id))
-    .map((tb) => JSON.parse(JSON.stringify(tb)));
+    .map((tb) => deepClone(tb));
 
   const edgeList: DiagramEdge[] = [];
 
@@ -102,7 +102,7 @@ export function buildCopiedSelectionSnapshot(
   }
 
   // Deduplicate by ID
-  const uniqueEdges = edgeList.map((e) => JSON.parse(JSON.stringify(e)));
+  const uniqueEdges = edgeList.map((e) => deepClone(e));
 
   return {
     nodes,

@@ -22,6 +22,7 @@ import { VirtualAnchorsContext } from './VirtualAnchorsContext';
 import GhostAnchorNode from './GhostAnchorNode';
 import { USE_LASSO_SELECTION, USE_GROUPS_AND_SWIMLANES, GROUP_MEMBERSHIP_TOLERANCE, SNAP_THRESHOLD } from '../core/config';
 import { findNearestHandle, getEdgeEndpointPosition } from '../utils/edgeSnapping';
+import { collectSelectionInput } from '../utils/selectionHelpers';
 import GroupNode from './GroupNode';
 import type { DiagramGroup } from '../core/types';
 
@@ -58,6 +59,7 @@ function FlowInner() {
   const setActiveTool = useDiagramStore((state) => state.setActiveTool);
   const copySelection = useDiagramStore((state) => state.copySelection);
   const pasteSelection = useDiagramStore((state) => state.pasteSelection);
+  const copiedSelection = useDiagramStore((state) => state.copiedSelection);
 
   const { screenToFlowPosition } = useReactFlow();
 
@@ -442,31 +444,33 @@ function FlowInner() {
 
       // Copy shortcut (Ctrl+C / Cmd+C)
       if (isMod && event.key.toLowerCase() === 'c') {
-        event.preventDefault();
-        const selNodeIds: string[] = [];
-        const selTextBoxIds: string[] = [];
-        for (const id of selectedNodeIds) {
-          const nType = nodeTypeById.get(id);
-          if (nType === 'textBox') {
-            selTextBoxIds.push(id);
-          } else if (nType === 'customNode') {
-            selNodeIds.push(id);
-          }
+        const minimalNodes = Array.from(selectedNodeIds).map((id) => ({
+          id,
+          type: nodeTypeById.get(id),
+        }));
+        const { nodeIds, edgeIds, textBoxIds } = collectSelectionInput(
+          minimalNodes,
+          Array.from(selectedEdgeIds)
+        );
+
+        if (nodeIds.length > 0 || textBoxIds.length > 0 || edgeIds.length > 0) {
+          event.preventDefault();
+          copySelection({ nodeIds, edgeIds, textBoxIds });
         }
-        const selEdgeIds = Array.from(selectedEdgeIds);
-        copySelection({ nodeIds: selNodeIds, edgeIds: selEdgeIds, textBoxIds: selTextBoxIds });
         return;
       }
 
       // Paste shortcut (Ctrl+V / Cmd+V)
       if (isMod && event.key.toLowerCase() === 'v') {
-        event.preventDefault();
-        const pasted = pasteSelection();
-        if (pasted) {
-          const newNodes = new Set([...pasted.nodeIds, ...pasted.textBoxIds]);
-          const newEdges = new Set(pasted.edgeIds);
-          setSelectedNodeIds(newNodes);
-          setSelectedEdgeIds(newEdges);
+        if (copiedSelection) {
+          event.preventDefault();
+          const pasted = pasteSelection();
+          if (pasted) {
+            const newNodes = new Set([...pasted.nodeIds, ...pasted.textBoxIds]);
+            const newEdges = new Set(pasted.edgeIds);
+            setSelectedNodeIds(newNodes);
+            setSelectedEdgeIds(newEdges);
+          }
         }
         return;
       }
@@ -502,7 +506,7 @@ function FlowInner() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [nodes, updateNodePosition, undo, redo, handleDeleteSelected, activeTool, setActiveTool, copySelection, pasteSelection, selectedNodeIds, selectedEdgeIds, nodeTypeById]);
+  }, [nodes, updateNodePosition, undo, redo, handleDeleteSelected, activeTool, setActiveTool, copySelection, pasteSelection, copiedSelection, selectedNodeIds, selectedEdgeIds, nodeTypeById]);
 
 
   // Handle ALL node changes — selection tracked in state, position updated continuously

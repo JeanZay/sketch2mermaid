@@ -339,4 +339,66 @@ describe('Duplicate Helpers & Actions Tests', () => {
       expect(node3.position).toEqual({ x: 10 + 2 * DUPLICATE_OFFSET.x, y: 20 + 2 * DUPLICATE_OFFSET.y });
     });
   });
+
+  describe('Robustness tests', () => {
+    test('copySelection with empty selection does not overwrite existing copy', () => {
+      const store = useDiagramStore.getState();
+      const n1 = store.addNode('process', 10, 20);
+      
+      // Initial copy
+      store.copySelection({ nodeIds: [n1], edgeIds: [], textBoxIds: [] });
+      const firstCopy = useDiagramStore.getState().copiedSelection;
+      expect(firstCopy).not.toBeNull();
+      expect(firstCopy!.nodes).toHaveLength(1);
+
+      // Empty copy should be ignored
+      store.copySelection({ nodeIds: [], edgeIds: [], textBoxIds: [] });
+      const secondCopy = useDiagramStore.getState().copiedSelection;
+      expect(secondCopy).not.toBeNull();
+      expect(secondCopy!.nodes).toHaveLength(1); // Keeps previous copy
+    });
+
+    test('pasteSelection when copiedSelection is null returns null without modifying diagram', () => {
+      const store = useDiagramStore.getState();
+      // Ensure clipboard is empty
+      useDiagramStore.setState({ copiedSelection: null });
+      
+      const nodesBefore = useDiagramStore.getState().diagram.nodes.length;
+      
+      const pasteResult = store.pasteSelection();
+      expect(pasteResult).toBeNull();
+      
+      const nodesAfter = useDiagramStore.getState().diagram.nodes.length;
+      expect(nodesAfter).toBe(nodesBefore);
+    });
+
+    test('duplication / paste of a node with an invalid parentGroupId clears the parentGroupId', () => {
+      const store = useDiagramStore.getState();
+      
+      // Create a group
+      const groupId = store.addGroup ? store.addGroup('subgraph', 0, 0, 500, 500) : 'group1';
+      
+      // Create a node inside the group
+      const n1 = store.addNode('process', 10, 20);
+      useDiagramStore.getState().assignNodeToGroup(n1, groupId);
+      
+      // Copy the node
+      store.copySelection({ nodeIds: [n1], edgeIds: [], textBoxIds: [] });
+      
+      // Delete the group to make parentGroupId invalid
+      if (store.deleteGroup) {
+        store.deleteGroup(groupId, { deleteChildren: false });
+      }
+      
+      // Paste the node
+      const pasteResult = store.pasteSelection();
+      expect(pasteResult).not.toBeNull();
+      
+      const pastedNodeId = pasteResult!.nodeIds[0];
+      const pastedNode = useDiagramStore.getState().diagram.nodes.find(n => n.id === pastedNodeId);
+      
+      expect(pastedNode).toBeDefined();
+      expect(pastedNode!.parentGroupId).toBeUndefined(); // parentGroupId should be cleared
+    });
+  });
 });
