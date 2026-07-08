@@ -40,14 +40,42 @@ export const DEBUG_MERMAID_IMPORT_LAYOUT = false;
 
 // ---------------------------------------------------------------------------
 // Layout spacing constants for Mermaid-like diagrams
+//
+// Values mirror Mermaid's own Dagre integration (source of truth:
+// packages/mermaid/src/rendering-util/layout-algorithms/dagre/index.js and
+// packages/mermaid/src/diagrams/flowchart/flowRenderer-v3-unified.ts):
+//   - nodeSpacing / rankSpacing default to 50 (flowchart config)
+//   - graph margins are marginx: 8, marginy: 8
+//   - Mermaid does NOT set `edgesep` or `acyclicer` (Dagre defaults apply)
 // ---------------------------------------------------------------------------
-export const MERMAID_LIKE_RANK_SEP = 60;
+export const MERMAID_LIKE_RANK_SEP = 50;
 export const MERMAID_LIKE_NODE_SEP = 50;
-export const MERMAID_LIKE_EDGE_SEP = 10;
-export const MERMAID_LIKE_MARGIN_X = 40;
-export const MERMAID_LIKE_MARGIN_Y = 40;
+export const MERMAID_LIKE_MARGIN_X = 8;
+export const MERMAID_LIKE_MARGIN_Y = 8;
 export const MERMAID_LIKE_LABEL_PADDING = 32;
 export const MERMAID_LIKE_MIN_EDGE_BEND = 20;
+
+/**
+ * Extra rank separation applied inside recursively laid out subgraphs.
+ * Mermaid: `node.graph.setGraph({ ranksep: ranksep + 25, nodesep })` in
+ * measureDagreGraph (dagre/index.js).
+ */
+export const MERMAID_LIKE_SUBGRAPH_RANK_SEP_EXTRA = 25;
+
+/**
+ * Padding between a cluster's children bounding box and the cluster border.
+ * Mermaid: flowDb.getData() sets `padding: 8` on subgraph nodes; the cluster
+ * rect is drawn with that padding around the children bounds.
+ */
+export const MERMAID_LIKE_CLUSTER_PADDING = 8;
+
+/**
+ * Deterministic height reserved for the subgraph title band on the canvas.
+ * Mermaid draws the cluster title inside the top of the cluster rect; our
+ * GroupNode renders a title area (~13px font + 2×8px padding + border ≈ 32px).
+ * This is a canvas-only visual constant, never exported to Mermaid.
+ */
+export const MERMAID_LIKE_GROUP_TITLE_HEIGHT = 32;
 
 /**
  * Threshold (in pixels) below which nodes are considered to be on the same rank (sibling nodes).

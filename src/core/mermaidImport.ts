@@ -1,5 +1,5 @@
 import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, EdgeDirection, DiagramDirection, NodeStyle, DiagramGroup } from './types';
-import { NODE_SIZE_DEFAULTS } from './nodeSizeConfig';
+import { NODE_SIZE_DEFAULTS, estimateNodeSize } from './nodeSizeConfig';
 import { findDefinitionByMermaidName, getShapeCapabilities } from './shapeRegistry';
 import { layoutImportedDiagram, selectHandlesDirectionAware } from './layout/mermaidLayout';
 import { DEBUG_MERMAID_IMPORT_LAYOUT, USE_MERMAID_LIKE_IMPORTED_LAYOUT } from './config';
@@ -660,11 +660,15 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
     }
   }
 
-  // Map final DiagramNodes and assign default sizes
+  // Map final DiagramNodes and assign sizes.
+  // Mermaid derives node dimensions from the rendered label plus padding;
+  // we approximate that deterministically with estimateNodeSize so layout
+  // spacing tracks label length like Mermaid Live. Fixed-size shapes keep
+  // their registry-defined dimensions.
   const finalNodes: DiagramNode[] = Array.from(nodesMap.values()).map(node => {
     const capabilities = getShapeCapabilities(node.shape);
     const isFixed = capabilities.sizingMode === 'fixed' && capabilities.fixedSize;
-    const size = isFixed ? capabilities.fixedSize! : (NODE_SIZE_DEFAULTS[node.shape] || NODE_SIZE_DEFAULTS.process);
+    const size = isFixed ? capabilities.fixedSize! : estimateNodeSize(node.shape, node.label);
     return {
       id: node.id,
       label: node.label,
