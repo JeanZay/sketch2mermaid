@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useId } from 'react';
-import { EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react';
+import { EdgeLabelRenderer, type EdgeProps } from '@xyflow/react';
 import { useDiagramStore, DEFAULT_EDGE_TEXT_STYLE } from '../store/diagramStore';
 import { useVirtualAnchors } from './VirtualAnchorsContext';
 import { USE_MERMAID_LIKE_EDGE_RENDERING } from '../core/config';
-import { getMermaidLikeOrthogonalEdgePath } from '../utils/edgeRouting';
+import { getCanvasEdgePath } from '../utils/edgeRouting';
 import { ArrowMarker, MermaidArrowMarker } from './EdgeMarkers';
 
 export const CustomEdge = ({
@@ -17,6 +17,7 @@ export const CustomEdge = ({
   style = {},
   label,
   selected,
+  data,
 }: EdgeProps) => {
   // Virtual anchor coordinates for edge distribution
   const virtualAnchors = useVirtualAnchors();
@@ -28,23 +29,15 @@ export const CustomEdge = ({
   const endX = anchor?.targetX ?? targetX;
   const endY = anchor?.targetY ?? targetY;
 
-  const pathResult = USE_MERMAID_LIKE_EDGE_RENDERING
-    ? getMermaidLikeOrthogonalEdgePath({
-        sourceX: startX,
-        sourceY: startY,
-        targetX: endX,
-        targetY: endY,
-        sourcePosition,
-        targetPosition,
-      })
-    : getBezierPath({
-        sourceX: startX,
-        sourceY: startY,
-        targetX: endX,
-        targetY: endY,
-        sourcePosition,
-        targetPosition,
-      });
+  const pathResult = getCanvasEdgePath({
+    data,
+    sourceX: startX,
+    sourceY: startY,
+    targetX: endX,
+    targetY: endY,
+    sourcePosition,
+    targetPosition,
+  });
   
   const edgePath = pathResult[0];
   const labelX = pathResult[1];

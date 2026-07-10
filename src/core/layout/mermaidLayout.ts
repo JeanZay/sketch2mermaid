@@ -10,9 +10,19 @@
  * implementation without touching the rest of the codebase.
  */
 import { Graph, layout } from '@dagrejs/dagre';
-import type { DiagramNode, DiagramEdge, DiagramDirection, ConnectedEdgeEndpoint, DiagramEdgeEndpoint, DiagramGroup } from '../types';
+import type {
+  DiagramNode,
+  DiagramEdge,
+  DiagramDirection,
+  ConnectedEdgeEndpoint,
+  DiagramEdgeEndpoint,
+  DiagramGroup,
+  EdgePoint,
+  ImportedEdgeData,
+} from '../types';
 import { isStructurallyConnectedEdge } from '../types';
 import { NODE_SIZE_DEFAULTS } from '../nodeSizeConfig';
+import { createImportedEdgeData, createImportedEdgeNodeSnapshot } from '../../utils/importedEdgeRouting';
 import {
   USE_MERMAID_LIKE_IMPORTED_LAYOUT,
   MERMAID_LIKE_RANK_SEP,
@@ -77,6 +87,8 @@ export interface LayoutResult {
   handles: Map<string, HandlePair>;
   /** Dagre's computed center coordinates for edge labels, keyed by edge id. */
   edgeLabelPositions?: Map<string, { x: number; y: number }>;
+  /** Shape-clipped Dagre routes for imported edges, keyed by edge id. */
+  edgeRoutes?: Map<string, ImportedEdgeData>;
   /** Top-left positions for groups, keyed by group id. */
   groupPositions?: Map<string, { x: number; y: number }>;
   /** Sizes for groups, keyed by group id. */
@@ -391,6 +403,7 @@ function runTwoPassLayout(
       positions,
       handles: flatResult.handles,
       edgeLabelPositions: flatResult.edgeLabelPositions,
+      edgeRoutes: flatResult.edgeRoutes,
       groupPositions,
       groupSizes
     };
@@ -667,6 +680,8 @@ interface SubgraphLayoutResult {
   groupFrames: Map<string, { x: number; y: number; width: number; height: number }>;
   /** Dagre-computed edge label centers, relative to this graph's origin. */
   edgeLabelCenters: Map<string, { x: number; y: number }>;
+  /** Unclipped Dagre edge routes, relative to this graph's origin. */
+  edgeRoutes: Map<string, EdgePoint[]>;
   /** Total bounding box of this graph's content. */
   width: number;
   height: number;
@@ -943,15 +958,21 @@ function layoutLevel(
   const positions = new Map<string, { x: number; y: number }>();
   const groupFrames = new Map<string, { x: number; y: number; width: number; height: number }>();
   const edgeLabelCenters = new Map<string, { x: number; y: number }>();
+  const edgeRoutes = new Map<string, EdgePoint[]>();
 
-  // Dagre-computed label centers for edges laid out at this level.
+  // Dagre-computed routes and label centers for edges laid out at this level.
   for (const edge of sortedEdges) {
-    if (!edge.label) continue;
     const fromAnchor = anchorOf.get((edge.from as ConnectedEdgeEndpoint).nodeId);
     const toAnchor = anchorOf.get((edge.to as ConnectedEdgeEndpoint).nodeId);
     if (!fromAnchor || !toAnchor) continue;
     const dagreEdge = g.edge(fromAnchor, toAnchor, edge.id);
-    if (dagreEdge && dagreEdge.x !== undefined && dagreEdge.y !== undefined) {
+    if (dagreEdge?.points?.length) {
+      edgeRoutes.set(
+        edge.id,
+        dagreEdge.points.map((point: EdgePoint) => ({ x: point.x - minX, y: point.y - minY })),
+      );
+    }
+    if (edge.label && dagreEdge && dagreEdge.x !== undefined && dagreEdge.y !== undefined) {
       edgeLabelCenters.set(edge.id, { x: dagreEdge.x - minX, y: dagreEdge.y - minY });
     }
   }
@@ -1000,6 +1021,9 @@ function layoutLevel(
     }
     for (const [edgeId, center] of inner.edgeLabelCenters) {
       edgeLabelCenters.set(edgeId, { x: center.x + offsetX, y: center.y + offsetY });
+    }
+    for (const [edgeId, points] of inner.edgeRoutes) {
+      edgeRoutes.set(edgeId, points.map((point) => ({ x: point.x + offsetX, y: point.y + offsetY })));
     }
   }
 
@@ -1086,11 +1110,14 @@ function layoutLevel(
     for (const [id, center] of edgeLabelCenters) {
       edgeLabelCenters.set(id, { x: center.x + shiftX, y: center.y + shiftY });
     }
+    for (const [id, points] of edgeRoutes) {
+      edgeRoutes.set(id, points.map((point) => ({ x: point.x + shiftX, y: point.y + shiftY })));
+    }
     totalMaxX += shiftX;
     totalMaxY += shiftY;
   }
 
-  return { positions, groupFrames, edgeLabelCenters, width: totalMaxX, height: totalMaxY };
+  return { positions, groupFrames, edgeLabelCenters, edgeRoutes, width: totalMaxX, height: totalMaxY };
 }
 
 /**
@@ -1131,6 +1158,7 @@ function layoutWithSubgraphs(
   // Handles + label positions from FINAL geometry.
   const handles = new Map<string, HandlePair>();
   const edgeLabelPositions = new Map<string, { x: number; y: number }>();
+  const edgeRoutes = new Map<string, ImportedEdgeData>();
   const defaultHandles = defaultHandlesForDirection(direction);
 
   const centerOf = (id: string): { x: number; y: number } | undefined => {
@@ -1166,9 +1194,24 @@ function layoutWithSubgraphs(
         edgeLabelPositions.set(edge.id, { x: (sc.x + tc.x) / 2, y: (sc.y + tc.y) / 2 });
       }
     }
+
+    const dagrePoints = root.edgeRoutes.get(edge.id);
+    const sourceNode = nodes.find((node) => node.id === fromId);
+    const targetNode = nodes.find((node) => node.id === toId);
+    const sourcePosition = positions.get(fromId);
+    const targetPosition = positions.get(toId);
+    if (dagrePoints && sourceNode && targetNode && sourcePosition && targetPosition) {
+      const route = createImportedEdgeData(
+        dagrePoints,
+        createImportedEdgeNodeSnapshot(sourceNode, sourcePosition),
+        createImportedEdgeNodeSnapshot(targetNode, targetPosition),
+        root.edgeLabelCenters.get(edge.id),
+      );
+      if (route) edgeRoutes.set(edge.id, route);
+    }
   }
 
-  return { positions, handles, edgeLabelPositions, groupPositions, groupSizes };
+  return { positions, handles, edgeLabelPositions, edgeRoutes, groupPositions, groupSizes };
 }
 
 export function layoutImportedDiagram(
@@ -1180,7 +1223,14 @@ export function layoutImportedDiagram(
 ): LayoutResult {
   const normalizedEdges = normalizeLayoutEdges(edges);
   if (nodes.length === 0) {
-    return { positions: new Map(), handles: new Map(), edgeLabelPositions: new Map(), groupPositions: new Map(), groupSizes: new Map() };
+    return {
+      positions: new Map(),
+      handles: new Map(),
+      edgeLabelPositions: new Map(),
+      edgeRoutes: new Map(),
+      groupPositions: new Map(),
+      groupSizes: new Map(),
+    };
   }
 
   try {
@@ -1315,19 +1365,32 @@ function dagreLayout(
 
   // 7. Extract edge label positions computed by Dagre
   const edgeLabelPositions = new Map<string, { x: number; y: number }>();
+  const edgeRoutes = new Map<string, ImportedEdgeData>();
   for (const edge of sortedEdges) {
-    if (!edge.label) continue;
-    
     // Dagre requires querying the edge using the exact from/to direction
     // that was passed to g.setEdge. We used 'directed' behavior.
     const from = (edge.from as ConnectedEdgeEndpoint).nodeId;
     const to = (edge.to as ConnectedEdgeEndpoint).nodeId;
     
     const dagreEdge = g.edge(from, to, edge.id);
-    if (dagreEdge && dagreEdge.x !== undefined && dagreEdge.y !== undefined) {
+    if (edge.label && dagreEdge && dagreEdge.x !== undefined && dagreEdge.y !== undefined) {
       edgeLabelPositions.set(edge.id, { x: dagreEdge.x, y: dagreEdge.y });
+    }
+
+    const sourceNode = nodeById.get(from);
+    const targetNode = nodeById.get(to);
+    const sourcePosition = positions.get(from);
+    const targetPosition = positions.get(to);
+    if (dagreEdge?.points && sourceNode && targetNode && sourcePosition && targetPosition) {
+      const route = createImportedEdgeData(
+        dagreEdge.points,
+        createImportedEdgeNodeSnapshot(sourceNode, sourcePosition),
+        createImportedEdgeNodeSnapshot(targetNode, targetPosition),
+        edgeLabelPositions.get(edge.id),
+      );
+      if (route) edgeRoutes.set(edge.id, route);
     }
   }
 
-  return { positions, handles, edgeLabelPositions };
+  return { positions, handles, edgeLabelPositions, edgeRoutes };
 }

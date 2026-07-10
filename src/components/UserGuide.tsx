@@ -144,7 +144,7 @@ export const UserGuide: React.FC = () => {
               <strong>Import .s2m</strong> : Charge un fichier projet <code>.s2m</code> pour reprendre votre travail.
             </li>
             <li>
-              <strong>Import Mermaid</strong> : Collez du code flowchart Mermaid existant pour le convertir instantanément en diagramme éditable sur le canvas.
+              <strong>Import Mermaid</strong> : Collez du code flowchart Mermaid existant pour le convertir en diagramme éditable avec des liens courbes routés comme dans Mermaid.
             </li>
             <li>
               <strong>Export (panneau de droite)</strong> : Copiez le code Mermaid généré sous format Markdown, HTML ou brut, ou téléchargez l'image SVG générée.

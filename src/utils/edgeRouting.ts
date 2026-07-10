@@ -1,5 +1,6 @@
-import { Position } from '@xyflow/react';
+import { getBezierPath, Position } from '@xyflow/react';
 import { USE_MERMAID_LIKE_EDGE_RENDERING, MERMAID_LIKE_MIN_EDGE_BEND } from '../core/config';
+import { getImportedEdgePath } from './importedEdgeRouting';
 
 interface GetOrthogonalPathParams {
   sourceX: number;
@@ -8,6 +9,10 @@ interface GetOrthogonalPathParams {
   targetY: number;
   sourcePosition?: Position | string;
   targetPosition?: Position | string;
+}
+
+interface GetCanvasEdgePathParams extends GetOrthogonalPathParams {
+  data?: unknown;
 }
 
 interface Point {
@@ -418,4 +423,23 @@ export function getMermaidLikeOrthogonalEdgePath({
   }
 
   return [pathString, labelX, labelY];
+}
+
+/**
+ * Imported Dagre points take precedence over handle coordinates. Missing or
+ * malformed route data deliberately falls back to the existing interactive
+ * React Flow path behavior.
+ */
+export function getCanvasEdgePath({ data, ...params }: GetCanvasEdgePathParams): [string, number, number] {
+  const importedPath = getImportedEdgePath(data);
+  if (importedPath) return importedPath;
+
+  if (USE_MERMAID_LIKE_EDGE_RENDERING) {
+    return getMermaidLikeOrthogonalEdgePath(params);
+  }
+  return getBezierPath({
+    ...params,
+    sourcePosition: normalizePosition(params.sourcePosition),
+    targetPosition: normalizePosition(params.targetPosition),
+  });
 }

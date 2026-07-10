@@ -118,6 +118,20 @@ describe('serializeSketch2MermaidFile', () => {
 
     expect(parsed.viewport).toBeUndefined();
   });
+
+  it('omits runtime imported edge routes without mutating the in-memory diagram', () => {
+    const diagram = makeTestDiagram();
+    diagram.edges[0].data = {
+      points: [{ x: 100, y: 106 }, { x: 100, y: 200 }],
+      curve: 'basis',
+    };
+
+    const parsed = JSON.parse(serializeSketch2MermaidFile(diagram));
+
+    expect(parsed.diagram.edges[0].data).toBeUndefined();
+    expect(diagram.edges[0].data?.points).toHaveLength(2);
+  });
+
 });
 
 // ---------------------------------------------------------------------------

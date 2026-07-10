@@ -2,6 +2,7 @@
 
 - **Mermaid Compatibility Constraint**: Only offer canvas options that are compatible with Mermaid.js rendering.
 - **No Canvas-Only Geometry Transforms**: Do not implement shape rotation, resizing, or free-form drawing features on the canvas. The geometry must map cleanly to nodes and connections in standard Mermaid flowcharts.
+- **Imported Edge Route Contract**: Mermaid-imported edges render from transient `DiagramEdge.data.points` produced by Dagre and clipped to shape boundaries. Keep that data out of `.s2m` and local-storage serialization, and fall back to interactive React Flow routing whenever its captured node bounds are stale.
 
 ## Deployment Workflow
 
@@ -73,7 +74,6 @@ After any significant development, enhancement, or fix, the agent must check if 
   - If the task changed user-visible behavior, verify that `src/core/changelog.ts` and `src/core/appVersion.ts` were updated consistently.
   - If the task did not require a changelog update, state that explicitly in the final report.
   - Current branch, commit hash, and push/deployment status if applicable.
-
 
 
 

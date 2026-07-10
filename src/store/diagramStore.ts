@@ -15,7 +15,8 @@ import type {
   DiagramGroup,
   GroupStyle
 } from '../core/types';
-import { isReservedCanvasId } from '../core/types';
+import { isReservedCanvasId, stripRuntimeEdgeData } from '../core/types';
+import type { ImportedEdgeData } from '../core/types';
 import { NODE_SIZE_DEFAULTS } from '../core/nodeSizeConfig';
 import type { CopiedSelectionSnapshot } from './duplicateHelpers';
 import { buildCopiedSelectionSnapshot, createDuplicatesFromSnapshot } from './duplicateHelpers';
@@ -289,6 +290,7 @@ export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
     style?: string;
     direction?: string;
     textStyle?: TextStyle;
+    data?: ImportedEdgeData;
   }
 
   const edges = Array.isArray(raw.edges)
@@ -409,6 +411,13 @@ export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
           style: normalizeEdgeStyle(edge.style),
           direction: normalizeEdgeDirection(edge.direction),
           textStyle: edge.textStyle,
+          data: edge.data
+            && Array.isArray(edge.data.points)
+            && edge.data.points.length >= 2
+            && edge.data.points.length <= 10_000
+            && edge.data.points.every((point) => Number.isFinite(point?.x) && Number.isFinite(point?.y))
+            ? edge.data
+            : undefined,
         };
       })
     : [];
@@ -428,7 +437,8 @@ export function normalizeDiagram(raw: CanonicalDiagram): CanonicalDiagram {
  * Normalizes both before comparing to handle optional fields with defaults.
  */
 export function areDiagramsEqual(a: CanonicalDiagram, b: CanonicalDiagram): boolean {
-  return JSON.stringify(normalizeDiagram(a)) === JSON.stringify(normalizeDiagram(b));
+  return JSON.stringify(stripRuntimeEdgeData(normalizeDiagram(a)))
+    === JSON.stringify(stripRuntimeEdgeData(normalizeDiagram(b)));
 }
 
 const HISTORY_DEPTH_LIMIT = 50;
@@ -1644,8 +1654,9 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 if (typeof window !== 'undefined') {
   const saveToLocalStorage = debounce((diagram: CanonicalDiagram) => {
     try {
+      const serializableDiagram = stripRuntimeEdgeData(diagram);
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        ...diagram,
+        ...serializableDiagram,
         schemaVersion: 1,
       }));
     } catch (e) {

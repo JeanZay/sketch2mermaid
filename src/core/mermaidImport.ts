@@ -1,8 +1,9 @@
-import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, EdgeDirection, DiagramDirection, NodeStyle, DiagramGroup } from './types';
+import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, EdgeDirection, DiagramDirection, NodeStyle, DiagramGroup, ImportedEdgeCurve } from './types';
 import { NODE_SIZE_DEFAULTS, estimateNodeSize } from './nodeSizeConfig';
 import { findDefinitionByMermaidName, getShapeCapabilities } from './shapeRegistry';
 import { layoutImportedDiagram, selectHandlesDirectionAware } from './layout/mermaidLayout';
 import { DEBUG_MERMAID_IMPORT_LAYOUT, USE_MERMAID_LIKE_IMPORTED_LAYOUT } from './config';
+import { rebaseImportedEdgeData } from '../utils/importedEdgeRouting';
 import mermaid from 'mermaid';
 
 export type MermaidImportWarningType =
@@ -88,6 +89,12 @@ interface ParsedNode {
   style?: NodeStyle;
   line?: number;
   parentGroupId?: string;
+}
+
+function getConfiguredImportedEdgeCurve(code: string): ImportedEdgeCurve {
+  const match = code.match(/["']?curve["']?\s*:\s*["']?(basis|linear|natural|rounded)["']?/i);
+  const curve = match?.[1]?.toLowerCase();
+  return curve === 'linear' || curve === 'natural' || curve === 'rounded' ? curve : 'basis';
 }
 
 interface ParsedEdge {
@@ -262,6 +269,7 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
   }
 
   const warnings: MermaidImportWarning[] = [];
+  const importedEdgeCurve = getConfiguredImportedEdgeCurve(code);
   const lines = code.split(/\r?\n/);
   
   // Track original 1-indexed lines
@@ -765,8 +773,7 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
     }
   }
 
-  // Apply handles per edge (geometric, based on post-layout positions)
-  // and apply Dagre's calculated label position if available.
+  // Apply compatibility handles plus Dagre's canonical routed geometry.
   for (const edge of finalEdges) {
     const handlePair = layoutResult.handles.get(edge.id);
     if (handlePair) {
@@ -781,6 +788,8 @@ export function importMermaidFlowchart(code: string): MermaidImportResult {
         }
       }
     }
+    const route = layoutResult.edgeRoutes?.get(edge.id);
+    if (route) edge.data = { ...route, curve: importedEdgeCurve };
   }
 
   // Deduplicate warnings by: type + line + raw + message
@@ -1138,6 +1147,7 @@ export async function importMermaidFlowchartAsync(code: string): Promise<Mermaid
               edge.targetHandle = handlePair.targetHandle;
               edge.from.handleId = handlePair.sourceHandle;
               edge.to.handleId = handlePair.targetHandle;
+              edge.data = rebaseImportedEdgeData(edge.data, sourceNode, targetNode);
             }
           }
         }

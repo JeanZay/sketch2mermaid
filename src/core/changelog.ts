@@ -20,6 +20,22 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.9.3',
+    date: '2026-07-10',
+    title: 'Mermaid-style Imported Edge Routing',
+    importance: 'normal',
+    items: [
+      {
+        type: 'improvement',
+        text: 'Imported flowcharts now render Dagre-routed curved edges with distinct shape-boundary endpoints for converging connections.',
+      },
+      {
+        type: 'fix',
+        text: 'Imported edge labels now use Dagre label coordinates or the routed path midpoint instead of node-center midpoints.',
+      },
+    ],
+  },
+  {
     version: '0.9.2',
     date: '2026-06-29',
     title: 'Selection and Duplication Offset Fix',

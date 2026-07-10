@@ -25,6 +25,7 @@ import { findNearestHandle, getEdgeEndpointPosition } from '../utils/edgeSnappin
 import { collectSelectionInput } from '../utils/selectionHelpers';
 import GroupNode from './GroupNode';
 import type { DiagramGroup } from '../core/types';
+import { isImportedEdgeRouteCurrent } from '../utils/importedEdgeRouting';
 
 const nodeTypes = {
   customNode: CustomNode,
@@ -254,6 +255,9 @@ function FlowInner() {
         label: edge.label,
         type: 'customEdge',
         selected: isSelected,
+        data: !isSelected && isImportedEdgeRouteCurrent(edge, diagram.nodes)
+          ? { ...edge.data }
+          : undefined,
       };
     });
 
@@ -269,11 +273,12 @@ function FlowInner() {
         label: '',
         type: 'customEdge',
         selected: false,
+        data: undefined,
       });
     }
 
     return list;
-  }, [diagram.edges, selectedEdgeIds, draftStart, draftMousePos]);
+  }, [diagram.edges, diagram.nodes, selectedEdgeIds, draftStart, draftMousePos]);
 
   // Access React Flow's internal node list for keyboard nudging
   const nodes = useNodes();

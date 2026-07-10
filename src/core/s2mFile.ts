@@ -9,8 +9,10 @@ import type {
   DiagramEdgeEndpoint,
 } from './types';
 import { isReservedCanvasId } from './types';
+import { stripRuntimeEdgeData } from './types';
 import { SHAPE_DEFINITIONS } from './shapeRegistry';
 import { normalizeDiagram } from '../store/diagramStore';
+import { APP_VERSION as CURRENT_APP_VERSION } from './appVersion';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -21,7 +23,7 @@ export const S2M_FILE_TYPE = 'sketch2mermaid' as const;
 export const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
 
 /** App version embedded in every exported .s2m file */
-export const APP_VERSION = '0.0.0';
+export const APP_VERSION = CURRENT_APP_VERSION;
 
 export const VALID_NODE_SHAPES: ReadonlySet<NodeShape> = new Set<NodeShape>(
   SHAPE_DEFINITIONS.map((d) => d.nodeShape)
@@ -52,6 +54,7 @@ export function serializeSketch2MermaidFile(
   diagram: CanonicalDiagram,
   viewport?: S2mViewport,
 ): string {
+  const serializableDiagram = stripRuntimeEdgeData(diagram);
   const hasGroups = (diagram.groups && diagram.groups.length > 0) || diagram.nodes.some(n => n.parentGroupId);
   const fileVersion = hasGroups ? 2 : 1;
 
@@ -70,7 +73,7 @@ export function serializeSketch2MermaidFile(
         style: n.style,
         parentGroupId: n.parentGroupId,
       })),
-      edges: diagram.edges,
+      edges: serializableDiagram.edges,
       textBoxes: diagram.textBoxes,
       groups: diagram.groups || [],
     };
@@ -83,7 +86,7 @@ export function serializeSketch2MermaidFile(
         delete copy.parentGroupId;
         return copy;
       }),
-      edges: diagram.edges,
+      edges: serializableDiagram.edges,
       textBoxes: diagram.textBoxes,
       schemaVersion: 1,
     };

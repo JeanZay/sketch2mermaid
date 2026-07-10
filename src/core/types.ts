@@ -66,6 +66,39 @@ export type DiagramEdgeEndpoint =
 export type EdgeConnectionStatus = 'connected' | 'detached';
 export type EdgeExportMode = 'mermaid' | 'canvasOnly';
 
+export interface EdgePoint {
+  x: number;
+  y: number;
+}
+
+export type ImportedEdgeCurve = 'basis' | 'linear' | 'natural' | 'rounded';
+
+/**
+ * Node geometry captured when an imported edge route is laid out. It lets the
+ * canvas reject stale Dagre geometry after a user manually moves or resizes a
+ * node, while keeping normal React Flow editing behavior intact.
+ */
+export interface ImportedEdgeNodeSnapshot {
+  nodeId: string;
+  shape: NodeShape;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Runtime-only rendering data produced by the Mermaid import layout. This is
+ * deliberately omitted from .s2m and local-storage serialization.
+ */
+export interface ImportedEdgeData {
+  points: EdgePoint[];
+  curve?: ImportedEdgeCurve;
+  labelPosition?: EdgePoint;
+  sourceNode?: ImportedEdgeNodeSnapshot;
+  targetNode?: ImportedEdgeNodeSnapshot;
+}
+
 export interface DiagramEdge {
   id: string;
   from: DiagramEdgeEndpoint;
@@ -81,6 +114,9 @@ export interface DiagramEdge {
    * Not exported to Mermaid.
    */
   textStyle?: TextStyle;
+
+  /** Runtime-only Dagre route for Mermaid-imported edges. */
+  data?: ImportedEdgeData;
 
   // Backward compatibility
   sourceHandle?: string | null;
@@ -142,6 +178,18 @@ export interface CanonicalDiagram {
   edges: DiagramEdge[];
   textBoxes: TextBox[];
   groups?: DiagramGroup[];
+}
+
+/** Returns a serialization-safe copy without transient imported edge routes. */
+export function stripRuntimeEdgeData(diagram: CanonicalDiagram): CanonicalDiagram {
+  return {
+    ...diagram,
+    edges: diagram.edges.map((edge) => {
+      const copy = { ...edge };
+      delete copy.data;
+      return copy;
+    }),
+  };
 }
 
 export type MermaidExportFormat = 'markdown' | 'html' | 'raw';
