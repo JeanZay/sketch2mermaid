@@ -476,6 +476,10 @@ export const SHAPE_DEFINITIONS: ShapeDefinition[] = [
     mermaidAliases: [],
     category: 'advanced',
     iconKey: 'collate',
+    capabilities: {
+      supportsLabel: false,
+      sizingMode: 'content',
+    },
   },
   {
     nodeShape: 'comLink',
@@ -484,6 +488,10 @@ export const SHAPE_DEFINITIONS: ShapeDefinition[] = [
     mermaidAliases: [],
     category: 'advanced',
     iconKey: 'comLink',
+    capabilities: {
+      supportsLabel: false,
+      sizingMode: 'content',
+    },
   },
   {
     nodeShape: 'extract',

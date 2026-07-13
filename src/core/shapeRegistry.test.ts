@@ -143,6 +143,16 @@ describe('Centralized Shape Registry', () => {
   });
 
   describe('Shape Capabilities', () => {
+    it.each(['collate', 'comLink'] as const)('should configure %s as label-less and content-sized', (shape) => {
+      const caps = getShapeCapabilities(shape);
+      expect(caps.supportsLabel).toBe(false);
+      expect(caps.sizingMode).toBe('content');
+      expect(caps.fixedSize).toBeUndefined();
+      expect(shapeSupportsLabel(shape)).toBe(false);
+      expect(isFixedSizeShape(shape)).toBe(false);
+      expect(getShapeFixedSize(shape)).toBeUndefined();
+    });
+
     it('should configure junction as label-less and fixed-size 14x14', () => {
       const caps = getShapeCapabilities('junction');
       expect(caps.supportsLabel).toBe(false);

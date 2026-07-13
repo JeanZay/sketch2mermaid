@@ -637,10 +637,12 @@ describe('Mermaid Node Styling tests', () => {
     expect(output).toContain('n3@{ shape: sl-rect, label: "Path: C:\\\\Users\\\\test / home/user" }');
   });
 
-  test('Export behavior for shapes that do not support labels (junction, forkJoin, summary)', () => {
+  test('Export behavior for shapes that do not support labels', () => {
     const junctionShape = findDefinitionByShape('junction')?.mermaidShape || 'f-circ';
     const forkJoinShape = findDefinitionByShape('forkJoin')?.mermaidShape || 'fork';
     const summaryShape = findDefinitionByShape('summary')?.mermaidShape || 'cross-circ';
+    const collateShape = findDefinitionByShape('collate')?.mermaidShape || 'hourglass';
+    const comLinkShape = findDefinitionByShape('comLink')?.mermaidShape || 'bolt';
 
     const diagram: CanonicalDiagram = {
       schemaVersion: 1,
@@ -650,7 +652,9 @@ describe('Mermaid Node Styling tests', () => {
         { id: 'n1', label: 'Legacy label', shape: 'junction', position: { x: 0, y: 0 } },
         { id: 'n2', label: 'Fork label', shape: 'forkJoin', position: { x: 0, y: 100 } },
         { id: 'n3', label: 'Normal node label', shape: 'process', position: { x: 0, y: 200 } },
-        { id: 'n4', label: 'Summary label', shape: 'summary', position: { x: 0, y: 300 } }
+        { id: 'n4', label: 'Summary label', shape: 'summary', position: { x: 0, y: 300 } },
+        { id: 'n5', label: 'Collate label', shape: 'collate', position: { x: 0, y: 400 } },
+        { id: 'n6', label: 'Communication label', shape: 'comLink', position: { x: 0, y: 500 } }
       ],
       edges: [],
       textBoxes: []
@@ -664,6 +668,10 @@ describe('Mermaid Node Styling tests', () => {
     expect(output).toContain('n3["Normal node label"]');
     expect(output).toContain(`n4@{ shape: ${summaryShape} }`);
     expect(output).not.toContain('Summary label');
+    expect(output).toContain(`n5@{ shape: ${collateShape} }`);
+    expect(output).not.toContain('Collate label');
+    expect(output).toContain(`n6@{ shape: ${comLinkShape} }`);
+    expect(output).not.toContain('Communication label');
   });
 
   test('toMermaid completely excludes detached / ghost edges', () => {

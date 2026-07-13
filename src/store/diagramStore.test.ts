@@ -82,6 +82,53 @@ describe('Zustand diagram store tests', () => {
     expect(state.nodes[0].label).toBe('Nouveau Label Modifié');
   });
 
+  test.each(['collate', 'comLink'] as const)('%s nodes reject labels while remaining resizable', (shape) => {
+    const store = useDiagramStore.getState();
+    store.addNode(shape, 0, 0);
+
+    let node = useDiagramStore.getState().diagram.nodes[0];
+    expect(node.label).toBe('');
+    expect(node.width).toBe(120);
+    expect(node.height).toBe(90);
+
+    store.updateNodeLabel(node.id, 'Forbidden label');
+    store.updateNodeSize(node.id, 150, 110);
+
+    node = useDiagramStore.getState().diagram.nodes[0];
+    expect(node.label).toBe('');
+    expect(node.width).toBe(150);
+    expect(node.height).toBe(110);
+  });
+
+  test.each(['collate', 'comLink'] as const)('changing a labeled node to %s clears its label', (shape) => {
+    const store = useDiagramStore.getState();
+    store.addNode('process', 0, 0);
+    store.updateNodeLabel('n1', 'Existing label');
+
+    store.updateNodeShape('n1', shape);
+
+    const node = useDiagramStore.getState().diagram.nodes[0];
+    expect(node.shape).toBe(shape);
+    expect(node.label).toBe('');
+  });
+
+  test('normalizeDiagram removes historical labels from collate and communication-link nodes', () => {
+    const normalized = normalizeDiagram({
+      schemaVersion: 1,
+      diagramType: 'flowchart',
+      direction: 'TD',
+      nodes: [
+        { id: 'n1', label: 'Old collate label', shape: 'collate', position: { x: 0, y: 0 } },
+        { id: 'n2', label: 'Old communication label', shape: 'comLink', position: { x: 200, y: 0 } },
+        { id: 'n3', label: 'Preserved process label', shape: 'process', position: { x: 400, y: 0 } },
+      ],
+      edges: [],
+      textBoxes: [],
+    });
+
+    expect(normalized.nodes.map((node) => node.label)).toEqual(['', '', 'Preserved process label']);
+  });
+
   test('change shape and position of a node', () => {
     const store = useDiagramStore.getState();
     store.addNode('process', 10, 10);

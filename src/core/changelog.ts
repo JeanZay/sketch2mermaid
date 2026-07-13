@@ -20,6 +20,18 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.10.1',
+    date: '2026-07-13',
+    title: 'Label-less Structural Shapes',
+    importance: 'minor',
+    items: [
+      {
+        type: 'fix',
+        text: 'Collate and Communication Link nodes no longer expose, retain, or export labels.',
+      },
+    ],
+  },
+  {
     version: '0.10.0',
     date: '2026-07-13',
     title: 'Mermaid-like Auto-layout',
