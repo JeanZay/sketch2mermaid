@@ -138,6 +138,9 @@ export const UserGuide: React.FC = () => {
           </p>
           <ul className="actions-guide-list">
             <li>
+              <strong>Auto-layout</strong> : Réorganise tout le canvas selon la direction active (<code>TD</code>, <code>LR</code>, <code>BT</code> ou <code>RL</code>). Les annotations textuelles et les flèches détachées restent présentes, suivent l'élément le plus proche et sont décalées en cas de chevauchement. L'action peut être annulée avec <strong>Ctrl+Z</strong>.
+            </li>
+            <li>
               <strong>Export .s2m</strong> : Télécharge un fichier projet <code>.s2m</code> local contenant tout votre diagramme (formes, liens, styles et positions).
             </li>
             <li>

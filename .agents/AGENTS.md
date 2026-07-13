@@ -3,6 +3,7 @@
 - **Mermaid Compatibility Constraint**: Only offer canvas options that are compatible with Mermaid.js rendering.
 - **No Canvas-Only Geometry Transforms**: Do not implement shape rotation, resizing, or free-form drawing features on the canvas. The geometry must map cleanly to nodes and connections in standard Mermaid flowcharts.
 - **Imported Edge Route Contract**: Mermaid-imported edges render from transient `DiagramEdge.data.points` produced by Dagre and clipped to shape boundaries. Keep that data out of `.s2m` and local-storage serialization, and fall back to interactive React Flow routing whenever its captured node bounds are stale.
+- **Auto-Layout Merge Contract**: Auto-layout may replace positions, measured node dimensions, connected handles, group frames, and transient imported routes only. It must preserve canonical IDs, labels, styles, group kinds, duplicate edges, text annotations, detached arrows, and every `canvasOnly` entity; canvas-only elements must be repositioned rather than recreated through a Mermaid round-trip.
 
 ## Deployment Workflow
 

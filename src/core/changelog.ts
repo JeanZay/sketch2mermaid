@@ -20,6 +20,22 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.10.0',
+    date: '2026-07-13',
+    title: 'Mermaid-like Auto-layout',
+    importance: 'normal',
+    items: [
+      {
+        type: 'feature',
+        text: 'Added a one-click Auto-layout action that rearranges the full canvas in the active Mermaid flow direction.',
+      },
+      {
+        type: 'improvement',
+        text: 'Text annotations and detached arrows now follow nearby diagram elements and avoid overlaps during Auto-layout.',
+      },
+    ],
+  },
+  {
     version: '0.9.3',
     date: '2026-07-10',
     title: 'Mermaid-style Imported Edge Routing',

@@ -32,7 +32,8 @@ Unlike generic diagramming tools, Sketch2Mermaid is explicitly constrained to wh
 - **Deterministic Export:** Generates character-by-character accurate Mermaid.js code with proper escaping to avoid parse errors.
 - **Mermaid Import (Beta):** Import standard Mermaid flowchart markup with Dagre-routed, shape-clipped curved edges that preserve converging paths.
 - **Save/Load Projects:** Export and import your visual diagrams natively using the `.s2m` format.
-- **Auto-Layout Native:** Uses standard flowchart directions (`TD`, `LR`, `BT`, `RL`). Canvas positions are pure editor metadata and do not leak into the generated code.
+- **Mermaid-like Auto-layout:** Reorganize the full canvas in `TD`, `LR`, `BT`, or `RL` with Mermaid SVG measurements and a deterministic Dagre fallback. Visual annotations and detached arrows remain on the canvas, follow their nearest diagram element, and are shifted away from collisions.
+- **Canvas-only Geometry:** Canvas positions, free text annotations, and detached arrows remain editor metadata and do not leak into generated Mermaid code.
 - **Zero-Backend Security:** 100% client-side web application. No database, no telemetry, no API keys.
 - **Local Persistence:** Your work is saved directly in your browser's `localStorage`.
 

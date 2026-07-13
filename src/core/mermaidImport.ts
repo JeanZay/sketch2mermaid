@@ -82,6 +82,11 @@ export interface MermaidImportResult {
   diagnostics?: LayoutOracleDiagnostics;
 }
 
+export interface MermaidLayoutRefinementResult {
+  diagram: CanonicalDiagram;
+  diagnostics: LayoutOracleDiagnostics;
+}
+
 interface ParsedNode {
   id: string;
   shape?: NodeShape;
@@ -938,10 +943,18 @@ function publishLayoutDiagnostics(diagnostics: LayoutOracleDiagnostics) {
   console.groupEnd();
 }
 
-export async function importMermaidFlowchartAsync(code: string): Promise<MermaidImportResult> {
-  // 1. Run the synchronous parsing first (which acts as the baseline/fallback)
-  const result = importMermaidFlowchart(code);
-  const { diagram, warnings } = result;
+/**
+ * Refines an already-laid-out canonical diagram with node bounds measured from
+ * Mermaid's rendered SVG. The function never reparses or replaces canonical
+ * entities: only node geometry, connected-edge handles, and transient routes
+ * are updated. When SVG measurement is unavailable, the input Dagre geometry
+ * is returned unchanged with fallback diagnostics.
+ */
+export async function refineMermaidLayoutWithSvg(
+  code: string,
+  diagram: CanonicalDiagram,
+  options: { asyncImportUsed?: boolean } = {},
+): Promise<MermaidLayoutRefinementResult> {
   const dagreBaseline = new Map(
     diagram.nodes.map((node) => [
       node.id,
@@ -956,7 +969,7 @@ export async function importMermaidFlowchartAsync(code: string): Promise<Mermaid
   const proposedPositions = new Map<string, { position: { x: number; y: number }; width: number; height: number; matchedBy: string }>();
 
   const diagnostics: LayoutOracleDiagnostics = {
-    asyncImportUsed: true,
+    asyncImportUsed: options.asyncImportUsed ?? false,
     oracleAttempted: false,
     mermaidRenderSucceeded: false,
     renderSucceeded: false,
@@ -1001,7 +1014,7 @@ export async function importMermaidFlowchartAsync(code: string): Promise<Mermaid
       };
     });
     publishLayoutDiagnostics(diagnostics);
-    return { diagram, warnings, diagnostics };
+    return { diagram, diagnostics };
   };
 
   // 2. Oracle Layout pass (only works in browser context)
@@ -1108,8 +1121,14 @@ export async function importMermaidFlowchartAsync(code: string): Promise<Mermaid
         .filter((el) => !diagram.nodes.some((node) => matchNodeElement(el, node.id, renderId)))
         .map((el) => el.getAttribute('data-id') || el.getAttribute('id') || (el.textContent || '').trim().slice(0, 80));
 
-      // Check if we successfully matched all nodes and got non-zero dimensions
-      if (diagnostics.positionsApplied === diagram.nodes.length && hasValidDimensions) {
+      // Apply the oracle atomically: every canonical node must be matched and
+      // measured. A partial measurement would mix incompatible coordinate
+      // systems and can corrupt group containment or edge routes.
+      if (
+        diagnostics.positionsApplied === diagram.nodes.length
+        && hasValidDimensions
+        && dimensionsExtracted === diagram.nodes.length
+      ) {
         // Apply positions
         for (const node of diagram.nodes) {
           const prop = proposedPositions.get(node.id);
@@ -1172,6 +1191,18 @@ export async function importMermaidFlowchartAsync(code: string): Promise<Mermaid
   }
 
   return finalize();
+}
+
+export async function importMermaidFlowchartAsync(code: string): Promise<MermaidImportResult> {
+  // The synchronous parser remains the authoritative import boundary and the
+  // deterministic Dagre fallback. The shared oracle only refines geometry.
+  const result = importMermaidFlowchart(code);
+  const refined = await refineMermaidLayoutWithSvg(code, result.diagram, { asyncImportUsed: true });
+  return {
+    diagram: refined.diagram,
+    warnings: result.warnings,
+    diagnostics: refined.diagnostics,
+  };
 }
 
 

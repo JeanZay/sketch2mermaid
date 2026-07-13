@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useReactFlow } from '@xyflow/react';
-import { useDiagramStore } from '../store/diagramStore';
+import { areDiagramsEqual, useDiagramStore } from '../store/diagramStore';
 import {
   serializeSketch2MermaidFile,
   parseSketch2MermaidFile,
@@ -12,6 +12,7 @@ import { useToast } from './useToast';
 import { ConfirmModal } from './ConfirmModal';
 import { ImportMermaidModal } from './ImportMermaidModal';
 import type { CanonicalDiagram, DiagramDirection, S2mViewport } from '../core/types';
+import { autoLayoutDiagram } from '../core/layout/autoLayout';
 
 export const TopNavBar = () => {
   const diagram = useDiagramStore((state) => state.diagram);
@@ -33,6 +34,7 @@ export const TopNavBar = () => {
   } | null>(null);
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isAutoLayouting, setIsAutoLayouting] = useState(false);
 
   // Hidden file input ref — only accessed in event handlers (not render)
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -161,6 +163,40 @@ export const TopNavBar = () => {
     fileInputRef.current?.click();
   }, []);
 
+  const hasLayoutableContent = diagram.nodes.length > 0
+    || diagram.edges.length > 0
+    || diagram.textBoxes.length > 0
+    || (diagram.groups?.length ?? 0) > 0;
+
+  const handleAutoLayout = useCallback(async () => {
+    if (isAutoLayouting || !hasLayoutableContent) return;
+    const sourceDiagram = structuredClone(diagram);
+    setIsAutoLayouting(true);
+
+    try {
+      const result = await autoLayoutDiagram(sourceDiagram);
+      const currentDiagram = useDiagramStore.getState().diagram;
+      if (!areDiagramsEqual(currentDiagram, sourceDiagram)) {
+        showToast('Le diagramme a changé pendant le calcul. Auto-layout annulé.', 'warning');
+        return;
+      }
+
+      loadDiagram(result.diagram, { resetHistory: false });
+      requestAnimationFrame(() => fitView({ duration: 200 }));
+
+      if (result.warnings.length > 0) {
+        showToast(result.warnings.join(' '), 'warning');
+      } else {
+        showToast('Auto-layout appliqué.', 'success');
+      }
+    } catch (error) {
+      console.error('Auto-layout failed', error);
+      showToast("Impossible d'appliquer l'auto-layout.", 'error');
+    } finally {
+      setIsAutoLayouting(false);
+    }
+  }, [diagram, fitView, hasLayoutableContent, isAutoLayouting, loadDiagram, showToast]);
+
   const directions: { val: DiagramDirection; label: string }[] = [
     { val: 'TD', label: 'TD' },
     { val: 'LR', label: 'LR' },
@@ -188,6 +224,34 @@ export const TopNavBar = () => {
               </button>
             ))}
           </nav>
+
+          <button
+            type="button"
+            onClick={handleAutoLayout}
+            disabled={!hasLayoutableContent || isAutoLayouting}
+            className={`auto-layout-btn${!hasLayoutableContent || isAutoLayouting ? ' disabled-btn' : ''}`}
+            title="Réorganiser tout le canvas selon la direction active"
+            aria-label="Auto-layout du canvas"
+          >
+            <svg
+              className={isAutoLayouting ? 'auto-layout-icon spinning' : 'auto-layout-icon'}
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="6" height="6" rx="1"></rect>
+              <rect x="15" y="15" width="6" height="6" rx="1"></rect>
+              <path d="M9 6h3a3 3 0 0 1 3 3v6"></path>
+              <path d="m12 12 3 3 3-3"></path>
+            </svg>
+            <span>{isAutoLayouting ? 'Layout…' : 'Auto-layout'}</span>
+          </button>
 
           <div className="header-divider"></div>
 
