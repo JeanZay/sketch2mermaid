@@ -679,9 +679,15 @@ flowchart TD
     test('importMermaidFlowchartAsync overrides positions and dimensions using Mermaid SVG oracle when render succeeds', async () => {
       // Stub mermaid.render
       const originalRender = mermaid.render;
+      const svgRoute = [
+        { x: 150.25, y: 125.5 },
+        { x: 150.25, y: 250.75 },
+        { x: 300.5, y: 370.25 },
+      ];
       mermaid.render = async (id: string) => {
         const mockSvg = `
           <svg id="${id}" viewBox="0 0 800 600" width="800" height="600">
+            <path data-edge="true" data-id="L_A_B_0" data-points="${window.btoa(JSON.stringify(svgRoute))}"></path>
             <g class="node" data-id="A" transform="translate(150, 100)">
               <rect class="label-container" width="100" height="50"></rect>
             </g>
@@ -729,6 +735,9 @@ flowchart TD
         const edge = result.diagram.edges[0];
         expect(edge.sourceHandle).toBe('b-source');
         expect(edge.targetHandle).toBe('t-target');
+        expect(edge.data?.points).toEqual(svgRoute);
+        expect(edge.data?.sourceNode).toMatchObject({ nodeId: 'A', x: 100, y: 75, width: 100, height: 50 });
+        expect(edge.data?.targetNode).toMatchObject({ nodeId: 'B', x: 240, y: 370, width: 120, height: 60 });
 
         // Verify diagnostics object
         expect(result.diagnostics).toBeDefined();
@@ -736,8 +745,57 @@ flowchart TD
         expect(result.diagnostics!.renderSucceeded).toBe(true);
         expect(result.diagnostics!.nodesExtracted).toBe(2);
         expect(result.diagnostics!.positionsApplied).toBe(2);
+        expect(result.diagnostics!.svgEdgeRoutesFound).toBe(1);
+        expect(result.diagnostics!.svgEdgeRoutesApplied).toBe(1);
         expect(result.diagnostics!.fallbackUsed).toBe(false);
         
+      } finally {
+        mermaid.render = originalRender;
+        Element.prototype.getBoundingClientRect = originalGetClientRect;
+      }
+    });
+
+    test('maps parallel SVG routes with underscored node ids using Mermaid edge counters', async () => {
+      const originalRender = mermaid.render;
+      const firstRoute = [{ x: 130, y: 110 }, { x: 120, y: 200 }, { x: 150, y: 290 }];
+      const secondRoute = [{ x: 170, y: 110 }, { x: 180, y: 200 }, { x: 150, y: 290 }];
+      mermaid.render = async (id: string) => ({
+        svg: `
+          <svg id="${id}" viewBox="0 0 400 400" width="400" height="400">
+            <path data-edge="true" data-id="L_A_node_B_node_0" data-points="${window.btoa(JSON.stringify(firstRoute))}"></path>
+            <path data-edge="true" data-id="L_A_node_B_node_2" data-points="${window.btoa(JSON.stringify(secondRoute))}"></path>
+            <g class="node" data-id="A_node"></g>
+            <g class="node" data-id="B_node"></g>
+          </svg>
+        `,
+        bindFunctions: () => {},
+      }) as unknown as { svg: string; bindFunctions: () => void };
+
+      const originalGetClientRect = Element.prototype.getBoundingClientRect;
+      Element.prototype.getBoundingClientRect = function() {
+        const dataId = this.getAttribute('data-id');
+        if (this.tagName.toLowerCase() === 'svg') {
+          return { left: 0, top: 0, right: 400, bottom: 400, width: 400, height: 400 } as DOMRect;
+        }
+        if (dataId === 'A_node') {
+          return { left: 100, top: 50, right: 200, bottom: 110, width: 100, height: 60 } as DOMRect;
+        }
+        if (dataId === 'B_node') {
+          return { left: 100, top: 290, right: 200, bottom: 350, width: 100, height: 60 } as DOMRect;
+        }
+        return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 } as DOMRect;
+      };
+
+      try {
+        const result = await importMermaidFlowchartAsync(`flowchart TD
+          A_node --> B_node
+          A_node -->|alternate| B_node`);
+
+        expect(result.diagram.edges).toHaveLength(2);
+        expect(result.diagram.edges[0].data?.points).toEqual(firstRoute);
+        expect(result.diagram.edges[1].data?.points).toEqual(secondRoute);
+        expect(result.diagnostics?.svgEdgeRoutesFound).toBe(2);
+        expect(result.diagnostics?.svgEdgeRoutesApplied).toBe(2);
       } finally {
         mermaid.render = originalRender;
         Element.prototype.getBoundingClientRect = originalGetClientRect;
@@ -749,6 +807,7 @@ flowchart TD
       mermaid.render = async (id: string) => {
         const mockSvg = `
           <svg id="${id}" viewBox="0 0 1600 1200" width="800" height="600">
+            <path data-edge="true" data-id="L_A_B_0" data-points="not-valid-base64"></path>
             <g class="node" data-id="A" transform="translate(300, 140)">
               <rect class="label-container" width="200" height="80"></rect>
             </g>
@@ -792,6 +851,9 @@ flowchart TD
         expect(result.diagnostics?.cssToViewBoxScale).toEqual({ x: 2, y: 2 });
         expect(result.diagnostics?.oraclePositionsApplied).toBe(2);
         expect(result.diagnostics?.oracleDimensionsApplied).toBe(2);
+        expect(result.diagnostics?.svgEdgeRoutesFound).toBe(1);
+        expect(result.diagnostics?.svgEdgeRoutesApplied).toBe(0);
+        expect(result.diagram.edges[0].data?.points.length).toBeGreaterThanOrEqual(2);
         expect(result.diagnostics?.nodeComparisons?.map((row) => row.matchedBy)).toEqual([
           'data-id',
           'data-id',

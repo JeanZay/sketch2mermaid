@@ -6,6 +6,7 @@ import { autoLayoutDiagram } from './autoLayout';
 
 const originalRender = mermaid.render;
 const originalGetBoundingClientRect = Element.prototype.getBoundingClientRect;
+const ORACLE_ROUTE = [{ x: 160, y: 120 }, { x: 220, y: 210 }, { x: 320, y: 300 }];
 
 afterEach(() => {
   mermaid.render = originalRender;
@@ -64,6 +65,7 @@ function installOracleMock(invalidSecondNode = false): void {
   mermaid.render = async (id: string) => ({
     svg: `
       <svg id="${id}" viewBox="0 0 800 600" width="800" height="600">
+        <path data-edge="true" data-id="L_A_B_0" data-points="${window.btoa(JSON.stringify(ORACLE_ROUTE))}"></path>
         <g class="node" data-id="A"></g>
         <g class="node" data-id="B"></g>
       </svg>
@@ -101,7 +103,9 @@ describe('auto-layout Mermaid SVG refinement', () => {
     expect(result.diagram.nodes[0].style).toEqual({ borderColor: '#123456' });
     expect(result.diagram.nodes[1].shape).toBe('comment');
     expect(result.diagram.edges[0].id).toBe('original-edge-id');
-    expect(result.diagram.edges[0].data?.points.length).toBeGreaterThanOrEqual(2);
+    expect(result.diagram.edges[0].data?.points).toEqual(ORACLE_ROUTE);
+    expect(result.diagnostics?.svgEdgeRoutesFound).toBe(1);
+    expect(result.diagnostics?.svgEdgeRoutesApplied).toBe(1);
   });
 
   it('rebuilds subgraph bounds around oracle-refined children', async () => {

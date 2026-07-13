@@ -20,6 +20,18 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.10.2',
+    date: '2026-07-13',
+    title: 'Mermaid Edge Curve Fidelity',
+    importance: 'minor',
+    items: [
+      {
+        type: 'fix',
+        text: 'Imported and auto-laid-out edges now reuse Mermaid SVG routing points so their curve direction matches the rendered preview.',
+      },
+    ],
+  },
+  {
     version: '0.10.1',
     date: '2026-07-13',
     title: 'Label-less Structural Shapes',

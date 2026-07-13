@@ -1,9 +1,10 @@
-import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, EdgeDirection, DiagramDirection, NodeStyle, DiagramGroup, ImportedEdgeCurve } from './types';
+import { isExportableEdge } from './types';
+import type { CanonicalDiagram, DiagramNode, DiagramEdge, NodeShape, EdgeStyle, EdgeDirection, DiagramDirection, NodeStyle, DiagramGroup, EdgePoint, ImportedEdgeCurve } from './types';
 import { NODE_SIZE_DEFAULTS, estimateNodeSize } from './nodeSizeConfig';
 import { findDefinitionByMermaidName, getShapeCapabilities } from './shapeRegistry';
 import { layoutImportedDiagram, selectHandlesDirectionAware } from './layout/mermaidLayout';
 import { DEBUG_MERMAID_IMPORT_LAYOUT, USE_MERMAID_LIKE_IMPORTED_LAYOUT } from './config';
-import { rebaseImportedEdgeData } from '../utils/importedEdgeRouting';
+import { createCapturedImportedEdgeData, rebaseImportedEdgeData } from '../utils/importedEdgeRouting';
 import mermaid from 'mermaid';
 
 export type MermaidImportWarningType =
@@ -40,6 +41,8 @@ export interface LayoutOracleDiagnostics {
   oracleDimensionsExtracted?: number;
   oraclePositionsApplied?: number;
   oracleDimensionsApplied?: number;
+  svgEdgeRoutesFound?: number;
+  svgEdgeRoutesApplied?: number;
   nodesExtracted: number;
   positionsApplied: number;
   finalNodeCount?: number;
@@ -111,6 +114,68 @@ interface ParsedEdge {
   unsupported: boolean;
   rawOperator: string;
   line?: number;
+}
+
+function decodeMermaidEdgePoints(encoded: string | null): EdgePoint[] | undefined {
+  if (!encoded) return undefined;
+  try {
+    const parsed = JSON.parse(window.atob(encoded)) as unknown;
+    if (
+      !Array.isArray(parsed)
+      || parsed.length < 2
+      || parsed.length > 10_000
+      || !parsed.every((point) => (
+        point
+        && typeof point === 'object'
+        && Number.isFinite((point as Partial<EdgePoint>).x)
+        && Number.isFinite((point as Partial<EdgePoint>).y)
+      ))
+    ) {
+      return undefined;
+    }
+    return parsed.map((point) => {
+      const edgePoint = point as EdgePoint;
+      return { x: edgePoint.x, y: edgePoint.y };
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+function extractMermaidSvgEdgeRoutes(
+  svgElement: SVGSVGElement,
+  edges: readonly DiagramEdge[],
+): { found: number; routes: Map<string, EdgePoint[]> } {
+  const routeElements = Array.from(
+    svgElement.querySelectorAll<SVGPathElement>('path[data-edge="true"][data-id][data-points]'),
+  );
+  const routeElementByMermaidId = new Map<string, SVGPathElement>();
+  for (const routeElement of routeElements) {
+    const mermaidId = routeElement.getAttribute('data-id');
+    if (mermaidId && !routeElementByMermaidId.has(mermaidId)) {
+      routeElementByMermaidId.set(mermaidId, routeElement);
+    }
+  }
+
+  const pairCounts = new Map<string, number>();
+  const routes = new Map<string, EdgePoint[]>();
+  for (const edge of edges) {
+    if (!isExportableEdge(edge) || edge.from.kind !== 'connected' || edge.to.kind !== 'connected') continue;
+    const pairKey = `${edge.from.nodeId}\u0000${edge.to.nodeId}`;
+    const precedingPairCount = pairCounts.get(pairKey) ?? 0;
+    pairCounts.set(pairKey, precedingPairCount + 1);
+
+    // Mermaid's getEdgeId starts at 0, then uses existingLinks.length + 1,
+    // producing the intentionally non-contiguous sequence 0, 2, 3, ...
+    const counter = precedingPairCount === 0 ? 0 : precedingPairCount + 1;
+    const mermaidId = `L_${edge.from.nodeId}_${edge.to.nodeId}_${counter}`;
+    const points = decodeMermaidEdgePoints(
+      routeElementByMermaidId.get(mermaidId)?.getAttribute('data-points') ?? null,
+    );
+    if (points) routes.set(edge.id, points);
+  }
+
+  return { found: routeElements.length, routes };
 }
 
 // Helpers for unescaping & sanitization
@@ -982,6 +1047,8 @@ export async function refineMermaidLayoutWithSvg(
     oracleDimensionsExtracted: 0,
     oraclePositionsApplied: 0,
     oracleDimensionsApplied: 0,
+    svgEdgeRoutesFound: 0,
+    svgEdgeRoutesApplied: 0,
     nodesExtracted: 0,
     positionsApplied: 0,
     finalNodeCount: diagram.nodes.length,
@@ -1075,6 +1142,9 @@ export async function refineMermaidLayoutWithSvg(
         y: svgRect.height > 0 ? Math.round((svgViewBox.height / svgRect.height) * 1000) / 1000 : 0,
       };
 
+      const svgEdgeRoutes = extractMermaidSvgEdgeRoutes(svgElement as SVGSVGElement, diagram.edges);
+      diagnostics.svgEdgeRoutesFound = svgEdgeRoutes.found;
+
       // Extract positions and bounding boxes for each node
       const allNodeGroups = Array.from(svgElement.querySelectorAll('.node'));
       diagnostics.nodesExtracted = allNodeGroups.length;
@@ -1166,7 +1236,15 @@ export async function refineMermaidLayoutWithSvg(
               edge.targetHandle = handlePair.targetHandle;
               edge.from.handleId = handlePair.sourceHandle;
               edge.to.handleId = handlePair.targetHandle;
-              edge.data = rebaseImportedEdgeData(edge.data, sourceNode, targetNode);
+              const rebasedData = rebaseImportedEdgeData(edge.data, sourceNode, targetNode);
+              const capturedData = createCapturedImportedEdgeData(
+                svgEdgeRoutes.routes.get(edge.id),
+                sourceNode,
+                targetNode,
+                rebasedData,
+              );
+              edge.data = capturedData ?? rebasedData;
+              if (capturedData) diagnostics.svgEdgeRoutesApplied = (diagnostics.svgEdgeRoutesApplied ?? 0) + 1;
             }
           }
         }

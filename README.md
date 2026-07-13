@@ -30,7 +30,7 @@ Unlike generic diagramming tools, Sketch2Mermaid is explicitly constrained to wh
 - **Flexible Ghost Arrows:** Create free-standing connections on the canvas with draggable endpoints that automatically snap to nearby node handles when released.
 - **Visual Containers (Groups & Swimlanes):** Organize your nodes into logical containers (Subgraphs or BPMN Swimlanes). Customize their labels, background/border colors, and layout direction (vertical TD or horizontal LR) which export natively to Mermaid flowchart groupings.
 - **Deterministic Export:** Generates character-by-character accurate Mermaid.js code with proper escaping to avoid parse errors.
-- **Mermaid Import (Beta):** Import standard Mermaid flowchart markup with Dagre-routed, shape-clipped curved edges that preserve converging paths.
+- **Mermaid Import (Beta):** Import standard Mermaid flowchart markup with Mermaid SVG-routed, shape-clipped curved edges that preserve converging paths, plus a deterministic Dagre fallback.
 - **Save/Load Projects:** Export and import your visual diagrams natively using the `.s2m` format.
 - **Mermaid-like Auto-layout:** Reorganize the full canvas in `TD`, `LR`, `BT`, or `RL` with Mermaid SVG measurements and a deterministic Dagre fallback. Visual annotations and detached arrows remain on the canvas, follow their nearest diagram element, and are shifted away from collisions.
 - **Canvas-only Geometry:** Canvas positions, free text annotations, and detached arrows remain editor metadata and do not leak into generated Mermaid code.

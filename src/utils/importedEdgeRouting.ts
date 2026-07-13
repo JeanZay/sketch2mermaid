@@ -242,6 +242,43 @@ export function createImportedEdgeData(
   };
 }
 
+/**
+ * Creates runtime route data from points already clipped by Mermaid's SVG
+ * renderer. Unlike `createImportedEdgeData`, this deliberately does not
+ * intersect the endpoints again: Mermaid has already used the exact rendered
+ * node shapes, which can be more precise than the local boundary models.
+ */
+export function createCapturedImportedEdgeData(
+  points: readonly EdgePoint[] | undefined,
+  sourceNode: DiagramNode,
+  targetNode: DiagramNode,
+  currentData?: ImportedEdgeData,
+): ImportedEdgeData | undefined {
+  if (
+    !Array.isArray(points)
+    || points.length < 2
+    || points.length > 10_000
+    || !points.every(isFinitePoint)
+  ) {
+    return undefined;
+  }
+
+  const capturedPoints = dedupeConsecutivePoints(points.map((point) => ({ x: point.x, y: point.y })));
+  if (capturedPoints.length < 2) return undefined;
+
+  const curve = currentData?.curve ?? 'basis';
+  const labelPosition = getPathLengthMidpoint(generateImportedEdgePath(capturedPoints, curve));
+
+  return {
+    ...currentData,
+    points: capturedPoints,
+    curve,
+    labelPosition,
+    sourceNode: createImportedEdgeNodeSnapshot(sourceNode),
+    targetNode: createImportedEdgeNodeSnapshot(targetNode),
+  };
+}
+
 export function generateRoundedPath(points: readonly EdgePoint[], radius = 5): string {
   if (points.length < 2) return '';
   let path = '';
